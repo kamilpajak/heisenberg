@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/kamilpajak/heisenberg/internal/analyzer"
+	"github.com/kamilpajak/heisenberg/internal/discovery"
+	"github.com/kamilpajak/heisenberg/internal/github"
 	"github.com/kamilpajak/heisenberg/internal/llm"
 	"github.com/kamilpajak/heisenberg/internal/parser"
 	"github.com/kamilpajak/heisenberg/pkg/models"
@@ -32,12 +34,13 @@ var analyzeCmd = &cobra.Command{
 
 TARGET can be:
   - A local file path: ./report.json
-  - A GitHub repo: owner/repo (coming soon)
+  - A GitHub repo: owner/repo
 
 Examples:
   heisenberg analyze ./playwright-report/results.json
   heisenberg analyze ./report.json --provider openai --model gpt-4o
-  heisenberg analyze ./report.json --format json`,
+  heisenberg analyze ./report.json --format json
+  heisenberg analyze playwright/playwright`,
 	Args: cobra.ExactArgs(1),
 	RunE: runAnalyze,
 }
@@ -54,7 +57,7 @@ func runAnalyze(cmd *cobra.Command, args []string) error {
 
 	// Detect target type
 	if githubRepoPattern.MatchString(target) {
-		return fmt.Errorf("GitHub repo analysis not yet implemented: %s", target)
+		return analyzeGitHubRepo(ctx, target)
 	}
 
 	// Local file analysis
@@ -75,6 +78,78 @@ func analyzeLocalFile(ctx context.Context, path string) error {
 		return fmt.Errorf("failed to parse report: %w", err)
 	}
 
+	return runAnalysis(ctx, report)
+}
+
+func analyzeGitHubRepo(ctx context.Context, repo string) error {
+	parts := strings.Split(repo, "/")
+	if len(parts) != 2 {
+		return fmt.Errorf("invalid repo format, expected owner/repo: %s", repo)
+	}
+	owner, repoName := parts[0], parts[1]
+
+	fmt.Fprintf(os.Stderr, "Fetching artifacts from: %s\n", repo)
+
+	// Create GitHub client
+	ghClient := github.NewClient("")
+
+	// Discover artifacts
+	svc := discovery.New(ghClient)
+	result, err := svc.DiscoverRepo(ctx, owner, repoName)
+	if err != nil {
+		return fmt.Errorf("discovery failed: %w", err)
+	}
+
+	if !result.Compatible {
+		return fmt.Errorf("no compatible test artifacts found in %s: %s", repo, result.Error)
+	}
+
+	// Find artifact with failures (prefer) or any artifact
+	var targetArtifact *discovery.ArtifactDiscoveryResult
+	for i := range result.Artifacts {
+		a := &result.Artifacts[i]
+		if a.HasFailures {
+			targetArtifact = a
+			break
+		}
+		if targetArtifact == nil {
+			targetArtifact = a
+		}
+	}
+
+	if targetArtifact == nil {
+		return fmt.Errorf("no artifacts found in %s", repo)
+	}
+
+	fmt.Fprintf(os.Stderr, "Found artifact: %s (run #%d)\n",
+		targetArtifact.ArtifactName, targetArtifact.WorkflowRun.RunNumber)
+
+	// Download and parse the artifact
+	files, err := ghClient.ExtractArtifact(ctx, owner, repoName, targetArtifact.ArtifactID, discovery.ReportPatterns)
+	if err != nil {
+		return fmt.Errorf("failed to download artifact: %w", err)
+	}
+
+	// Find and parse the report file
+	var report *models.Report
+	for _, file := range files {
+		if file.Name == targetArtifact.FileName || strings.HasSuffix(file.Name, ".json") {
+			p := &parser.PlaywrightParser{}
+			report, err = p.ParseBytes(file.Content)
+			if err == nil && report != nil {
+				break
+			}
+		}
+	}
+
+	if report == nil {
+		return fmt.Errorf("failed to parse report from artifact")
+	}
+
+	return runAnalysis(ctx, report)
+}
+
+func runAnalysis(ctx context.Context, report *models.Report) error {
 	// Check for failures
 	if !report.HasFailures() {
 		fmt.Println("No test failures found.")
