@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
 )
 
 // Client handles GitHub API interactions
@@ -27,6 +28,23 @@ func NewClient() *Client {
 	}
 }
 
+// ArtifactType represents the format of a test artifact
+type ArtifactType string
+
+const (
+	ArtifactHTML ArtifactType = "html"
+	ArtifactJSON ArtifactType = "json"
+	ArtifactBlob ArtifactType = "blob"
+)
+
+// ArtifactResult contains fetched artifact data
+type ArtifactResult struct {
+	Type    ArtifactType
+	Content []byte   // Extracted content for html/json
+	Blobs   [][]byte // Raw zips for blob reports (need merging)
+	Name    string
+}
+
 // Artifact represents a GitHub Actions artifact
 type Artifact struct {
 	ID        int64  `json:"id"`
@@ -42,39 +60,100 @@ type WorkflowRun struct {
 	Conclusion string `json:"conclusion"`
 }
 
-// FetchTestArtifact finds and downloads a test artifact from a repo
-func (c *Client) FetchTestArtifact(ctx context.Context, owner, repo string) ([]byte, string, error) {
-	// Get recent failed workflow runs
-	runs, err := c.listWorkflowRuns(ctx, owner, repo)
-	if err != nil {
-		return nil, "", fmt.Errorf("failed to list workflow runs: %w", err)
+// FetchTestArtifact finds and downloads test artifacts from a repo.
+// If runID > 0, fetches from that specific run. Otherwise scans recent runs.
+// Priority: html-report > json > blob-report.
+func (c *Client) FetchTestArtifact(ctx context.Context, owner, repo string, runID int64) (*ArtifactResult, error) {
+	if runID > 0 {
+		return c.fetchFromRun(ctx, owner, repo, runID)
 	}
 
-	// Find a run with artifacts (prefer failed runs)
+	runs, err := c.listWorkflowRuns(ctx, owner, repo)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list workflow runs: %w", err)
+	}
+
 	for _, run := range runs {
 		artifacts, err := c.listArtifacts(ctx, owner, repo, run.ID)
 		if err != nil {
 			continue
 		}
 
-		for _, artifact := range artifacts {
-			if artifact.Expired {
-				continue
-			}
+		result := c.selectAndFetch(ctx, owner, repo, artifacts)
+		if result != nil {
+			return result, nil
+		}
+	}
 
-			// Try to download and extract
-			content, err := c.downloadAndExtract(ctx, owner, repo, artifact.ID)
-			if err != nil {
-				continue
-			}
+	return nil, fmt.Errorf("no test artifacts found")
+}
 
-			if len(content) > 0 {
-				return content, artifact.Name, nil
+func (c *Client) fetchFromRun(ctx context.Context, owner, repo string, runID int64) (*ArtifactResult, error) {
+	artifacts, err := c.listArtifacts(ctx, owner, repo, runID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list artifacts for run %d: %w", runID, err)
+	}
+
+	result := c.selectAndFetch(ctx, owner, repo, artifacts)
+	if result == nil {
+		return nil, fmt.Errorf("no test artifacts found in run %d", runID)
+	}
+	return result, nil
+}
+
+func (c *Client) selectAndFetch(ctx context.Context, owner, repo string, artifacts []Artifact) *ArtifactResult {
+	var htmlArtifacts, jsonArtifacts, blobArtifacts []Artifact
+
+	for _, a := range artifacts {
+		if a.Expired {
+			continue
+		}
+		name := strings.ToLower(a.Name)
+		switch {
+		case strings.Contains(name, "html-report"):
+			htmlArtifacts = append(htmlArtifacts, a)
+		case strings.HasSuffix(name, ".json") || strings.Contains(name, "json"):
+			jsonArtifacts = append(jsonArtifacts, a)
+		case strings.Contains(name, "blob-report"):
+			blobArtifacts = append(blobArtifacts, a)
+		}
+	}
+
+	// Priority 1: HTML report
+	for _, a := range htmlArtifacts {
+		content, err := c.downloadAndExtract(ctx, owner, repo, a.ID)
+		if err == nil && len(content) > 0 {
+			return &ArtifactResult{Type: ArtifactHTML, Content: content, Name: a.Name}
+		}
+	}
+
+	// Priority 2: JSON report
+	for _, a := range jsonArtifacts {
+		content, err := c.downloadAndExtract(ctx, owner, repo, a.ID)
+		if err == nil && len(content) > 0 {
+			return &ArtifactResult{Type: ArtifactJSON, Content: content, Name: a.Name}
+		}
+	}
+
+	// Priority 3: Blob reports (download all shards as raw zips)
+	if len(blobArtifacts) > 0 {
+		var blobs [][]byte
+		for _, a := range blobArtifacts {
+			zipData, err := c.downloadRawZip(ctx, owner, repo, a.ID)
+			if err == nil && len(zipData) > 0 {
+				blobs = append(blobs, zipData)
+			}
+		}
+		if len(blobs) > 0 {
+			return &ArtifactResult{
+				Type:  ArtifactBlob,
+				Blobs: blobs,
+				Name:  fmt.Sprintf("%d blob-report(s)", len(blobs)),
 			}
 		}
 	}
 
-	return nil, "", fmt.Errorf("no test artifacts found")
+	return nil
 }
 
 func (c *Client) listWorkflowRuns(ctx context.Context, owner, repo string) ([]WorkflowRun, error) {
@@ -105,7 +184,7 @@ func (c *Client) listArtifacts(ctx context.Context, owner, repo string, runID in
 	return result.Artifacts, nil
 }
 
-func (c *Client) downloadAndExtract(ctx context.Context, owner, repo string, artifactID int64) ([]byte, error) {
+func (c *Client) downloadRawZip(ctx context.Context, owner, repo string, artifactID int64) ([]byte, error) {
 	url := fmt.Sprintf("%s/repos/%s/%s/actions/artifacts/%d/zip", c.baseURL, owner, repo, artifactID)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
@@ -128,43 +207,61 @@ func (c *Client) downloadAndExtract(ctx context.Context, owner, repo string, art
 		return nil, fmt.Errorf("download failed: %s", resp.Status)
 	}
 
-	zipData, err := io.ReadAll(resp.Body)
+	return io.ReadAll(resp.Body)
+}
+
+func (c *Client) downloadAndExtract(ctx context.Context, owner, repo string, artifactID int64) ([]byte, error) {
+	zipData, err := c.downloadRawZip(ctx, owner, repo, artifactID)
 	if err != nil {
 		return nil, err
 	}
 
-	return c.extractFirstJSON(zipData)
+	return c.extractFirstFile(zipData)
 }
 
-func (c *Client) extractFirstJSON(zipData []byte) ([]byte, error) {
+func (c *Client) extractFirstFile(zipData []byte) ([]byte, error) {
 	reader, err := zip.NewReader(bytes.NewReader(zipData), int64(len(zipData)))
 	if err != nil {
 		return nil, err
 	}
+
+	var fallback []byte
 
 	for _, f := range reader.File {
 		if f.FileInfo().IsDir() {
 			continue
 		}
 
+		name := strings.ToLower(f.Name)
+		isJSON := strings.HasSuffix(name, ".json")
+		isHTML := strings.HasSuffix(name, ".html")
+
 		rc, err := f.Open()
 		if err != nil {
 			continue
 		}
-
 		content, err := io.ReadAll(rc)
 		rc.Close()
-		if err != nil {
+		if err != nil || len(content) == 0 {
 			continue
 		}
 
-		// Return first JSON-like content
-		if len(content) > 0 && (content[0] == '{' || content[0] == '[') {
+		if isHTML {
 			return content, nil
+		}
+		if isJSON {
+			return content, nil
+		}
+		if fallback == nil {
+			fallback = content
 		}
 	}
 
-	return nil, fmt.Errorf("no JSON files found in artifact")
+	if fallback != nil {
+		return fallback, nil
+	}
+
+	return nil, fmt.Errorf("no files found in artifact")
 }
 
 func (c *Client) doRequest(ctx context.Context, url string, result interface{}) error {
