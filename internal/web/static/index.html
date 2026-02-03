@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Heisenberg</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 2rem 1rem;
+    background: #0d1117;
+    color: #c9d1d9;
+    line-height: 1.6;
+  }
+  h1 { color: #58a6ff; margin-bottom: 0.25rem; }
+  h1 span { color: #c9d1d9; font-weight: 300; }
+  .subtitle { color: #8b949e; margin-bottom: 2rem; }
+  form {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 1.5rem;
+  }
+  input {
+    flex: 1;
+    min-width: 200px;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    background: #161b22;
+    color: #c9d1d9;
+    font-size: 0.9rem;
+  }
+  input::placeholder { color: #484f58; }
+  input:focus { outline: none; border-color: #58a6ff; }
+  button {
+    padding: 0.5rem 1.25rem;
+    border: none;
+    border-radius: 6px;
+    background: #238636;
+    color: #fff;
+    font-size: 0.9rem;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  button:hover { background: #2ea043; }
+  button:disabled { background: #21262d; color: #484f58; cursor: not-allowed; }
+  #progress {
+    font-family: "SF Mono", SFMono-Regular, Consolas, monospace;
+    font-size: 0.8rem;
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    padding: 1rem;
+    max-height: 300px;
+    overflow-y: auto;
+    display: none;
+  }
+  #progress .line { padding: 0.1rem 0; }
+  #progress .step { color: #58a6ff; }
+  #progress .tool { color: #d2a8ff; }
+  #progress .info { color: #8b949e; }
+  #progress .error { color: #f85149; }
+  #result {
+    display: none;
+    margin-top: 1.5rem;
+    padding: 1rem;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    background: #161b22;
+  }
+  .badge {
+    display: inline-block;
+    padding: 0.2rem 0.6rem;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+  }
+  .badge.high { background: #238636; color: #fff; }
+  .badge.medium { background: #9e6a03; color: #fff; }
+  .badge.low { background: #da3633; color: #fff; }
+  .badge.neutral { background: #30363d; color: #c9d1d9; }
+  .analysis-text {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    font-size: 0.9rem;
+  }
+  .tip {
+    margin-top: 1rem;
+    padding: 0.75rem;
+    background: #1c1e23;
+    border-left: 3px solid #9e6a03;
+    border-radius: 0 6px 6px 0;
+    font-size: 0.85rem;
+    color: #e3b341;
+  }
+</style>
+</head>
+<body>
+  <h1>Heisenberg</h1>
+  <p class="subtitle">AI-powered test failure analysis</p>
+
+  <form id="form">
+    <input type="text" id="repo" placeholder="owner/repo" required>
+    <input type="text" id="runId" placeholder="run ID (optional)" style="max-width:160px">
+    <button type="submit" id="btn">Analyze</button>
+  </form>
+
+  <div id="progress"></div>
+  <div id="result"></div>
+
+  <script>
+    const form = document.getElementById('form');
+    const repoInput = document.getElementById('repo');
+    const runIdInput = document.getElementById('runId');
+    const btn = document.getElementById('btn');
+    const progress = document.getElementById('progress');
+    const result = document.getElementById('result');
+    let source = null;
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      if (source) { source.close(); source = null; }
+
+      const repo = repoInput.value.trim();
+      if (!repo) return;
+
+      progress.style.display = 'block';
+      progress.innerHTML = '';
+      result.style.display = 'none';
+      result.innerHTML = '';
+      btn.disabled = true;
+      btn.textContent = 'Analyzing...';
+
+      let url = '/api/analyze?repo=' + encodeURIComponent(repo);
+      const runId = runIdInput.value.trim();
+      if (runId) url += '&run_id=' + encodeURIComponent(runId);
+
+      source = new EventSource(url);
+
+      source.onmessage = (e) => {
+        const ev = JSON.parse(e.data);
+
+        if (ev.type === 'done') {
+          source.close();
+          source = null;
+          btn.disabled = false;
+          btn.textContent = 'Analyze';
+          showResult(ev.analysis);
+          return;
+        }
+
+        if (ev.type === 'error') {
+          source.close();
+          source = null;
+          btn.disabled = false;
+          btn.textContent = 'Analyze';
+          addLine('error', ev.message);
+          return;
+        }
+
+        if (ev.type === 'step') {
+          addLine('step', '[' + ev.step + '/' + ev.max + '] ' + ev.message);
+        } else if (ev.type === 'tool') {
+          let msg = '[' + ev.step + '/' + ev.max + '] Tool: ' + ev.tool;
+          if (ev.args) msg += ' ' + ev.args;
+          addLine('tool', msg);
+        } else if (ev.type === 'result') {
+          addLine('tool', '[' + ev.step + '/' + ev.max + ']   result: ' + ev.preview);
+        } else if (ev.type === 'info') {
+          addLine('info', ev.message);
+        }
+      };
+
+      source.onerror = () => {
+        source.close();
+        source = null;
+        btn.disabled = false;
+        btn.textContent = 'Analyze';
+        addLine('error', 'Connection lost');
+      };
+    });
+
+    function addLine(cls, text) {
+      const div = document.createElement('div');
+      div.className = 'line ' + cls;
+      div.textContent = text;
+      progress.appendChild(div);
+      progress.scrollTop = progress.scrollHeight;
+    }
+
+    function showResult(a) {
+      if (!a) return;
+      result.style.display = 'block';
+      let html = '';
+
+      if (a.Category === 'diagnosis') {
+        const level = a.Confidence >= 70 ? 'high' : (a.Confidence >= 40 ? 'medium' : 'low');
+        html += '<span class="badge ' + level + '">Confidence: ' + a.Confidence + '%</span> ';
+        html += '<span class="badge neutral">Sensitivity: ' + a.Sensitivity + '</span>';
+      } else if (a.Category === 'no_failures') {
+        html += '<span class="badge high">No failures</span>';
+      } else if (a.Category === 'not_supported') {
+        html += '<span class="badge neutral">Not supported</span>';
+      }
+
+      html += '<div class="analysis-text">' + escapeHtml(a.Text) + '</div>';
+
+      if (a.Category === 'diagnosis' && a.Confidence < 70 && a.Sensitivity === 'high') {
+        html += '<div class="tip">Additional data sources (backend logs, Docker state) may improve this diagnosis.</div>';
+      }
+
+      result.innerHTML = html;
+    }
+
+    function escapeHtml(s) {
+      const d = document.createElement('div');
+      d.textContent = s;
+      return d.innerHTML;
+    }
+  </script>
+</body>
+</html>

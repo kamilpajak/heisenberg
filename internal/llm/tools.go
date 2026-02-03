@@ -17,6 +17,7 @@ type ToolHandler struct {
 	Repo         string
 	RunID        int64
 	SnapshotHTML func([]byte) ([]byte, error)
+	Emitter      ProgressEmitter
 
 	artifacts      []gh.Artifact // cached after first list
 	calledTraces   bool          // whether get_test_traces has been called
