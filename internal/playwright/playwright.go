@@ -84,15 +84,9 @@ func MergeBlobReports(blobZips [][]byte) (string, error) {
 		return "", fmt.Errorf("failed to create temp dir: %w", err)
 	}
 
-	// Extract each blob zip into the blob dir
+	// Extract all blob zips directly into the blob dir
 	for i, zipData := range blobZips {
-		shardDir := filepath.Join(blobDir, fmt.Sprintf("shard-%d", i))
-		if err := os.MkdirAll(shardDir, 0755); err != nil {
-			os.RemoveAll(blobDir)
-			return "", fmt.Errorf("failed to create shard dir: %w", err)
-		}
-
-		if err := extractZip(zipData, shardDir); err != nil {
+		if err := extractZip(zipData, blobDir); err != nil {
 			os.RemoveAll(blobDir)
 			return "", fmt.Errorf("failed to extract blob %d: %w", i, err)
 		}

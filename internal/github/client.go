@@ -101,6 +101,21 @@ func (c *Client) fetchFromRun(ctx context.Context, owner, repo string, runID int
 	return result, nil
 }
 
+// classifyArtifact returns the artifact type based on its name.
+func classifyArtifact(name string) ArtifactType {
+	n := strings.ToLower(name)
+	switch {
+	case strings.Contains(n, "html-report") || n == "playwright-report":
+		return ArtifactHTML
+	case strings.HasSuffix(n, ".json") || strings.Contains(n, "json"):
+		return ArtifactJSON
+	case strings.Contains(n, "blob-report"):
+		return ArtifactBlob
+	default:
+		return ""
+	}
+}
+
 func (c *Client) selectAndFetch(ctx context.Context, owner, repo string, artifacts []Artifact) *ArtifactResult {
 	var htmlArtifacts, jsonArtifacts, blobArtifacts []Artifact
 
@@ -108,13 +123,12 @@ func (c *Client) selectAndFetch(ctx context.Context, owner, repo string, artifac
 		if a.Expired {
 			continue
 		}
-		name := strings.ToLower(a.Name)
-		switch {
-		case strings.Contains(name, "html-report"):
+		switch classifyArtifact(a.Name) {
+		case ArtifactHTML:
 			htmlArtifacts = append(htmlArtifacts, a)
-		case strings.HasSuffix(name, ".json") || strings.Contains(name, "json"):
+		case ArtifactJSON:
 			jsonArtifacts = append(jsonArtifacts, a)
-		case strings.Contains(name, "blob-report"):
+		case ArtifactBlob:
 			blobArtifacts = append(blobArtifacts, a)
 		}
 	}
