@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	gh "github.com/kamilpajak/heisenberg/internal/github"
+	"github.com/kamilpajak/heisenberg/internal/trace"
 )
 
 // ToolHandler executes tool calls on behalf of the agent loop.
@@ -34,6 +35,8 @@ func (h *ToolHandler) Execute(ctx context.Context, call FunctionCall) (string, b
 		return h.getWorkflowFile(ctx, call.Args)
 	case "get_repo_file":
 		return h.getRepoFile(ctx, call.Args)
+	case "get_test_traces":
+		return h.getTestTraces(ctx, call.Args)
 	case "done":
 		return "", true, nil
 	default:
@@ -167,6 +170,60 @@ func (h *ToolHandler) getRepoFile(ctx context.Context, args map[string]any) (str
 	return content, false, nil
 }
 
+func (h *ToolHandler) getTestTraces(ctx context.Context, args map[string]any) (string, bool, error) {
+	name, _ := args["artifact_name"].(string)
+
+	// Cache artifacts list
+	if h.artifacts == nil {
+		artifacts, err := h.GitHub.ListArtifacts(ctx, h.Owner, h.Repo, h.RunID)
+		if err != nil {
+			return errorResult(err), false, nil
+		}
+		h.artifacts = artifacts
+	}
+
+	// Find matching artifact: exact name or first "test-results*"
+	var artifact *gh.Artifact
+	for i, a := range h.artifacts {
+		if a.Expired {
+			continue
+		}
+		if name != "" && a.Name == name {
+			artifact = &h.artifacts[i]
+			break
+		}
+		if name == "" && strings.Contains(strings.ToLower(a.Name), "test-results") {
+			artifact = &h.artifacts[i]
+			break
+		}
+	}
+	if artifact == nil {
+		if name != "" {
+			return errorResult(fmt.Errorf("artifact %q not found", name)), false, nil
+		}
+		return errorResult(fmt.Errorf("no test-results artifact found")), false, nil
+	}
+
+	zipData, err := h.GitHub.DownloadRawZip(ctx, h.Owner, h.Repo, artifact.ID)
+	if err != nil {
+		return errorResult(err), false, nil
+	}
+
+	traces, err := trace.ParseArtifact(zipData)
+	if err != nil {
+		return errorResult(err), false, nil
+	}
+
+	result := trace.FormatSummary(traces)
+
+	const maxLen = 100000
+	if len(result) > maxLen {
+		result = result[:maxLen] + "\n... (truncated)"
+	}
+
+	return result, false, nil
+}
+
 func errorResult(err error) string {
 	b, _ := json.Marshal(map[string]string{"error": err.Error()})
 	return string(b)
@@ -237,6 +294,16 @@ func ToolDeclarations() []FunctionDeclaration {
 					"path": {Type: "string"},
 				},
 				Required: []string{"path"},
+			},
+		},
+		{
+			Name:        "get_test_traces",
+			Description: "Download a Playwright test-results artifact and extract trace data: browser action sequence, console errors, failed HTTP requests, and error context snapshots. Use this for detailed failure analysis.",
+			Parameters: &Schema{
+				Type: "object",
+				Properties: map[string]Schema{
+					"artifact_name": {Type: "string"},
+				},
 			},
 		},
 		{

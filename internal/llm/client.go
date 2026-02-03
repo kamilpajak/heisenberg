@@ -49,7 +49,8 @@ Strategy:
 2. Use tools to gather more data — fetch artifacts, read logs, inspect config files
 3. Focus on FAILED jobs and their logs
 4. For Playwright test failures, fetch the HTML report artifact first
-5. When you have enough information, call the "done" tool, then provide your analysis
+5. If a test-results artifact exists, use get_test_traces to examine the exact browser action sequence, console errors, and failed HTTP requests from Playwright trace recordings
+6. When you have enough information, call the "done" tool, then provide your analysis
 
 Be thorough but efficient. Don't fetch data you don't need.`}},
 	}
