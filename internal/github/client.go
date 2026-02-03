@@ -95,10 +95,21 @@ func (c *Client) fetchFromRun(ctx context.Context, owner, repo string, runID int
 	}
 
 	result := c.selectAndFetch(ctx, owner, repo, artifacts)
-	if result == nil {
-		return nil, fmt.Errorf("no test artifacts found in run %d", runID)
+	if result != nil {
+		return result, nil
 	}
-	return result, nil
+
+	// Found artifacts but none are Playwright reports
+	var names []string
+	for _, a := range artifacts {
+		if !a.Expired {
+			names = append(names, a.Name)
+		}
+	}
+	if len(names) > 0 {
+		return nil, fmt.Errorf("no Playwright reports found in run %d (found: %s)", runID, strings.Join(names, ", "))
+	}
+	return nil, fmt.Errorf("no artifacts found in run %d", runID)
 }
 
 // classifyArtifact returns the artifact type based on its name.
