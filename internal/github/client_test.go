@@ -30,9 +30,9 @@ func TestClassifyArtifact(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := classifyArtifact(tt.name)
+			got := ClassifyArtifact(tt.name)
 			if got != tt.want {
-				t.Errorf("classifyArtifact(%q) = %q, want %q", tt.name, got, tt.want)
+				t.Errorf("ClassifyArtifact(%q) = %q, want %q", tt.name, got, tt.want)
 			}
 		})
 	}

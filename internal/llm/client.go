@@ -1,0 +1,195 @@
+package llm
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"strings"
+)
+
+const maxIterations = 10
+
+// Client handles Gemini API calls with function calling support.
+type Client struct {
+	apiKey  string
+	baseURL string
+	model   string
+}
+
+// NewClient creates a new LLM client (Google Gemini).
+func NewClient() (*Client, error) {
+	apiKey := os.Getenv("GOOGLE_API_KEY")
+	if apiKey == "" {
+		return nil, fmt.Errorf("GOOGLE_API_KEY environment variable required")
+	}
+
+	return &Client{
+		apiKey:  apiKey,
+		baseURL: "https://generativelanguage.googleapis.com/v1beta",
+		model:   "gemini-2.5-flash",
+	}, nil
+}
+
+// RunAgentLoop runs the agentic conversation loop. The model can call tools
+// iteratively until it produces a text response or hits the iteration limit.
+func (c *Client) RunAgentLoop(ctx context.Context, handler *ToolHandler, initialContext string, verbose bool) (string, error) {
+	tools := []Tool{{FunctionDeclarations: ToolDeclarations()}}
+
+	system := &Content{
+		Parts: []Part{{Text: `You are an expert CI/CD failure analyst. You have access to tools that let you inspect a GitHub Actions workflow run.
+
+Your goal: determine the root cause of test failures and provide actionable guidance.
+
+Strategy:
+1. Review the initial context (run info, jobs, artifacts)
+2. Use tools to gather more data — fetch artifacts, read logs, inspect config files
+3. Focus on FAILED jobs and their logs
+4. For Playwright test failures, fetch the HTML report artifact first
+5. When you have enough information, call the "done" tool, then provide your analysis
+
+Be thorough but efficient. Don't fetch data you don't need.`}},
+	}
+
+	history := []Content{
+		{Role: "user", Parts: []Part{{Text: initialContext}}},
+	}
+
+	for i := range maxIterations {
+		step := i + 1
+		fmt.Fprintf(os.Stderr, "[step %d/%d] Calling model...\n", step, maxIterations)
+
+		resp, err := c.generate(ctx, history, tools, system)
+		if err != nil {
+			return "", fmt.Errorf("step %d: %w", step, err)
+		}
+
+		if len(resp.Candidates) == 0 {
+			return "", fmt.Errorf("step %d: empty response from model", step)
+		}
+
+		modelContent := resp.Candidates[0].Content
+		modelContent.Role = "model"
+		history = append(history, modelContent)
+
+		// Check for function calls
+		var calls []FunctionCall
+		for _, p := range modelContent.Parts {
+			if p.FunctionCall != nil {
+				calls = append(calls, *p.FunctionCall)
+			}
+		}
+
+		if len(calls) == 0 {
+			// No function calls — model returned text, we're done
+			var texts []string
+			for _, p := range modelContent.Parts {
+				if p.Text != "" {
+					texts = append(texts, p.Text)
+				}
+			}
+			if len(texts) == 0 {
+				return "", fmt.Errorf("step %d: model returned neither text nor function calls", step)
+			}
+			return strings.Join(texts, "\n"), nil
+		}
+
+		// Execute each function call
+		var responseParts []Part
+		done := false
+		for _, call := range calls {
+			fmt.Fprintf(os.Stderr, "[step %d/%d] Tool: %s\n", step, maxIterations, call.Name)
+
+			if verbose {
+				if len(call.Args) > 0 {
+					argsJSON, _ := json.Marshal(call.Args)
+					fmt.Fprintf(os.Stderr, "[step %d/%d]   args: %s\n", step, maxIterations, string(argsJSON))
+				}
+			}
+
+			result, isDone, err := handler.Execute(ctx, call)
+			if err != nil {
+				return "", fmt.Errorf("step %d, tool %s: %w", step, call.Name, err)
+			}
+
+			if isDone {
+				done = true
+			}
+
+			if verbose && len(result) > 0 {
+				preview := result
+				if len(preview) > 200 {
+					preview = preview[:200] + "..."
+				}
+				fmt.Fprintf(os.Stderr, "[step %d/%d]   result: %s\n", step, maxIterations, preview)
+			}
+
+			responseParts = append(responseParts, Part{
+				FunctionResponse: &FunctionResponse{
+					Name:     call.Name,
+					Response: map[string]any{"result": result},
+				},
+			})
+		}
+
+		history = append(history, Content{Role: "user", Parts: responseParts})
+
+		if done {
+			// Model called "done" — do one more generate to get the final text
+			fmt.Fprintf(os.Stderr, "[step %d/%d] Model signalled done, generating final analysis...\n", step, maxIterations)
+			continue
+		}
+	}
+
+	return "", fmt.Errorf("agent loop exceeded %d iterations without completing", maxIterations)
+}
+
+func (c *Client) generate(ctx context.Context, history []Content, tools []Tool, system *Content) (*GenerateResponse, error) {
+	req := GenerateRequest{
+		Contents:         history,
+		Tools:            tools,
+		SystemInstruction: system,
+		GenerationConfig: &GenerationConfig{
+			Temperature:     0.1,
+			MaxOutputTokens: 8192,
+		},
+	}
+
+	jsonBody, err := json.Marshal(req)
+	if err != nil {
+		return nil, err
+	}
+
+	url := fmt.Sprintf("%s/models/%s:generateContent?key=%s", c.baseURL, c.model, c.apiKey)
+
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(jsonBody))
+	if err != nil {
+		return nil, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("Gemini API error: %s - %s", resp.Status, string(body))
+	}
+
+	var result GenerateResponse
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	return &result, nil
+}
