@@ -20,6 +20,9 @@ type ToolHandler struct {
 
 	artifacts      []gh.Artifact // cached after first list
 	calledTraces   bool          // whether get_test_traces has been called
+	category       string        // set by done tool
+	confidence     int           // 0-100, set by done tool
+	sensitivity    string        // "high", "medium", "low", set by done tool
 }
 
 // Execute dispatches a function call, returning the result string and whether
@@ -39,6 +42,15 @@ func (h *ToolHandler) Execute(ctx context.Context, call FunctionCall) (string, b
 	case "get_test_traces":
 		return h.getTestTraces(ctx, call.Args)
 	case "done":
+		h.category = stringArgOrDefault(call.Args, "category", CategoryDiagnosis)
+		if h.category != CategoryDiagnosis && h.category != CategoryNoFailures && h.category != CategoryNotSupported {
+			h.category = CategoryDiagnosis
+		}
+		h.confidence = intArgOrDefault(call.Args, "confidence", 50)
+		h.sensitivity = stringArgOrDefault(call.Args, "missing_information_sensitivity", "medium")
+		if h.sensitivity != "high" && h.sensitivity != "medium" && h.sensitivity != "low" {
+			h.sensitivity = "medium"
+		}
 		return "", true, nil
 	default:
 		return fmt.Sprintf("unknown tool: %s", call.Name), false, nil
@@ -240,6 +252,15 @@ func (h *ToolHandler) HasPendingTraces() bool {
 	return false
 }
 
+// DiagnosisCategory returns the outcome category set by the done tool, or "" if done was not called.
+func (h *ToolHandler) DiagnosisCategory() string { return h.category }
+
+// DiagnosisConfidence returns the confidence score (0-100) set by the done tool.
+func (h *ToolHandler) DiagnosisConfidence() int { return h.confidence }
+
+// DiagnosisSensitivity returns the missing information sensitivity set by the done tool.
+func (h *ToolHandler) DiagnosisSensitivity() string { return h.sensitivity }
+
 func errorResult(err error) string {
 	b, _ := json.Marshal(map[string]string{"error": err.Error()})
 	return string(b)
@@ -259,6 +280,37 @@ func intArg(args map[string]any, key string) (int64, error) {
 	default:
 		return 0, fmt.Errorf("%s must be a number, got %T", key, v)
 	}
+}
+
+func intArgOrDefault(args map[string]any, key string, def int) int {
+	v, ok := args[key]
+	if !ok {
+		return def
+	}
+	switch n := v.(type) {
+	case float64:
+		return int(n)
+	case json.Number:
+		i, err := n.Int64()
+		if err != nil {
+			return def
+		}
+		return int(i)
+	default:
+		return def
+	}
+}
+
+func stringArgOrDefault(args map[string]any, key string, def string) string {
+	v, ok := args[key]
+	if !ok {
+		return def
+	}
+	s, ok := v.(string)
+	if !ok {
+		return def
+	}
+	return s
 }
 
 // ToolDeclarations returns the function declarations for all available tools.
@@ -325,6 +377,26 @@ func ToolDeclarations() []FunctionDeclaration {
 		{
 			Name:        "done",
 			Description: "Signal that you have gathered enough information. After calling this, provide your final analysis as text.",
+			Parameters: &Schema{
+				Type: "object",
+				Properties: map[string]Schema{
+					"category": {
+						Type:        "string",
+						Description: "The type of conclusion reached. diagnosis: a specific failure root cause was identified. no_failures: all tests are passing, no failures to diagnose. not_supported: the test framework or artifact format is not supported for analysis.",
+						Enum:        []string{"diagnosis", "no_failures", "not_supported"},
+					},
+					"confidence": {
+						Type:        "number",
+						Description: "Diagnosis confidence score from 0 to 100. Only meaningful when category is 'diagnosis'. 80-100: clear root cause identified with strong evidence. 40-79: likely cause identified but some ambiguity remains. 0-39: uncertain, multiple possible causes or insufficient evidence.",
+					},
+					"missing_information_sensitivity": {
+						Type:        "string",
+						Description: "How much additional data (backend logs, Docker containers, CI environment) would improve the diagnosis. Only meaningful when category is 'diagnosis'. high: additional data would likely reveal the root cause. medium: additional data might help but current evidence is reasonable. low: diagnosis is based on sufficient frontend/test evidence.",
+						Enum:        []string{"high", "medium", "low"},
+					},
+				},
+				Required: []string{"category"},
+			},
 		},
 	}
 }
