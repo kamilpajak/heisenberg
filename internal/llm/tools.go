@@ -47,6 +47,11 @@ func (h *ToolHandler) Execute(ctx context.Context, call FunctionCall) (string, b
 			h.category = CategoryDiagnosis
 		}
 		h.confidence = intArgOrDefault(call.Args, "confidence", 50)
+		if h.confidence < 0 {
+			h.confidence = 0
+		} else if h.confidence > 100 {
+			h.confidence = 100
+		}
 		h.sensitivity = stringArgOrDefault(call.Args, "missing_information_sensitivity", "medium")
 		if h.sensitivity != "high" && h.sensitivity != "medium" && h.sensitivity != "low" {
 			h.sensitivity = "medium"

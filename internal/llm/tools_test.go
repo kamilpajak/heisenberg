@@ -95,7 +95,7 @@ func TestDoneWithNoArgs(t *testing.T) {
 
 func TestDoneWithFloat64Confidence(t *testing.T) {
 	h := &ToolHandler{}
-	_, _, err := h.Execute(context.Background(), FunctionCall{
+	_, isDone, err := h.Execute(context.Background(), FunctionCall{
 		Name: "done",
 		Args: map[string]any{
 			"category":                        "diagnosis",
@@ -106,6 +106,9 @@ func TestDoneWithFloat64Confidence(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	if !isDone {
+		t.Fatal("expected done=true")
+	}
 	if h.DiagnosisConfidence() != 72 {
 		t.Errorf("confidence = %d, want 72", h.DiagnosisConfidence())
 	}
@@ -113,7 +116,7 @@ func TestDoneWithFloat64Confidence(t *testing.T) {
 
 func TestDoneWithInvalidSensitivity(t *testing.T) {
 	h := &ToolHandler{}
-	_, _, err := h.Execute(context.Background(), FunctionCall{
+	_, isDone, err := h.Execute(context.Background(), FunctionCall{
 		Name: "done",
 		Args: map[string]any{
 			"category":                        "diagnosis",
@@ -124,6 +127,9 @@ func TestDoneWithInvalidSensitivity(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	if !isDone {
+		t.Fatal("expected done=true")
+	}
 	if h.DiagnosisSensitivity() != "medium" {
 		t.Errorf("sensitivity = %q, want %q", h.DiagnosisSensitivity(), "medium")
 	}
@@ -131,7 +137,7 @@ func TestDoneWithInvalidSensitivity(t *testing.T) {
 
 func TestDoneWithInvalidCategory(t *testing.T) {
 	h := &ToolHandler{}
-	_, _, err := h.Execute(context.Background(), FunctionCall{
+	_, isDone, err := h.Execute(context.Background(), FunctionCall{
 		Name: "done",
 		Args: map[string]any{
 			"category": "unknown_value",
@@ -140,8 +146,45 @@ func TestDoneWithInvalidCategory(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	if !isDone {
+		t.Fatal("expected done=true")
+	}
 	if h.DiagnosisCategory() != CategoryDiagnosis {
 		t.Errorf("category = %q, want %q (fallback)", h.DiagnosisCategory(), CategoryDiagnosis)
+	}
+}
+
+func TestDoneConfidenceClampedAbove100(t *testing.T) {
+	h := &ToolHandler{}
+	_, _, err := h.Execute(context.Background(), FunctionCall{
+		Name: "done",
+		Args: map[string]any{
+			"category":   "diagnosis",
+			"confidence": float64(150),
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if h.DiagnosisConfidence() != 100 {
+		t.Errorf("confidence = %d, want 100 (clamped)", h.DiagnosisConfidence())
+	}
+}
+
+func TestDoneConfidenceClampedBelowZero(t *testing.T) {
+	h := &ToolHandler{}
+	_, _, err := h.Execute(context.Background(), FunctionCall{
+		Name: "done",
+		Args: map[string]any{
+			"category":   "diagnosis",
+			"confidence": float64(-10),
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if h.DiagnosisConfidence() != 0 {
+		t.Errorf("confidence = %d, want 0 (clamped)", h.DiagnosisConfidence())
 	}
 }
 
