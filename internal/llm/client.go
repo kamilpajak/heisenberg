@@ -36,7 +36,7 @@ func NewClient() (*Client, error) {
 
 // RunAgentLoop runs the agentic conversation loop. The model can call tools
 // iteratively until it produces a text response or hits the iteration limit.
-func (c *Client) RunAgentLoop(ctx context.Context, handler *ToolHandler, initialContext string, verbose bool) (string, error) {
+func (c *Client) RunAgentLoop(ctx context.Context, handler *ToolHandler, initialContext string, verbose bool) (*AnalysisResult, error) {
 	tools := []Tool{{FunctionDeclarations: ToolDeclarations()}}
 
 	system := &Content{
@@ -52,6 +52,22 @@ Strategy:
 5. Use get_test_traces on test-results artifacts to get browser actions, console errors, and failed HTTP requests from Playwright trace recordings
 6. When you have enough information, call the "done" tool, then provide your analysis
 
+When calling the "done" tool, classify your conclusion:
+- category "diagnosis": you identified a specific failure root cause. Include confidence (0-100) and missing_information_sensitivity.
+- category "no_failures": all tests are passing, nothing to diagnose.
+- category "not_supported": the test framework or artifact format cannot be analyzed.
+
+For "diagnosis" category:
+  Confidence scoring (0-100):
+  - 80-100: Clear root cause identified with strong evidence
+  - 40-79: Likely cause identified but some ambiguity remains
+  - 0-39: Uncertain, multiple possible causes or insufficient evidence
+
+  Missing information sensitivity:
+  - high: Backend logs, Docker state, or CI environment data would likely reveal the root cause
+  - medium: Additional data might help but current evidence is reasonable
+  - low: Diagnosis is well-supported by frontend/test evidence alone
+
 Be thorough but efficient. Don't fetch data you don't need.`}},
 	}
 
@@ -65,11 +81,11 @@ Be thorough but efficient. Don't fetch data you don't need.`}},
 
 		resp, err := c.generate(ctx, history, tools, system)
 		if err != nil {
-			return "", fmt.Errorf("step %d: %w", step, err)
+			return nil, fmt.Errorf("step %d: %w", step, err)
 		}
 
 		if len(resp.Candidates) == 0 {
-			return "", fmt.Errorf("step %d: empty response from model", step)
+			return nil, fmt.Errorf("step %d: empty response from model", step)
 		}
 
 		modelContent := resp.Candidates[0].Content
@@ -103,9 +119,14 @@ Be thorough but efficient. Don't fetch data you don't need.`}},
 				}
 			}
 			if len(texts) == 0 {
-				return "", fmt.Errorf("step %d: model returned neither text nor function calls", step)
+				return nil, fmt.Errorf("step %d: model returned neither text nor function calls", step)
 			}
-			return strings.Join(texts, "\n"), nil
+			return &AnalysisResult{
+				Text:        strings.Join(texts, "\n"),
+				Category:    handler.DiagnosisCategory(),
+				Confidence:  handler.DiagnosisConfidence(),
+				Sensitivity: handler.DiagnosisSensitivity(),
+			}, nil
 		}
 
 		// Execute each function call
@@ -123,7 +144,7 @@ Be thorough but efficient. Don't fetch data you don't need.`}},
 
 			result, isDone, err := handler.Execute(ctx, call)
 			if err != nil {
-				return "", fmt.Errorf("step %d, tool %s: %w", step, call.Name, err)
+				return nil, fmt.Errorf("step %d, tool %s: %w", step, call.Name, err)
 			}
 
 			if isDone {
@@ -166,7 +187,7 @@ Be thorough but efficient. Don't fetch data you don't need.`}},
 		}
 	}
 
-	return "", fmt.Errorf("agent loop exceeded %d iterations without completing", maxIterations)
+	return nil, fmt.Errorf("agent loop exceeded %d iterations without completing", maxIterations)
 }
 
 // forceTraces calls get_test_traces programmatically when the model skips it.

@@ -112,8 +112,21 @@ func run(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("analysis failed: %w", err)
 	}
 
-	fmt.Println(result)
+	printResult(result)
 	return nil
+}
+
+func printResult(r *llm.AnalysisResult) {
+	if r.Category == llm.CategoryDiagnosis {
+		fmt.Printf("Confidence: %d%% (sensitivity: %s)\n\n", r.Confidence, r.Sensitivity)
+	}
+
+	fmt.Println(r.Text)
+
+	if r.Category == llm.CategoryDiagnosis && r.Confidence < 70 && r.Sensitivity == "high" {
+		fmt.Println()
+		fmt.Println("Tip: Additional data sources (backend logs, Docker state) may improve this diagnosis.")
+	}
 }
 
 func buildInitialContext(run *gh.WorkflowRun, jobs []gh.Job, artifacts []gh.Artifact) string {

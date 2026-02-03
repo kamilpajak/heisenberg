@@ -57,10 +57,26 @@ type FunctionDeclaration struct {
 
 // Schema describes the JSON schema for function parameters.
 type Schema struct {
-	Type       string            `json:"type"`
-	Properties map[string]Schema `json:"properties,omitempty"`
-	Required   []string          `json:"required,omitempty"`
-	Enum       []string          `json:"enum,omitempty"`
+	Type        string            `json:"type"`
+	Description string            `json:"description,omitempty"`
+	Properties  map[string]Schema `json:"properties,omitempty"`
+	Required    []string          `json:"required,omitempty"`
+	Enum        []string          `json:"enum,omitempty"`
+}
+
+// Outcome categories for the done tool.
+const (
+	CategoryDiagnosis    = "diagnosis"
+	CategoryNoFailures   = "no_failures"
+	CategoryNotSupported = "not_supported"
+)
+
+// AnalysisResult holds the final output from the agent loop.
+type AnalysisResult struct {
+	Text        string
+	Category    string // "diagnosis", "no_failures", "not_supported", or "" (model skipped done)
+	Confidence  int    // 0-100, meaningful only for "diagnosis"
+	Sensitivity string // "high", "medium", "low", meaningful only for "diagnosis"
 }
 
 // GenerationConfig controls response generation.
