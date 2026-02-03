@@ -49,7 +49,7 @@ Strategy:
 2. Use tools to gather more data — fetch artifacts, read logs, inspect config files
 3. Focus on FAILED jobs and their logs
 4. For Playwright test failures, fetch the HTML report artifact first
-5. If a test-results artifact exists, use get_test_traces to examine the exact browser action sequence, console errors, and failed HTTP requests from Playwright trace recordings
+5. Use get_test_traces on test-results artifacts to get browser actions, console errors, and failed HTTP requests from Playwright trace recordings
 6. When you have enough information, call the "done" tool, then provide your analysis
 
 Be thorough but efficient. Don't fetch data you don't need.`}},
@@ -85,7 +85,17 @@ Be thorough but efficient. Don't fetch data you don't need.`}},
 		}
 
 		if len(calls) == 0 {
-			// No function calls — model returned text, we're done
+			// No function calls — model returned text.
+			// But if traces are pending, force a trace fetch before finishing.
+			if handler.HasPendingTraces() {
+				traceResult := c.forceTraces(ctx, handler, step, maxIterations, verbose)
+				history = append(history, Content{
+					Role: "user",
+					Parts: []Part{{Text: "I also fetched the Playwright traces. Incorporate this data into your analysis:\n\n" + traceResult}},
+				})
+				continue
+			}
+
 			var texts []string
 			for _, p := range modelContent.Parts {
 				if p.Text != "" {
@@ -138,6 +148,17 @@ Be thorough but efficient. Don't fetch data you don't need.`}},
 
 		history = append(history, Content{Role: "user", Parts: responseParts})
 
+		// If model called done but traces are pending, inject trace data first.
+		if done && handler.HasPendingTraces() {
+			traceResult := c.forceTraces(ctx, handler, step, maxIterations, verbose)
+			history = append(history, Content{
+				Role: "user",
+				Parts: []Part{{Text: "Before your final analysis, here is Playwright trace data you must incorporate:\n\n" + traceResult}},
+			})
+			// Don't set done — let the model regenerate with trace data.
+			continue
+		}
+
 		if done {
 			// Model called "done" — do one more generate to get the final text
 			fmt.Fprintf(os.Stderr, "[step %d/%d] Model signalled done, generating final analysis...\n", step, maxIterations)
@@ -146,6 +167,23 @@ Be thorough but efficient. Don't fetch data you don't need.`}},
 	}
 
 	return "", fmt.Errorf("agent loop exceeded %d iterations without completing", maxIterations)
+}
+
+// forceTraces calls get_test_traces programmatically when the model skips it.
+func (c *Client) forceTraces(ctx context.Context, handler *ToolHandler, step, maxIter int, verbose bool) string {
+	fmt.Fprintf(os.Stderr, "[step %d/%d] Forcing get_test_traces (model skipped it)\n", step, maxIter)
+	result, _, _ := handler.Execute(ctx, FunctionCall{
+		Name: "get_test_traces",
+		Args: map[string]any{},
+	})
+	if verbose && len(result) > 0 {
+		preview := result
+		if len(preview) > 200 {
+			preview = preview[:200] + "..."
+		}
+		fmt.Fprintf(os.Stderr, "[step %d/%d]   result: %s\n", step, maxIter, preview)
+	}
+	return result
 }
 
 func (c *Client) generate(ctx context.Context, history []Content, tools []Tool, system *Content) (*GenerateResponse, error) {

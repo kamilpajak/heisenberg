@@ -18,7 +18,8 @@ type ToolHandler struct {
 	RunID        int64
 	SnapshotHTML func([]byte) ([]byte, error)
 
-	artifacts []gh.Artifact // cached after first list
+	artifacts      []gh.Artifact // cached after first list
+	calledTraces   bool          // whether get_test_traces has been called
 }
 
 // Execute dispatches a function call, returning the result string and whether
@@ -171,6 +172,7 @@ func (h *ToolHandler) getRepoFile(ctx context.Context, args map[string]any) (str
 }
 
 func (h *ToolHandler) getTestTraces(ctx context.Context, args map[string]any) (string, bool, error) {
+	h.calledTraces = true
 	name, _ := args["artifact_name"].(string)
 
 	// Cache artifacts list
@@ -222,6 +224,20 @@ func (h *ToolHandler) getTestTraces(ctx context.Context, args map[string]any) (s
 	}
 
 	return result, false, nil
+}
+
+// HasPendingTraces reports whether test-results artifacts exist but
+// get_test_traces has not been called yet.
+func (h *ToolHandler) HasPendingTraces() bool {
+	if h.calledTraces {
+		return false
+	}
+	for _, a := range h.artifacts {
+		if !a.Expired && strings.Contains(strings.ToLower(a.Name), "test-results") {
+			return true
+		}
+	}
+	return false
 }
 
 func errorResult(err error) string {
