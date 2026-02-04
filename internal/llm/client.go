@@ -114,7 +114,7 @@ Be thorough but efficient. Don't fetch data you don't need.`}},
 			if handler.HasPendingTraces() {
 				traceResult := c.forceTraces(ctx, handler, step, maxIterations, verbose)
 				history = append(history, Content{
-					Role: "user",
+					Role:  "user",
 					Parts: []Part{{Text: "I also fetched the Playwright traces. Incorporate this data into your analysis:\n\n" + traceResult}},
 				})
 				continue
@@ -185,7 +185,7 @@ Be thorough but efficient. Don't fetch data you don't need.`}},
 		if done && handler.HasPendingTraces() {
 			traceResult := c.forceTraces(ctx, handler, step, maxIterations, verbose)
 			history = append(history, Content{
-				Role: "user",
+				Role:  "user",
 				Parts: []Part{{Text: "Before your final analysis, here is Playwright trace data you must incorporate:\n\n" + traceResult}},
 			})
 			// Don't set done — let the model regenerate with trace data.
@@ -252,8 +252,8 @@ func (c *Client) forceTraces(ctx context.Context, handler *ToolHandler, step, ma
 
 func (c *Client) generate(ctx context.Context, history []Content, tools []Tool, system *Content) (*GenerateResponse, error) {
 	req := GenerateRequest{
-		Contents:         history,
-		Tools:            tools,
+		Contents:          history,
+		Tools:             tools,
 		SystemInstruction: system,
 		GenerationConfig: &GenerationConfig{
 			Temperature:     0.1,
@@ -286,7 +286,7 @@ func (c *Client) generate(ctx context.Context, history []Content, tools []Tool, 
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("Gemini API error: %s - %s", resp.Status, string(body))
+		return nil, fmt.Errorf("gemini API error: %s - %s", resp.Status, string(body))
 	}
 
 	var result GenerateResponse

@@ -19,7 +19,7 @@ func Snapshot(url string) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not start playwright: %w", err)
 	}
-	defer pw.Stop()
+	defer pw.Stop() //nolint:errcheck // best-effort cleanup
 
 	browser, err := pw.Chromium.Launch(playwright.BrowserTypeLaunchOptions{
 		Headless: playwright.Bool(true),
@@ -27,7 +27,7 @@ func Snapshot(url string) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not launch browser: %w", err)
 	}
-	defer browser.Close()
+	defer browser.Close() //nolint:errcheck // best-effort cleanup
 
 	page, err := browser.NewPage()
 	if err != nil {
@@ -40,7 +40,7 @@ func Snapshot(url string) ([]byte, error) {
 		return nil, fmt.Errorf("could not navigate: %w", err)
 	}
 
-	page.WaitForTimeout(1000)
+	page.WaitForTimeout(1000) //nolint:staticcheck // intentional delay for page render in browser automation
 
 	// Try to expand failed test sections (common patterns in test reporters)
 	expandSelectors := []string{
@@ -56,13 +56,13 @@ func Snapshot(url string) ([]byte, error) {
 			if i >= 20 {
 				break
 			}
-			entry.Click(playwright.LocatorClickOptions{
+			entry.Click(playwright.LocatorClickOptions{ //nolint:errcheck // best-effort UI expansion
 				Timeout: playwright.Float(500),
 			})
 		}
 	}
 
-	page.WaitForTimeout(500)
+	page.WaitForTimeout(500) //nolint:staticcheck // intentional delay for click effects in browser automation
 
 	content, err := page.Locator("body").InnerText()
 	if err != nil {
@@ -186,6 +186,6 @@ func IsAvailable() bool {
 	if err != nil {
 		return false
 	}
-	pw.Stop()
+	pw.Stop() //nolint:errcheck // best-effort cleanup
 	return true
 }
