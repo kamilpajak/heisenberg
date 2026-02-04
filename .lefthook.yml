@@ -1,0 +1,15 @@
+pre-commit:
+  parallel: true
+  commands:
+    fmt:
+      run: gofmt -l {staged_files} | grep '\.go$' && exit 1 || true
+      glob: "*.go"
+
+    lint:
+      run: golangci-lint run --timeout=5m
+
+pre-push:
+  parallel: true
+  commands:
+    test:
+      run: go test -race ./...

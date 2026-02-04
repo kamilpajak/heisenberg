@@ -1,0 +1,27 @@
+version: "2"
+
+run:
+  timeout: 5m
+
+linters:
+  enable:
+    - errcheck
+    - govet
+    - staticcheck
+    - ineffassign
+    - unused
+    - misspell
+  settings:
+    errcheck:
+      exclude-functions:
+        - (*os.File).Close
+        - (io.Closer).Close
+        - os.RemoveAll
+        - os.MkdirAll
+        - (net/http.ResponseWriter).Write
+        - (*net/http.Server).Close
+        - (*net/http.Server).Shutdown
+        - (*net/http.Server).Serve
+        - fmt.Fprint
+        - fmt.Fprintf
+        - fmt.Fprintln
