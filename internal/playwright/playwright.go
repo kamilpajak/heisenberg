@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 
+	"github.com/kamilpajak/heisenberg/internal/server"
 	"github.com/playwright-community/playwright-go"
 )
 
@@ -157,6 +158,26 @@ func extractZip(zipData []byte, destDir string) error {
 // Install installs playwright browsers
 func Install() error {
 	return playwright.Install()
+}
+
+// SnapshotHTML serves HTML content locally and captures page text via headless browser.
+func SnapshotHTML(htmlContent []byte) ([]byte, error) {
+	if !IsAvailable() {
+		return nil, fmt.Errorf("playwright not installed. Run: go run github.com/playwright-community/playwright-go/cmd/playwright install chromium")
+	}
+
+	srv, err := server.Start(htmlContent, "index.html")
+	if err != nil {
+		return nil, fmt.Errorf("failed to start server: %w", err)
+	}
+	defer srv.Stop()
+
+	snapshot, err := Snapshot(srv.URL("index.html"))
+	if err != nil {
+		return nil, fmt.Errorf("failed to capture snapshot: %w", err)
+	}
+
+	return snapshot, nil
 }
 
 // IsAvailable checks if playwright browsers are installed

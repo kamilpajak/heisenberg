@@ -12,7 +12,6 @@ import (
 	"github.com/kamilpajak/heisenberg/internal/analysis"
 	"github.com/kamilpajak/heisenberg/internal/llm"
 	"github.com/kamilpajak/heisenberg/internal/playwright"
-	"github.com/kamilpajak/heisenberg/internal/server"
 	"github.com/kamilpajak/heisenberg/internal/web"
 	"github.com/spf13/cobra"
 )
@@ -65,7 +64,7 @@ func run(cmd *cobra.Command, args []string) error {
 		RunID:        runID,
 		Verbose:      verbose,
 		Emitter:      &llm.TextEmitter{W: os.Stderr},
-		SnapshotHTML: snapshotHTML,
+		SnapshotHTML: playwright.SnapshotHTML,
 	})
 	if err != nil {
 		return fmt.Errorf("analysis failed: %w", err)
@@ -112,21 +111,3 @@ func serve(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func snapshotHTML(htmlContent []byte) ([]byte, error) {
-	if !playwright.IsAvailable() {
-		return nil, fmt.Errorf("playwright not installed. Run: go run github.com/playwright-community/playwright-go/cmd/playwright install chromium")
-	}
-
-	srv, err := server.Start(htmlContent, "index.html")
-	if err != nil {
-		return nil, fmt.Errorf("failed to start server: %w", err)
-	}
-	defer srv.Stop()
-
-	snapshot, err := playwright.Snapshot(srv.URL("index.html"))
-	if err != nil {
-		return nil, fmt.Errorf("failed to capture snapshot: %w", err)
-	}
-
-	return snapshot, nil
-}

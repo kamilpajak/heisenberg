@@ -128,12 +128,18 @@ Be thorough but efficient. Don't fetch data you don't need.`}},
 			if len(texts) == 0 {
 				return nil, fmt.Errorf("step %d: model returned neither text nor function calls", step)
 			}
-			return &AnalysisResult{
+			result := &AnalysisResult{
 				Text:        strings.Join(texts, "\n"),
 				Category:    handler.DiagnosisCategory(),
 				Confidence:  handler.DiagnosisConfidence(),
 				Sensitivity: handler.DiagnosisSensitivity(),
-			}, nil
+			}
+			if result.Category == "" {
+				result.Category = CategoryDiagnosis
+				result.Confidence = 50
+				result.Sensitivity = "medium"
+			}
+			return result, nil
 		}
 
 		// Execute each function call

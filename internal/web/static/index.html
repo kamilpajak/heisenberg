@@ -198,19 +198,19 @@
       result.style.display = 'block';
       let html = '';
 
-      if (a.Category === 'diagnosis') {
-        const level = a.Confidence >= 70 ? 'high' : (a.Confidence >= 40 ? 'medium' : 'low');
-        html += '<span class="badge ' + level + '">Confidence: ' + a.Confidence + '%</span> ';
-        html += '<span class="badge neutral">Sensitivity: ' + a.Sensitivity + '</span>';
-      } else if (a.Category === 'no_failures') {
+      if (a.category === 'diagnosis') {
+        const level = a.confidence >= 70 ? 'high' : (a.confidence >= 40 ? 'medium' : 'low');
+        html += '<span class="badge ' + level + '">Confidence: ' + a.confidence + '%</span> ';
+        html += '<span class="badge neutral">Sensitivity: ' + a.sensitivity + '</span>';
+      } else if (a.category === 'no_failures') {
         html += '<span class="badge high">No failures</span>';
-      } else if (a.Category === 'not_supported') {
+      } else if (a.category === 'not_supported') {
         html += '<span class="badge neutral">Not supported</span>';
       }
 
-      html += '<div class="analysis-text">' + escapeHtml(a.Text) + '</div>';
+      html += '<div class="analysis-text">' + escapeHtml(a.text) + '</div>';
 
-      if (a.Category === 'diagnosis' && a.Confidence < 70 && a.Sensitivity === 'high') {
+      if (a.category === 'diagnosis' && a.confidence < 70 && a.sensitivity === 'high') {
         html += '<div class="tip">Additional data sources (backend logs, Docker state) may improve this diagnosis.</div>';
       }
 

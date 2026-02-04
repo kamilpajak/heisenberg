@@ -73,10 +73,10 @@ const (
 
 // AnalysisResult holds the final output from the agent loop.
 type AnalysisResult struct {
-	Text        string
-	Category    string // "diagnosis", "no_failures", "not_supported", or "" (model skipped done)
-	Confidence  int    // 0-100, meaningful only for "diagnosis"
-	Sensitivity string // "high", "medium", "low", meaningful only for "diagnosis"
+	Text        string `json:"text"`
+	Category    string `json:"category"`    // "diagnosis", "no_failures", "not_supported", or "" (model skipped done)
+	Confidence  int    `json:"confidence"`  // 0-100, meaningful only for "diagnosis"
+	Sensitivity string `json:"sensitivity"` // "high", "medium", "low", meaningful only for "diagnosis"
 }
 
 // GenerationConfig controls response generation.

@@ -1,7 +1,6 @@
 package web
 
 import (
-	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -9,7 +8,6 @@ import (
 	"github.com/kamilpajak/heisenberg/internal/analysis"
 	"github.com/kamilpajak/heisenberg/internal/llm"
 	"github.com/kamilpajak/heisenberg/internal/playwright"
-	"github.com/kamilpajak/heisenberg/internal/server"
 )
 
 func (h *Handler) handleAnalyze(w http.ResponseWriter, r *http.Request) {
@@ -52,7 +50,7 @@ func (h *Handler) handleAnalyze(w http.ResponseWriter, r *http.Request) {
 		RunID:        runID,
 		Verbose:      true,
 		Emitter:      emitter,
-		SnapshotHTML: snapshotHTML,
+		SnapshotHTML: playwright.SnapshotHTML,
 	})
 	if err != nil {
 		emitter.Emit(llm.ProgressEvent{Type: "error", Message: err.Error()})
@@ -62,21 +60,3 @@ func (h *Handler) handleAnalyze(w http.ResponseWriter, r *http.Request) {
 	emitter.Emit(llm.ProgressEvent{Type: "done", Analysis: result})
 }
 
-func snapshotHTML(htmlContent []byte) ([]byte, error) {
-	if !playwright.IsAvailable() {
-		return nil, fmt.Errorf("playwright not installed")
-	}
-
-	srv, err := server.Start(htmlContent, "index.html")
-	if err != nil {
-		return nil, fmt.Errorf("failed to start server: %w", err)
-	}
-	defer srv.Stop()
-
-	snapshot, err := playwright.Snapshot(srv.URL("index.html"))
-	if err != nil {
-		return nil, fmt.Errorf("failed to capture snapshot: %w", err)
-	}
-
-	return snapshot, nil
-}
