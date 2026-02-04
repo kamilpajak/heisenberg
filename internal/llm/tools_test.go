@@ -3,6 +3,9 @@ package llm
 import (
 	"context"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestDoneDiagnosis(t *testing.T) {
@@ -15,59 +18,33 @@ func TestDoneDiagnosis(t *testing.T) {
 			"missing_information_sensitivity": "low",
 		},
 	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !isDone {
-		t.Fatal("expected done=true")
-	}
-	if h.DiagnosisCategory() != CategoryDiagnosis {
-		t.Errorf("category = %q, want %q", h.DiagnosisCategory(), CategoryDiagnosis)
-	}
-	if h.DiagnosisConfidence() != 85 {
-		t.Errorf("confidence = %d, want 85", h.DiagnosisConfidence())
-	}
-	if h.DiagnosisSensitivity() != "low" {
-		t.Errorf("sensitivity = %q, want %q", h.DiagnosisSensitivity(), "low")
-	}
+	require.NoError(t, err)
+	require.True(t, isDone)
+	assert.Equal(t, CategoryDiagnosis, h.DiagnosisCategory())
+	assert.Equal(t, 85, h.DiagnosisConfidence())
+	assert.Equal(t, "low", h.DiagnosisSensitivity())
 }
 
 func TestDoneNoFailures(t *testing.T) {
 	h := &ToolHandler{}
 	_, isDone, err := h.Execute(context.Background(), FunctionCall{
 		Name: "done",
-		Args: map[string]any{
-			"category": "no_failures",
-		},
+		Args: map[string]any{"category": "no_failures"},
 	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !isDone {
-		t.Fatal("expected done=true")
-	}
-	if h.DiagnosisCategory() != CategoryNoFailures {
-		t.Errorf("category = %q, want %q", h.DiagnosisCategory(), CategoryNoFailures)
-	}
+	require.NoError(t, err)
+	require.True(t, isDone)
+	assert.Equal(t, CategoryNoFailures, h.DiagnosisCategory())
 }
 
 func TestDoneNotSupported(t *testing.T) {
 	h := &ToolHandler{}
 	_, isDone, err := h.Execute(context.Background(), FunctionCall{
 		Name: "done",
-		Args: map[string]any{
-			"category": "not_supported",
-		},
+		Args: map[string]any{"category": "not_supported"},
 	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !isDone {
-		t.Fatal("expected done=true")
-	}
-	if h.DiagnosisCategory() != CategoryNotSupported {
-		t.Errorf("category = %q, want %q", h.DiagnosisCategory(), CategoryNotSupported)
-	}
+	require.NoError(t, err)
+	require.True(t, isDone)
+	assert.Equal(t, CategoryNotSupported, h.DiagnosisCategory())
 }
 
 func TestDoneWithNoArgs(t *testing.T) {
@@ -76,21 +53,11 @@ func TestDoneWithNoArgs(t *testing.T) {
 		Name: "done",
 		Args: map[string]any{},
 	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !isDone {
-		t.Fatal("expected done=true")
-	}
-	if h.DiagnosisCategory() != CategoryDiagnosis {
-		t.Errorf("category = %q, want %q", h.DiagnosisCategory(), CategoryDiagnosis)
-	}
-	if h.DiagnosisConfidence() != 50 {
-		t.Errorf("confidence = %d, want 50", h.DiagnosisConfidence())
-	}
-	if h.DiagnosisSensitivity() != "medium" {
-		t.Errorf("sensitivity = %q, want %q", h.DiagnosisSensitivity(), "medium")
-	}
+	require.NoError(t, err)
+	require.True(t, isDone)
+	assert.Equal(t, CategoryDiagnosis, h.DiagnosisCategory())
+	assert.Equal(t, 50, h.DiagnosisConfidence())
+	assert.Equal(t, "medium", h.DiagnosisSensitivity())
 }
 
 func TestDoneWithFloat64Confidence(t *testing.T) {
@@ -103,15 +70,9 @@ func TestDoneWithFloat64Confidence(t *testing.T) {
 			"missing_information_sensitivity": "high",
 		},
 	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !isDone {
-		t.Fatal("expected done=true")
-	}
-	if h.DiagnosisConfidence() != 72 {
-		t.Errorf("confidence = %d, want 72", h.DiagnosisConfidence())
-	}
+	require.NoError(t, err)
+	require.True(t, isDone)
+	assert.Equal(t, 72, h.DiagnosisConfidence())
 }
 
 func TestDoneWithInvalidSensitivity(t *testing.T) {
@@ -124,74 +85,43 @@ func TestDoneWithInvalidSensitivity(t *testing.T) {
 			"missing_information_sensitivity": "invalid",
 		},
 	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !isDone {
-		t.Fatal("expected done=true")
-	}
-	if h.DiagnosisSensitivity() != "medium" {
-		t.Errorf("sensitivity = %q, want %q", h.DiagnosisSensitivity(), "medium")
-	}
+	require.NoError(t, err)
+	require.True(t, isDone)
+	assert.Equal(t, "medium", h.DiagnosisSensitivity())
 }
 
 func TestDoneWithInvalidCategory(t *testing.T) {
 	h := &ToolHandler{}
 	_, isDone, err := h.Execute(context.Background(), FunctionCall{
 		Name: "done",
-		Args: map[string]any{
-			"category": "unknown_value",
-		},
+		Args: map[string]any{"category": "unknown_value"},
 	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !isDone {
-		t.Fatal("expected done=true")
-	}
-	if h.DiagnosisCategory() != CategoryDiagnosis {
-		t.Errorf("category = %q, want %q (fallback)", h.DiagnosisCategory(), CategoryDiagnosis)
-	}
+	require.NoError(t, err)
+	require.True(t, isDone)
+	assert.Equal(t, CategoryDiagnosis, h.DiagnosisCategory(), "invalid category should fall back to diagnosis")
 }
 
 func TestDoneConfidenceClampedAbove100(t *testing.T) {
 	h := &ToolHandler{}
 	_, _, err := h.Execute(context.Background(), FunctionCall{
 		Name: "done",
-		Args: map[string]any{
-			"category":   "diagnosis",
-			"confidence": float64(150),
-		},
+		Args: map[string]any{"category": "diagnosis", "confidence": float64(150)},
 	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if h.DiagnosisConfidence() != 100 {
-		t.Errorf("confidence = %d, want 100 (clamped)", h.DiagnosisConfidence())
-	}
+	require.NoError(t, err)
+	assert.Equal(t, 100, h.DiagnosisConfidence())
 }
 
 func TestDoneConfidenceClampedBelowZero(t *testing.T) {
 	h := &ToolHandler{}
 	_, _, err := h.Execute(context.Background(), FunctionCall{
 		Name: "done",
-		Args: map[string]any{
-			"category":   "diagnosis",
-			"confidence": float64(-10),
-		},
+		Args: map[string]any{"category": "diagnosis", "confidence": float64(-10)},
 	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if h.DiagnosisConfidence() != 0 {
-		t.Errorf("confidence = %d, want 0 (clamped)", h.DiagnosisConfidence())
-	}
+	require.NoError(t, err)
+	assert.Equal(t, 0, h.DiagnosisConfidence())
 }
 
 func TestDoneSkippedCategory(t *testing.T) {
 	h := &ToolHandler{}
-	// Simulate model skipping done entirely — category stays ""
-	if h.DiagnosisCategory() != "" {
-		t.Errorf("category = %q, want empty string", h.DiagnosisCategory())
-	}
+	assert.Empty(t, h.DiagnosisCategory())
 }

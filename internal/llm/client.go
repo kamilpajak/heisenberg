@@ -11,6 +11,13 @@ import (
 	"strings"
 )
 
+// emit sends a progress event via the handler's emitter, if set.
+func emit(h *ToolHandler, ev ProgressEvent) {
+	if h != nil && h.Emitter != nil {
+		h.Emitter.Emit(ev)
+	}
+}
+
 const maxIterations = 10
 
 // Client handles Gemini API calls with function calling support.
@@ -77,7 +84,7 @@ Be thorough but efficient. Don't fetch data you don't need.`}},
 
 	for i := range maxIterations {
 		step := i + 1
-		fmt.Fprintf(os.Stderr, "[step %d/%d] Calling model...\n", step, maxIterations)
+		emit(handler, ProgressEvent{Type: "step", Step: step, MaxStep: maxIterations, Message: "Calling model..."})
 
 		resp, err := c.generate(ctx, history, tools, system)
 		if err != nil {
@@ -121,26 +128,30 @@ Be thorough but efficient. Don't fetch data you don't need.`}},
 			if len(texts) == 0 {
 				return nil, fmt.Errorf("step %d: model returned neither text nor function calls", step)
 			}
-			return &AnalysisResult{
+			result := &AnalysisResult{
 				Text:        strings.Join(texts, "\n"),
 				Category:    handler.DiagnosisCategory(),
 				Confidence:  handler.DiagnosisConfidence(),
 				Sensitivity: handler.DiagnosisSensitivity(),
-			}, nil
+			}
+			if result.Category == "" {
+				result.Category = CategoryDiagnosis
+				result.Confidence = 50
+				result.Sensitivity = "medium"
+			}
+			return result, nil
 		}
 
 		// Execute each function call
 		var responseParts []Part
 		done := false
 		for _, call := range calls {
-			fmt.Fprintf(os.Stderr, "[step %d/%d] Tool: %s\n", step, maxIterations, call.Name)
-
-			if verbose {
-				if len(call.Args) > 0 {
-					argsJSON, _ := json.Marshal(call.Args)
-					fmt.Fprintf(os.Stderr, "[step %d/%d]   args: %s\n", step, maxIterations, string(argsJSON))
-				}
+			toolEvent := ProgressEvent{Type: "tool", Step: step, MaxStep: maxIterations, Tool: call.Name}
+			if verbose && len(call.Args) > 0 {
+				argsJSON, _ := json.Marshal(call.Args)
+				toolEvent.Args = string(argsJSON)
 			}
+			emit(handler, toolEvent)
 
 			result, isDone, err := handler.Execute(ctx, call)
 			if err != nil {
@@ -156,7 +167,7 @@ Be thorough but efficient. Don't fetch data you don't need.`}},
 				if len(preview) > 200 {
 					preview = preview[:200] + "..."
 				}
-				fmt.Fprintf(os.Stderr, "[step %d/%d]   result: %s\n", step, maxIterations, preview)
+				emit(handler, ProgressEvent{Type: "result", Step: step, MaxStep: maxIterations, Preview: preview})
 			}
 
 			responseParts = append(responseParts, Part{
@@ -182,7 +193,7 @@ Be thorough but efficient. Don't fetch data you don't need.`}},
 
 		if done {
 			// Model called "done" — do one more generate to get the final text
-			fmt.Fprintf(os.Stderr, "[step %d/%d] Model signalled done, generating final analysis...\n", step, maxIterations)
+			emit(handler, ProgressEvent{Type: "step", Step: step, MaxStep: maxIterations, Message: "Model signalled done, generating final analysis..."})
 			continue
 		}
 	}
@@ -192,7 +203,7 @@ Be thorough but efficient. Don't fetch data you don't need.`}},
 
 // forceTraces calls get_test_traces programmatically when the model skips it.
 func (c *Client) forceTraces(ctx context.Context, handler *ToolHandler, step, maxIter int, verbose bool) string {
-	fmt.Fprintf(os.Stderr, "[step %d/%d] Forcing get_test_traces (model skipped it)\n", step, maxIter)
+	emit(handler, ProgressEvent{Type: "tool", Step: step, MaxStep: maxIter, Tool: "get_test_traces", Message: "Forcing get_test_traces (model skipped it)"})
 	result, _, _ := handler.Execute(ctx, FunctionCall{
 		Name: "get_test_traces",
 		Args: map[string]any{},
@@ -202,7 +213,7 @@ func (c *Client) forceTraces(ctx context.Context, handler *ToolHandler, step, ma
 		if len(preview) > 200 {
 			preview = preview[:200] + "..."
 		}
-		fmt.Fprintf(os.Stderr, "[step %d/%d]   result: %s\n", step, maxIter, preview)
+		emit(handler, ProgressEvent{Type: "result", Step: step, MaxStep: maxIter, Preview: preview})
 	}
 	return result
 }

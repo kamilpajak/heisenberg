@@ -6,92 +6,45 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestParseArtifact(t *testing.T) {
-	// Build a fake artifact ZIP matching the GitHub structure:
-	// test-comment-replies-chromium/trace.zip  (inner ZIP with trace files)
-	// test-comment-replies-chromium/error-context.md
 	innerZip := buildInnerTraceZip(t)
 	artifactZip := buildArtifactZip(t, map[string][]byte{
-		"test-comment-replies-chromium/trace.zip":         innerZip,
-		"test-comment-replies-chromium/error-context.md":  []byte("## Page snapshot\nSign in form visible"),
+		"test-comment-replies-chromium/trace.zip":        innerZip,
+		"test-comment-replies-chromium/error-context.md": []byte("## Page snapshot\nSign in form visible"),
 	})
 
 	traces, err := ParseArtifact(artifactZip)
-	if err != nil {
-		t.Fatalf("ParseArtifact: %v", err)
-	}
-
-	if len(traces) != 1 {
-		t.Fatalf("expected 1 trace, got %d", len(traces))
-	}
+	require.NoError(t, err)
+	require.Len(t, traces, 1)
 
 	tr := traces[0]
+	assert.Equal(t, "test-comment-replies-chromium", tr.TestDir)
+	assert.Contains(t, tr.ErrorContext, "Sign in form visible")
+	require.NotEmpty(t, tr.Actions)
 
-	if tr.TestDir != "test-comment-replies-chromium" {
-		t.Errorf("TestDir = %q, want %q", tr.TestDir, "test-comment-replies-chromium")
-	}
-
-	if !strings.Contains(tr.ErrorContext, "Sign in form visible") {
-		t.Errorf("ErrorContext missing expected content, got: %s", tr.ErrorContext)
-	}
-
-	if len(tr.Actions) == 0 {
-		t.Error("expected actions, got none")
-	}
-
-	// Verify actions are from expected classes
 	for _, a := range tr.Actions {
-		switch a.Class {
-		case "Frame", "Page", "Locator":
-			// ok
-		default:
-			t.Errorf("unexpected action class: %s", a.Class)
-		}
+		assert.Contains(t, []string{"Frame", "Page", "Locator"}, a.Class, "unexpected action class")
 	}
 
-	if len(tr.ConsoleErrors) == 0 {
-		t.Error("expected console errors, got none")
-	}
+	require.NotEmpty(t, tr.ConsoleErrors)
+	assert.True(t, containsAny(tr.ConsoleErrors, "403", "Authorization"), "expected a 403 or Authorization console error")
 
-	foundAuthError := false
-	for _, msg := range tr.ConsoleErrors {
-		if strings.Contains(msg, "403") || strings.Contains(msg, "Authorization") {
-			foundAuthError = true
-			break
-		}
-	}
-	if !foundAuthError {
-		t.Error("expected a 403 or Authorization console error")
-	}
-
-	if len(tr.FailedRequests) == 0 {
-		t.Error("expected failed requests, got none")
-	}
-
-	found403 := false
-	for _, r := range tr.FailedRequests {
-		if r.Status == 403 {
-			found403 = true
-			break
-		}
-	}
-	if !found403 {
-		t.Error("expected a 403 failed request")
-	}
+	require.NotEmpty(t, tr.FailedRequests)
+	assert.True(t, hasStatus(tr.FailedRequests, 403), "expected a 403 failed request")
 }
 
 func TestParseArtifactNoTraces(t *testing.T) {
-	// ZIP with no trace directories
 	artifactZip := buildArtifactZip(t, map[string][]byte{
 		"random-file.txt": []byte("hello"),
 	})
 
 	_, err := ParseArtifact(artifactZip)
-	if err == nil {
-		t.Fatal("expected error for artifact with no traces")
-	}
+	assert.Error(t, err)
 }
 
 func TestFormatSummary(t *testing.T) {
@@ -110,7 +63,7 @@ func TestFormatSummary(t *testing.T) {
 
 	result := FormatSummary(traces)
 
-	checks := []string{
+	for _, expected := range []string{
 		"## Test: test-login-chromium",
 		"### Last Browser Actions",
 		"Frame.goto",
@@ -121,17 +74,12 @@ func TestFormatSummary(t *testing.T) {
 		"GET http://localhost/api/auth → 403",
 		"### Error Context",
 		"Login page snapshot",
-	}
-
-	for _, check := range checks {
-		if !strings.Contains(result, check) {
-			t.Errorf("FormatSummary missing %q", check)
-		}
+	} {
+		assert.Contains(t, result, expected)
 	}
 }
 
 func TestMaxActionsLimit(t *testing.T) {
-	// Build trace with more than maxActions "before" events
 	var lines []string
 	lines = append(lines, `{"type":"context-options","version":8}`)
 	for i := range 20 {
@@ -145,16 +93,31 @@ func TestMaxActionsLimit(t *testing.T) {
 	})
 
 	traces, err := ParseArtifact(artifactZip)
-	if err != nil {
-		t.Fatalf("ParseArtifact: %v", err)
-	}
-
-	if len(traces[0].Actions) != maxActions {
-		t.Errorf("expected %d actions (max), got %d", maxActions, len(traces[0].Actions))
-	}
+	require.NoError(t, err)
+	assert.Len(t, traces[0].Actions, maxActions)
 }
 
 // --- helpers ---
+
+func containsAny(items []string, substrs ...string) bool {
+	for _, item := range items {
+		for _, sub := range substrs {
+			if strings.Contains(item, sub) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func hasStatus(reqs []Request, status int) bool {
+	for _, r := range reqs {
+		if r.Status == status {
+			return true
+		}
+	}
+	return false
+}
 
 func buildArtifactZip(t *testing.T, files map[string][]byte) []byte {
 	t.Helper()
@@ -162,16 +125,11 @@ func buildArtifactZip(t *testing.T, files map[string][]byte) []byte {
 	w := zip.NewWriter(&buf)
 	for name, data := range files {
 		fw, err := w.Create(name)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err := fw.Write(data); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
+		_, err = fw.Write(data)
+		require.NoError(t, err)
 	}
-	if err := w.Close(); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, w.Close())
 	return buf.Bytes()
 }
 
@@ -219,16 +177,10 @@ func buildInnerTraceZipFromLines(t *testing.T, traceContent, networkContent stri
 	w := zip.NewWriter(&buf)
 	for name, data := range files {
 		fw, err := w.Create(name)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err := fw.Write(data); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
+		_, err = fw.Write(data)
+		require.NoError(t, err)
 	}
-	if err := w.Close(); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, w.Close())
 	return buf.Bytes()
 }
-
