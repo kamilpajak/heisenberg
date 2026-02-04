@@ -12,7 +12,6 @@ test:
 	go test -race -v ./...
 
 lint:
-	go vet ./...
 	golangci-lint run --timeout=5m
 
 setup:
