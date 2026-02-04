@@ -88,7 +88,7 @@ func printResult(r *llm.AnalysisResult) {
 }
 
 func serve(cmd *cobra.Command, args []string) error {
-	addr := fmt.Sprintf(":%d", port)
+	addr := fmt.Sprintf("127.0.0.1:%d", port)
 	srv := &http.Server{
 		Addr:    addr,
 		Handler: web.NewHandler(),

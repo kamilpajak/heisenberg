@@ -82,6 +82,7 @@ Be thorough but efficient. Don't fetch data you don't need.`}},
 		{Role: "user", Parts: []Part{{Text: initialContext}}},
 	}
 
+	pendingDone := false
 	for i := range maxIterations {
 		step := i + 1
 		emit(handler, ProgressEvent{Type: "step", Step: step, MaxStep: maxIterations, Message: "Calling model..."})
@@ -193,8 +194,39 @@ Be thorough but efficient. Don't fetch data you don't need.`}},
 
 		if done {
 			// Model called "done" — do one more generate to get the final text
+			pendingDone = true
 			emit(handler, ProgressEvent{Type: "step", Step: step, MaxStep: maxIterations, Message: "Model signalled done, generating final analysis..."})
 			continue
+		}
+	}
+
+	if pendingDone {
+		// done was signalled on the last iteration — one final generate to get the text
+		resp, err := c.generate(ctx, history, tools, system)
+		if err != nil {
+			return nil, fmt.Errorf("final step: %w", err)
+		}
+		if len(resp.Candidates) > 0 {
+			var texts []string
+			for _, p := range resp.Candidates[0].Content.Parts {
+				if p.Text != "" {
+					texts = append(texts, p.Text)
+				}
+			}
+			if len(texts) > 0 {
+				result := &AnalysisResult{
+					Text:        strings.Join(texts, "\n"),
+					Category:    handler.DiagnosisCategory(),
+					Confidence:  handler.DiagnosisConfidence(),
+					Sensitivity: handler.DiagnosisSensitivity(),
+				}
+				if result.Category == "" {
+					result.Category = CategoryDiagnosis
+					result.Confidence = 50
+					result.Sensitivity = "medium"
+				}
+				return result, nil
+			}
 		}
 	}
 
