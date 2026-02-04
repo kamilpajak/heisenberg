@@ -24,8 +24,14 @@ func NewSSEEmitter(w http.ResponseWriter) *SSEEmitter {
 	return &SSEEmitter{w: w, flusher: f}
 }
 
+const ssePreviewLimit = 500
+
 // Emit writes a progress event as an SSE data line and flushes.
+// Large Preview payloads are truncated to keep SSE lines within reasonable bounds.
 func (e *SSEEmitter) Emit(ev llm.ProgressEvent) {
+	if len(ev.Preview) > ssePreviewLimit {
+		ev.Preview = ev.Preview[:ssePreviewLimit] + "..."
+	}
 	data, err := json.Marshal(ev)
 	if err != nil {
 		return

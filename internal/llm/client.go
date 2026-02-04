@@ -8,7 +8,9 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"regexp"
 	"strings"
+	"time"
 )
 
 // emit sends a progress event via the handler's emitter, if set.
@@ -20,11 +22,63 @@ func emit(h *ToolHandler, ev ProgressEvent) {
 
 const maxIterations = 10
 
+var ansiRe = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
+
+// previewExcerpt returns a short excerpt of s, preferring content around error
+// keywords. Strips ANSI codes. Falls back to the tail if no keywords found.
+func previewExcerpt(s string, maxLen int) string {
+	clean := ansiRe.ReplaceAllString(s, "")
+	if len(clean) <= maxLen {
+		return clean
+	}
+	lower := strings.ToLower(clean)
+	// Specific patterns first; generic "error" last (catches ##[error] boilerplate)
+	for _, kw := range []string{"FAIL", "Error:", "timeout", "panic", "error"} {
+		target := strings.ToLower(kw)
+		if idx := strings.LastIndex(lower, target); idx != -1 {
+			start := max(0, idx-maxLen/4)
+			end := min(len(clean), start+maxLen)
+			return "..." + clean[start:end] + "..."
+		}
+	}
+	return "..." + clean[len(clean)-maxLen:]
+}
+
 // Client handles Gemini API calls with function calling support.
 type Client struct {
 	apiKey  string
 	baseURL string
 	model   string
+}
+
+// isEmptyResponse checks if the model returned neither text nor function calls.
+func isEmptyResponse(c *Candidate) bool {
+	if c == nil {
+		return true
+	}
+	for _, p := range c.Content.Parts {
+		if p.Text != "" || p.FunctionCall != nil {
+			return false
+		}
+	}
+	return true
+}
+
+// describeEmptyResponse builds a diagnostic message for empty model responses.
+func describeEmptyResponse(c *Candidate) string {
+	if c == nil {
+		return "no candidate"
+	}
+	msg := fmt.Sprintf("finishReason=%s", c.FinishReason)
+	for _, sr := range c.SafetyRatings {
+		if sr.Blocked || sr.Probability == "HIGH" || sr.Probability == "MEDIUM" {
+			msg += fmt.Sprintf(", safety %s=%s", sr.Category, sr.Probability)
+			if sr.Blocked {
+				msg += " (blocked)"
+			}
+		}
+	}
+	return msg
 }
 
 // NewClient creates a new LLM client (Google Gemini).
@@ -85,18 +139,58 @@ Be thorough but efficient. Don't fetch data you don't need.`}},
 	pendingDone := false
 	for i := range maxIterations {
 		step := i + 1
-		emit(handler, ProgressEvent{Type: "step", Step: step, MaxStep: maxIterations, Message: "Calling model..."})
+		stepMsg := "Calling model..."
+		if pendingDone {
+			stepMsg = "Generating final analysis..."
+		}
+		emit(handler, ProgressEvent{Type: "step", Step: step, MaxStep: maxIterations, Message: stepMsg})
 
+		t0 := time.Now()
 		resp, err := c.generate(ctx, history, tools, system)
+		modelMs := int(time.Since(t0).Milliseconds())
 		if err != nil {
 			return nil, fmt.Errorf("step %d: %w", step, err)
+		}
+
+		tokens := 0
+		if resp.UsageMetadata != nil {
+			tokens = resp.UsageMetadata.PromptTokenCount
 		}
 
 		if len(resp.Candidates) == 0 {
 			return nil, fmt.Errorf("step %d: empty response from model", step)
 		}
 
-		modelContent := resp.Candidates[0].Content
+		candidate := &resp.Candidates[0]
+
+		// Handle empty response (known Gemini issue with reasoning tokens)
+		if isEmptyResponse(candidate) {
+			diag := describeEmptyResponse(candidate)
+			if verbose {
+				emit(handler, ProgressEvent{Type: "result", Step: step, MaxStep: maxIterations, ModelMs: modelMs, Tokens: tokens})
+			}
+			// Add nudge and retry once
+			history = append(history, Content{
+				Role:  "user",
+				Parts: []Part{{Text: "Please provide your analysis or call a tool. Do not respond with empty content."}},
+			})
+			emit(handler, ProgressEvent{Type: "step", Step: step, MaxStep: maxIterations, Message: "Retrying (empty response)..."})
+			t0 = time.Now()
+			resp, err = c.generate(ctx, history, tools, system)
+			modelMs = int(time.Since(t0).Milliseconds())
+			if err != nil {
+				return nil, fmt.Errorf("step %d retry: %w", step, err)
+			}
+			if resp.UsageMetadata != nil {
+				tokens = resp.UsageMetadata.PromptTokenCount
+			}
+			if len(resp.Candidates) == 0 || isEmptyResponse(&resp.Candidates[0]) {
+				return nil, fmt.Errorf("step %d: model returned empty response after retry (%s)", step, diag)
+			}
+			candidate = &resp.Candidates[0]
+		}
+
+		modelContent := candidate.Content
 		modelContent.Role = "model"
 		history = append(history, modelContent)
 
@@ -110,6 +204,10 @@ Be thorough but efficient. Don't fetch data you don't need.`}},
 
 		if len(calls) == 0 {
 			// No function calls — model returned text.
+			if verbose {
+				emit(handler, ProgressEvent{Type: "result", Step: step, MaxStep: maxIterations, ModelMs: modelMs, Tokens: tokens})
+			}
+
 			// But if traces are pending, force a trace fetch before finishing.
 			if handler.HasPendingTraces() {
 				traceResult := c.forceTraces(ctx, handler, step, maxIterations, verbose)
@@ -127,6 +225,7 @@ Be thorough but efficient. Don't fetch data you don't need.`}},
 				}
 			}
 			if len(texts) == 0 {
+				// This shouldn't happen after the empty response check above, but guard anyway
 				return nil, fmt.Errorf("step %d: model returned neither text nor function calls", step)
 			}
 			result := &AnalysisResult{
@@ -146,7 +245,7 @@ Be thorough but efficient. Don't fetch data you don't need.`}},
 		// Execute each function call
 		var responseParts []Part
 		done := false
-		for _, call := range calls {
+		for ci, call := range calls {
 			toolEvent := ProgressEvent{Type: "tool", Step: step, MaxStep: maxIterations, Tool: call.Name}
 			if verbose && len(call.Args) > 0 {
 				argsJSON, _ := json.Marshal(call.Args)
@@ -154,7 +253,9 @@ Be thorough but efficient. Don't fetch data you don't need.`}},
 			}
 			emit(handler, toolEvent)
 
+			t1 := time.Now()
 			result, isDone, err := handler.Execute(ctx, call)
+			toolMs := int(time.Since(t1).Milliseconds())
 			if err != nil {
 				return nil, fmt.Errorf("step %d, tool %s: %w", step, call.Name, err)
 			}
@@ -163,12 +264,24 @@ Be thorough but efficient. Don't fetch data you don't need.`}},
 				done = true
 			}
 
-			if verbose && len(result) > 0 {
-				preview := result
-				if len(preview) > 200 {
-					preview = preview[:200] + "..."
+			if verbose {
+				ev := ProgressEvent{
+					Type:    "result",
+					Step:    step,
+					MaxStep: maxIterations,
+					Chars:   len(result),
+					ToolMs:  toolMs,
 				}
-				emit(handler, ProgressEvent{Type: "result", Step: step, MaxStep: maxIterations, Preview: preview})
+				// Attach model stats to the last tool call in this step
+				if ci == len(calls)-1 {
+					ev.ModelMs = modelMs
+					ev.Tokens = tokens
+				}
+				// Keep Preview for SSE backward compat
+				if len(result) > 0 {
+					ev.Preview = previewExcerpt(result, 200)
+				}
+				emit(handler, ev)
 			}
 
 			responseParts = append(responseParts, Part{
@@ -195,16 +308,25 @@ Be thorough but efficient. Don't fetch data you don't need.`}},
 		if done {
 			// Model called "done" — do one more generate to get the final text
 			pendingDone = true
-			emit(handler, ProgressEvent{Type: "step", Step: step, MaxStep: maxIterations, Message: "Model signalled done, generating final analysis..."})
 			continue
 		}
 	}
 
 	if pendingDone {
 		// done was signalled on the last iteration — one final generate to get the text
+		emit(handler, ProgressEvent{Type: "step", Step: maxIterations, MaxStep: maxIterations, Message: "Generating final analysis..."})
+		t0 := time.Now()
 		resp, err := c.generate(ctx, history, tools, system)
+		finalModelMs := int(time.Since(t0).Milliseconds())
 		if err != nil {
 			return nil, fmt.Errorf("final step: %w", err)
+		}
+		finalTokens := 0
+		if resp.UsageMetadata != nil {
+			finalTokens = resp.UsageMetadata.PromptTokenCount
+		}
+		if verbose {
+			emit(handler, ProgressEvent{Type: "result", Step: maxIterations, MaxStep: maxIterations, ModelMs: finalModelMs, Tokens: finalTokens})
 		}
 		if len(resp.Candidates) > 0 {
 			var texts []string
@@ -236,16 +358,18 @@ Be thorough but efficient. Don't fetch data you don't need.`}},
 // forceTraces calls get_test_traces programmatically when the model skips it.
 func (c *Client) forceTraces(ctx context.Context, handler *ToolHandler, step, maxIter int, verbose bool) string {
 	emit(handler, ProgressEvent{Type: "tool", Step: step, MaxStep: maxIter, Tool: "get_test_traces", Message: "Forcing get_test_traces (model skipped it)"})
+	t0 := time.Now()
 	result, _, _ := handler.Execute(ctx, FunctionCall{
 		Name: "get_test_traces",
 		Args: map[string]any{},
 	})
-	if verbose && len(result) > 0 {
-		preview := result
-		if len(preview) > 200 {
-			preview = preview[:200] + "..."
+	toolMs := int(time.Since(t0).Milliseconds())
+	if verbose {
+		ev := ProgressEvent{Type: "result", Step: step, MaxStep: maxIter, Chars: len(result), ToolMs: toolMs}
+		if len(result) > 0 {
+			ev.Preview = previewExcerpt(result, 200)
 		}
-		emit(handler, ProgressEvent{Type: "result", Step: step, MaxStep: maxIter, Preview: preview})
+		emit(handler, ev)
 	}
 	return result
 }

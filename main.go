@@ -9,6 +9,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/fatih/color"
 	"github.com/kamilpajak/heisenberg/internal/analysis"
 	"github.com/kamilpajak/heisenberg/internal/llm"
 	"github.com/kamilpajak/heisenberg/internal/playwright"
@@ -58,33 +59,67 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 	owner, repoName := parts[0], parts[1]
 
+	emitter := llm.NewTextEmitter(os.Stderr)
+
 	result, err := analysis.Run(context.Background(), analysis.Params{
 		Owner:        owner,
 		Repo:         repoName,
 		RunID:        runID,
 		Verbose:      verbose,
-		Emitter:      &llm.TextEmitter{W: os.Stderr},
+		Emitter:      emitter,
 		SnapshotHTML: playwright.SnapshotHTML,
 	})
 	if err != nil {
+		emitter.Close()
 		return fmt.Errorf("analysis failed: %w", err)
 	}
 
+	emitter.Close()
 	printResult(result)
 	return nil
 }
 
 func printResult(r *llm.AnalysisResult) {
 	if r.Category == llm.CategoryDiagnosis {
-		fmt.Printf("Confidence: %d%% (sensitivity: %s)\n\n", r.Confidence, r.Sensitivity)
+		fmt.Fprintln(os.Stderr)
+		dim := color.New(color.FgHiBlack)
+		_, _ = dim.Fprintln(os.Stderr, "  "+strings.Repeat("━", 50))
+		printConfidenceBar(r.Confidence, r.Sensitivity)
 	}
 
+	fmt.Fprintln(os.Stderr)
 	fmt.Println(r.Text)
 
 	if r.Category == llm.CategoryDiagnosis && r.Confidence < 70 && r.Sensitivity == "high" {
-		fmt.Println()
-		fmt.Println("Tip: Additional data sources (backend logs, Docker state) may improve this diagnosis.")
+		fmt.Fprintln(os.Stderr)
+		yellow := color.New(color.FgYellow)
+		_, _ = yellow.Fprintln(os.Stderr, "  Tip: Additional data sources (backend logs, Docker state) may improve this diagnosis.")
 	}
+}
+
+func printConfidenceBar(confidence int, sensitivity string) {
+	const barWidth = 24
+	filled := confidence * barWidth / 100
+	if filled > barWidth {
+		filled = barWidth
+	}
+
+	var barColor *color.Color
+	switch {
+	case confidence >= 80:
+		barColor = color.New(color.FgGreen)
+	case confidence >= 40:
+		barColor = color.New(color.FgYellow)
+	default:
+		barColor = color.New(color.FgRed)
+	}
+
+	bar := strings.Repeat("█", filled) + strings.Repeat("░", barWidth-filled)
+
+	fmt.Fprintf(os.Stderr, "  Confidence: %d%% ", confidence)
+	_, _ = barColor.Fprint(os.Stderr, bar)
+	dim := color.New(color.FgHiBlack)
+	_, _ = dim.Fprintf(os.Stderr, " (%s sensitivity)\n", sensitivity)
 }
 
 func serve(cmd *cobra.Command, args []string) error {

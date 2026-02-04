@@ -2,20 +2,37 @@ package llm
 
 // GenerateRequest is the request body for Gemini generateContent.
 type GenerateRequest struct {
-	Contents         []Content         `json:"contents"`
-	Tools            []Tool            `json:"tools,omitempty"`
-	GenerationConfig *GenerationConfig `json:"generationConfig,omitempty"`
-	SystemInstruction *Content         `json:"systemInstruction,omitempty"`
+	Contents          []Content         `json:"contents"`
+	Tools             []Tool            `json:"tools,omitempty"`
+	GenerationConfig  *GenerationConfig `json:"generationConfig,omitempty"`
+	SystemInstruction *Content          `json:"systemInstruction,omitempty"`
 }
 
 // GenerateResponse is the response from Gemini generateContent.
 type GenerateResponse struct {
-	Candidates []Candidate `json:"candidates"`
+	Candidates    []Candidate    `json:"candidates"`
+	UsageMetadata *UsageMetadata `json:"usageMetadata,omitempty"`
+}
+
+// UsageMetadata contains token usage information from Gemini.
+type UsageMetadata struct {
+	PromptTokenCount     int `json:"promptTokenCount"`
+	CandidatesTokenCount int `json:"candidatesTokenCount"`
+	TotalTokenCount      int `json:"totalTokenCount"`
 }
 
 // Candidate is a single response candidate.
 type Candidate struct {
-	Content Content `json:"content"`
+	Content       Content        `json:"content"`
+	FinishReason  string         `json:"finishReason,omitempty"`
+	SafetyRatings []SafetyRating `json:"safetyRatings,omitempty"`
+}
+
+// SafetyRating indicates content safety assessment.
+type SafetyRating struct {
+	Category    string `json:"category"`
+	Probability string `json:"probability"`
+	Blocked     bool   `json:"blocked,omitempty"`
 }
 
 // Content represents a message in the conversation.
