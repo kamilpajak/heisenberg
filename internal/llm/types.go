@@ -42,10 +42,13 @@ type Content struct {
 }
 
 // Part is a union type: exactly one of Text, FunctionCall, or FunctionResponse is set.
+// ThoughtSignature is an opaque token returned by Gemini 3+ models that must be
+// preserved on functionCall parts when sending history back to the API.
 type Part struct {
 	Text             string            `json:"text,omitempty"`
 	FunctionCall     *FunctionCall     `json:"functionCall,omitempty"`
 	FunctionResponse *FunctionResponse `json:"functionResponse,omitempty"`
+	ThoughtSignature string            `json:"thoughtSignature,omitempty"`
 }
 
 // FunctionCall is a tool invocation requested by the model.

@@ -91,7 +91,7 @@ func NewClient() (*Client, error) {
 	return &Client{
 		apiKey:  apiKey,
 		baseURL: "https://generativelanguage.googleapis.com/v1beta",
-		model:   "gemini-2.5-flash",
+		model:   "gemini-3-pro-preview",
 	}, nil
 }
 

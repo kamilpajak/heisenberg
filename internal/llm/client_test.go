@@ -200,7 +200,14 @@ func TestNewClient_Success(t *testing.T) {
 	c, err := NewClient()
 	require.NoError(t, err)
 	assert.Equal(t, "test-key", c.apiKey)
-	assert.Equal(t, "gemini-2.5-flash", c.model)
+	assert.Equal(t, "gemini-3-pro-preview", c.model)
+}
+
+func TestNewClient_UsesGemini3Pro(t *testing.T) {
+	t.Setenv("GOOGLE_API_KEY", "test-key")
+	c, err := NewClient()
+	require.NoError(t, err)
+	assert.Equal(t, "gemini-3-pro-preview", c.model, "must use Gemini 3 Pro")
 }
 
 // noopEmitter discards all progress events.
