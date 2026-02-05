@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"os/signal"
@@ -75,29 +76,29 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	emitter.Close()
-	printResult(result)
+	printResult(os.Stderr, os.Stdout, result)
 	return nil
 }
 
-func printResult(r *llm.AnalysisResult) {
+func printResult(stderr, stdout io.Writer, r *llm.AnalysisResult) {
 	if r.Category == llm.CategoryDiagnosis {
-		fmt.Fprintln(os.Stderr)
+		fmt.Fprintln(stderr)
 		dim := color.New(color.FgHiBlack)
-		_, _ = dim.Fprintln(os.Stderr, "  "+strings.Repeat("━", 50))
-		printConfidenceBar(r.Confidence, r.Sensitivity)
+		_, _ = dim.Fprintln(stderr, "  "+strings.Repeat("━", 50))
+		printConfidenceBar(stderr, r.Confidence, r.Sensitivity)
 	}
 
-	fmt.Fprintln(os.Stderr)
-	fmt.Println(r.Text)
+	fmt.Fprintln(stderr)
+	fmt.Fprintln(stdout, r.Text)
 
 	if r.Category == llm.CategoryDiagnosis && r.Confidence < 70 && r.Sensitivity == "high" {
-		fmt.Fprintln(os.Stderr)
+		fmt.Fprintln(stderr)
 		yellow := color.New(color.FgYellow)
-		_, _ = yellow.Fprintln(os.Stderr, "  Tip: Additional data sources (backend logs, Docker state) may improve this diagnosis.")
+		_, _ = yellow.Fprintln(stderr, "  Tip: Additional data sources (backend logs, Docker state) may improve this diagnosis.")
 	}
 }
 
-func printConfidenceBar(confidence int, sensitivity string) {
+func printConfidenceBar(w io.Writer, confidence int, sensitivity string) {
 	const barWidth = 24
 	filled := confidence * barWidth / 100
 	if filled > barWidth {
@@ -116,10 +117,10 @@ func printConfidenceBar(confidence int, sensitivity string) {
 
 	bar := strings.Repeat("█", filled) + strings.Repeat("░", barWidth-filled)
 
-	fmt.Fprintf(os.Stderr, "  Confidence: %d%% ", confidence)
-	_, _ = barColor.Fprint(os.Stderr, bar)
+	fmt.Fprintf(w, "  Confidence: %d%% ", confidence)
+	_, _ = barColor.Fprint(w, bar)
 	dim := color.New(color.FgHiBlack)
-	_, _ = dim.Fprintf(os.Stderr, " (%s sensitivity)\n", sensitivity)
+	_, _ = dim.Fprintf(w, " (%s sensitivity)\n", sensitivity)
 }
 
 func serve(cmd *cobra.Command, args []string) error {

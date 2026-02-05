@@ -203,6 +203,240 @@ func TestNewClient_Success(t *testing.T) {
 	assert.Equal(t, "gemini-2.5-flash", c.model)
 }
 
+// noopEmitter discards all progress events.
+type noopEmitter struct{}
+
+func (noopEmitter) Emit(ProgressEvent) {}
+
+// mockServer creates a test server that returns responses in sequence.
+func mockServer(t *testing.T, responses []GenerateResponse) *httptest.Server {
+	t.Helper()
+	call := 0
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if call >= len(responses) {
+			t.Fatalf("unexpected call %d (only %d responses)", call, len(responses))
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(responses[call])
+		call++
+	}))
+}
+
+func TestRunAgentLoop_TextOnlyResponse(t *testing.T) {
+	ts := mockServer(t, []GenerateResponse{
+		{
+			Candidates:    []Candidate{{Content: Content{Parts: []Part{{Text: "The test failed because..."}}}}},
+			UsageMetadata: &UsageMetadata{PromptTokenCount: 500, TotalTokenCount: 600},
+		},
+	})
+	defer ts.Close()
+
+	c := &Client{apiKey: "test", baseURL: ts.URL, model: "m"}
+	handler := &ToolHandler{Emitter: noopEmitter{}}
+
+	result, err := c.RunAgentLoop(context.Background(), handler, "initial context", false)
+
+	require.NoError(t, err)
+	assert.Equal(t, "The test failed because...", result.Text)
+	assert.Equal(t, CategoryDiagnosis, result.Category)
+	assert.Equal(t, 50, result.Confidence)
+}
+
+func TestRunAgentLoop_TextOnlyVerbose(t *testing.T) {
+	ts := mockServer(t, []GenerateResponse{
+		{
+			Candidates:    []Candidate{{Content: Content{Parts: []Part{{Text: "analysis"}}}}},
+			UsageMetadata: &UsageMetadata{PromptTokenCount: 200},
+		},
+	})
+	defer ts.Close()
+
+	c := &Client{apiKey: "test", baseURL: ts.URL, model: "m"}
+	handler := &ToolHandler{Emitter: noopEmitter{}}
+
+	result, err := c.RunAgentLoop(context.Background(), handler, "context", true)
+
+	require.NoError(t, err)
+	assert.Equal(t, "analysis", result.Text)
+}
+
+func TestRunAgentLoop_DoneThenText(t *testing.T) {
+	ts := mockServer(t, []GenerateResponse{
+		// Step 1: model calls done tool
+		{
+			Candidates: []Candidate{{Content: Content{Parts: []Part{{
+				FunctionCall: &FunctionCall{
+					Name: "done",
+					Args: map[string]any{"category": "diagnosis", "confidence": float64(90), "missing_information_sensitivity": "low"},
+				},
+			}}}}},
+			UsageMetadata: &UsageMetadata{PromptTokenCount: 1000},
+		},
+		// Step 2: model returns final text
+		{
+			Candidates:    []Candidate{{Content: Content{Parts: []Part{{Text: "Root cause: timeout"}}}}},
+			UsageMetadata: &UsageMetadata{PromptTokenCount: 1200},
+		},
+	})
+	defer ts.Close()
+
+	c := &Client{apiKey: "test", baseURL: ts.URL, model: "m"}
+	handler := &ToolHandler{Emitter: noopEmitter{}}
+
+	result, err := c.RunAgentLoop(context.Background(), handler, "context", true)
+
+	require.NoError(t, err)
+	assert.Equal(t, "Root cause: timeout", result.Text)
+	assert.Equal(t, CategoryDiagnosis, result.Category)
+	assert.Equal(t, 90, result.Confidence)
+	assert.Equal(t, "low", result.Sensitivity)
+}
+
+func TestRunAgentLoop_EmptyResponseRetry(t *testing.T) {
+	ts := mockServer(t, []GenerateResponse{
+		// Step 1: empty response (reasoning tokens consumed output)
+		{
+			Candidates:    []Candidate{{Content: Content{Parts: []Part{{}}}, FinishReason: "STOP"}},
+			UsageMetadata: &UsageMetadata{PromptTokenCount: 5000},
+		},
+		// Step 1 retry: actual text response
+		{
+			Candidates:    []Candidate{{Content: Content{Parts: []Part{{Text: "Recovered analysis"}}}}},
+			UsageMetadata: &UsageMetadata{PromptTokenCount: 5100},
+		},
+	})
+	defer ts.Close()
+
+	c := &Client{apiKey: "test", baseURL: ts.URL, model: "m"}
+	handler := &ToolHandler{Emitter: noopEmitter{}}
+
+	result, err := c.RunAgentLoop(context.Background(), handler, "context", true)
+
+	require.NoError(t, err)
+	assert.Equal(t, "Recovered analysis", result.Text)
+}
+
+func TestRunAgentLoop_EmptyResponseRetryFails(t *testing.T) {
+	ts := mockServer(t, []GenerateResponse{
+		{
+			Candidates:    []Candidate{{Content: Content{Parts: []Part{{}}}, FinishReason: "STOP"}},
+			UsageMetadata: &UsageMetadata{PromptTokenCount: 5000},
+		},
+		// Retry also empty
+		{
+			Candidates:    []Candidate{{Content: Content{Parts: []Part{{}}}, FinishReason: "STOP"}},
+			UsageMetadata: &UsageMetadata{PromptTokenCount: 5100},
+		},
+	})
+	defer ts.Close()
+
+	c := &Client{apiKey: "test", baseURL: ts.URL, model: "m"}
+	handler := &ToolHandler{Emitter: noopEmitter{}}
+
+	_, err := c.RunAgentLoop(context.Background(), handler, "context", false)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "empty response after retry")
+}
+
+func TestRunAgentLoop_NoCandidates(t *testing.T) {
+	ts := mockServer(t, []GenerateResponse{
+		{Candidates: []Candidate{}},
+	})
+	defer ts.Close()
+
+	c := &Client{apiKey: "test", baseURL: ts.URL, model: "m"}
+	handler := &ToolHandler{Emitter: noopEmitter{}}
+
+	_, err := c.RunAgentLoop(context.Background(), handler, "context", false)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "empty response from model")
+}
+
+func TestRunAgentLoop_ToolCallVerbose(t *testing.T) {
+	call := 0
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		var resp GenerateResponse
+		switch call {
+		case 0:
+			// Model calls an unknown tool (returns result without GitHub client)
+			resp = GenerateResponse{
+				Candidates: []Candidate{{Content: Content{Parts: []Part{{
+					FunctionCall: &FunctionCall{
+						Name: "fake_tool",
+						Args: map[string]any{"key": "value"},
+					},
+				}}}}},
+				UsageMetadata: &UsageMetadata{PromptTokenCount: 800, TotalTokenCount: 900},
+			}
+		default:
+			// Model returns final text
+			resp = GenerateResponse{
+				Candidates:    []Candidate{{Content: Content{Parts: []Part{{Text: "diagnosis text"}}}}},
+				UsageMetadata: &UsageMetadata{PromptTokenCount: 1000},
+			}
+		}
+		_ = json.NewEncoder(w).Encode(resp)
+		call++
+	}))
+	defer ts.Close()
+
+	c := &Client{apiKey: "test", baseURL: ts.URL, model: "m"}
+	handler := &ToolHandler{Emitter: noopEmitter{}}
+
+	result, err := c.RunAgentLoop(context.Background(), handler, "context", true)
+
+	require.NoError(t, err)
+	assert.Equal(t, "diagnosis text", result.Text)
+}
+
+func TestRunAgentLoop_GenerateErrorMidLoop(t *testing.T) {
+	call := 0
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if call == 0 {
+			// First call: model calls done
+			resp := GenerateResponse{
+				Candidates: []Candidate{{Content: Content{Parts: []Part{{
+					FunctionCall: &FunctionCall{
+						Name: "done",
+						Args: map[string]any{"category": "diagnosis", "confidence": float64(80), "missing_information_sensitivity": "low"},
+					},
+				}}}}},
+				UsageMetadata: &UsageMetadata{PromptTokenCount: 500},
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(resp)
+			call++
+			return
+		}
+		// Second call: API error
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(`{"error": "server error"}`))
+	}))
+	defer ts.Close()
+
+	c := &Client{apiKey: "test", baseURL: ts.URL, model: "m"}
+	handler := &ToolHandler{Emitter: noopEmitter{}}
+
+	_, err := c.RunAgentLoop(context.Background(), handler, "context", false)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "gemini API error")
+}
+
+func TestEmit_NilHandler(t *testing.T) {
+	// Should not panic
+	emit(nil, ProgressEvent{Type: "info", Message: "test"})
+}
+
+func TestEmit_NilEmitter(t *testing.T) {
+	h := &ToolHandler{}
+	// Should not panic
+	emit(h, ProgressEvent{Type: "info", Message: "test"})
+}
+
 // repeat creates a string of n copies of s.
 func repeat(s string, n int) string {
 	result := ""
