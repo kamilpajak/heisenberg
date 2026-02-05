@@ -95,12 +95,8 @@ func NewClient() (*Client, error) {
 	}, nil
 }
 
-// RunAgentLoop runs the agentic conversation loop. The model can call tools
-// iteratively until it produces a text response or hits the iteration limit.
-func (c *Client) RunAgentLoop(ctx context.Context, handler *ToolHandler, initialContext string, verbose bool) (*AnalysisResult, error) {
-	tools := []Tool{{FunctionDeclarations: ToolDeclarations()}}
-
-	system := &Content{
+func systemPrompt() *Content {
+	return &Content{
 		Parts: []Part{{Text: `You are an expert CI/CD failure analyst. You have access to tools that let you inspect a GitHub Actions workflow run.
 
 Your goal: determine the root cause of test failures and provide actionable guidance.
@@ -131,146 +127,198 @@ For "diagnosis" category:
 
 Be thorough but efficient. Don't fetch data you don't need.`}},
 	}
+}
 
-	history := []Content{
-		{Role: "user", Parts: []Part{{Text: initialContext}}},
+// extractCalls returns all function calls from a model response.
+func extractCalls(c Content) []FunctionCall {
+	var calls []FunctionCall
+	for _, p := range c.Parts {
+		if p.FunctionCall != nil {
+			calls = append(calls, *p.FunctionCall)
+		}
+	}
+	return calls
+}
+
+// collectTexts returns all text parts from a model response.
+func collectTexts(c Content) []string {
+	var texts []string
+	for _, p := range c.Parts {
+		if p.Text != "" {
+			texts = append(texts, p.Text)
+		}
+	}
+	return texts
+}
+
+// loopState tracks mutable state across agent loop iterations.
+type loopState struct {
+	history        []Content
+	pendingDone    bool
+	hasCalledTools bool
+	doneNudged     bool
+	savedText      string
+}
+
+// RunAgentLoop runs the agentic conversation loop. The model can call tools
+// iteratively until it produces a text response or hits the iteration limit.
+func (c *Client) RunAgentLoop(ctx context.Context, handler *ToolHandler, initialContext string, verbose bool) (*AnalysisResult, error) {
+	tools := []Tool{{FunctionDeclarations: ToolDeclarations()}}
+	system := systemPrompt()
+
+	s := &loopState{
+		history: []Content{
+			{Role: "user", Parts: []Part{{Text: initialContext}}},
+		},
 	}
 
-	pendingDone := false
-	hasCalledTools := false
-	doneNudged := false
-	var savedText string
 	for i := range maxIterations {
 		step := i + 1
 		stepMsg := "Calling model..."
-		if pendingDone {
+		if s.pendingDone {
 			stepMsg = "Generating final analysis..."
 		}
 		emit(handler, ProgressEvent{Type: "step", Step: step, MaxStep: maxIterations, Message: stepMsg})
 
-		t0 := time.Now()
-		resp, err := c.generate(ctx, history, tools, system)
-		modelMs := int(time.Since(t0).Milliseconds())
+		candidate, modelMs, tokens, err := c.callModel(ctx, s, tools, system, handler, step, verbose)
 		if err != nil {
-			return nil, fmt.Errorf("step %d: %w", step, err)
-		}
-
-		tokens := 0
-		if resp.UsageMetadata != nil {
-			tokens = resp.UsageMetadata.PromptTokenCount
-		}
-
-		if len(resp.Candidates) == 0 {
-			return nil, fmt.Errorf("step %d: empty response from model", step)
-		}
-
-		candidate := &resp.Candidates[0]
-
-		if isEmptyResponse(candidate) {
-			history, candidate, modelMs, tokens, err = c.handleEmptyResponse(ctx, history, tools, system, handler, step, verbose, modelMs, tokens, candidate)
-			if err != nil {
-				return nil, err
-			}
+			return nil, err
 		}
 
 		modelContent := candidate.Content
 		modelContent.Role = "model"
-		history = append(history, modelContent)
+		s.history = append(s.history, modelContent)
 
-		// Check for function calls
-		var calls []FunctionCall
-		for _, p := range modelContent.Parts {
-			if p.FunctionCall != nil {
-				calls = append(calls, *p.FunctionCall)
-			}
-		}
-
-		if len(calls) == 0 {
-			// No function calls — model returned text.
-			if verbose {
-				emit(handler, ProgressEvent{Type: "result", Step: step, MaxStep: maxIterations, ModelMs: modelMs, Tokens: tokens})
-			}
-
-			// But if traces are pending, force a trace fetch before finishing.
-			if handler.HasPendingTraces() {
-				traceResult := c.forceTraces(ctx, handler, step, maxIterations, verbose)
-				history = append(history, Content{
-					Role:  "user",
-					Parts: []Part{{Text: "I also fetched the Playwright traces. Incorporate this data into your analysis:\n\n" + traceResult}},
-				})
-				continue
-			}
-
-			// Nudge fallback: model was nudged but still didn't call done.
-			// Return the original analysis text with defaults.
-			if doneNudged && handler.DiagnosisCategory() == "" {
-				return buildResult([]string{savedText}, handler), nil
-			}
-
-			var texts []string
-			for _, p := range modelContent.Parts {
-				if p.Text != "" {
-					texts = append(texts, p.Text)
-				}
-			}
-			if len(texts) == 0 {
-				// This shouldn't happen after the empty response check above, but guard anyway
-				return nil, fmt.Errorf("step %d: model returned neither text nor function calls", step)
-			}
-
-			// Nudge: model returned text without calling done after a real analysis.
-			// Save the text, ask the model to call done, and continue.
-			if handler.DiagnosisCategory() == "" && hasCalledTools && !doneNudged && i < maxIterations-1 {
-				savedText = strings.Join(texts, "\n")
-				doneNudged = true
-				history = append(history, Content{
-					Role:  "user",
-					Parts: []Part{{Text: "You provided your analysis but forgot to call the 'done' tool. Please call the 'done' tool now with your confidence and missing_information_sensitivity assessment. Do not repeat your analysis text."}},
-				})
-				emit(handler, ProgressEvent{Type: "step", Step: step, MaxStep: maxIterations, Message: "Requesting structured metadata..."})
-				continue
-			}
-
-			return buildResult(texts, handler), nil
-		}
-
-		responseParts, done, err := c.executeCalls(ctx, handler, calls, step, verbose, modelMs, tokens)
+		result, err := c.processResponse(ctx, s, handler, modelContent, step, i, verbose, modelMs, tokens)
 		if err != nil {
 			return nil, err
 		}
-		hasCalledTools = true
-
-		history = append(history, Content{Role: "user", Parts: responseParts})
-
-		// If model called done but traces are pending, inject trace data first.
-		if done && handler.HasPendingTraces() {
-			traceResult := c.forceTraces(ctx, handler, step, maxIterations, verbose)
-			history = append(history, Content{
-				Role:  "user",
-				Parts: []Part{{Text: "Before your final analysis, here is Playwright trace data you must incorporate:\n\n" + traceResult}},
-			})
-			// Don't set done — let the model regenerate with trace data.
-			continue
-		}
-
-		// If model called done after a nudge, return the saved analysis text
-		// with the structured metadata from the done call.
-		if done && savedText != "" {
-			return buildResult([]string{savedText}, handler), nil
-		}
-
-		if done {
-			// Model called "done" — do one more generate to get the final text
-			pendingDone = true
-			continue
+		if result != nil {
+			return result, nil
 		}
 	}
 
-	if pendingDone {
-		return c.generateFinal(ctx, history, tools, system, handler, verbose)
+	if s.pendingDone {
+		return c.generateFinal(ctx, s.history, tools, system, handler, verbose)
 	}
 
 	return nil, fmt.Errorf("agent loop exceeded %d iterations without completing", maxIterations)
+}
+
+// callModel calls the LLM and handles empty response retries.
+func (c *Client) callModel(ctx context.Context, s *loopState, tools []Tool, system *Content, handler *ToolHandler, step int, verbose bool) (*Candidate, int, int, error) {
+	t0 := time.Now()
+	resp, err := c.generate(ctx, s.history, tools, system)
+	modelMs := int(time.Since(t0).Milliseconds())
+	if err != nil {
+		return nil, 0, 0, fmt.Errorf("step %d: %w", step, err)
+	}
+
+	tokens := 0
+	if resp.UsageMetadata != nil {
+		tokens = resp.UsageMetadata.PromptTokenCount
+	}
+
+	if len(resp.Candidates) == 0 {
+		return nil, 0, 0, fmt.Errorf("step %d: empty response from model", step)
+	}
+
+	candidate := &resp.Candidates[0]
+	if isEmptyResponse(candidate) {
+		s.history, candidate, modelMs, tokens, err = c.handleEmptyResponse(ctx, s.history, tools, system, handler, step, verbose, modelMs, tokens, candidate)
+		if err != nil {
+			return nil, 0, 0, err
+		}
+	}
+
+	return candidate, modelMs, tokens, nil
+}
+
+// processResponse dispatches the model response to text or tool handling.
+// Returns a non-nil result when the loop should return, nil when it should continue.
+func (c *Client) processResponse(ctx context.Context, s *loopState, handler *ToolHandler, content Content, step, iteration int, verbose bool, modelMs, tokens int) (*AnalysisResult, error) {
+	calls := extractCalls(content)
+	if len(calls) == 0 {
+		return c.handleTextResponse(ctx, s, handler, content, step, iteration, verbose, modelMs, tokens)
+	}
+	return c.handleToolResponse(ctx, s, handler, calls, step, verbose, modelMs, tokens)
+}
+
+// handleTextResponse processes a text-only model response, handling pending
+// traces, done-nudge logic, and result building.
+func (c *Client) handleTextResponse(ctx context.Context, s *loopState, handler *ToolHandler, content Content, step, iteration int, verbose bool, modelMs, tokens int) (*AnalysisResult, error) {
+	if verbose {
+		emit(handler, ProgressEvent{Type: "result", Step: step, MaxStep: maxIterations, ModelMs: modelMs, Tokens: tokens})
+	}
+
+	// If traces are pending, force a trace fetch before finishing.
+	if handler.HasPendingTraces() {
+		traceResult := c.forceTraces(ctx, handler, step, maxIterations, verbose)
+		s.history = append(s.history, Content{
+			Role:  "user",
+			Parts: []Part{{Text: "I also fetched the Playwright traces. Incorporate this data into your analysis:\n\n" + traceResult}},
+		})
+		return nil, nil
+	}
+
+	// Nudge fallback: model was nudged but still didn't call done.
+	// Return the original analysis text with defaults.
+	if s.doneNudged && handler.DiagnosisCategory() == "" {
+		return buildResult([]string{s.savedText}, handler), nil
+	}
+
+	texts := collectTexts(content)
+	if len(texts) == 0 {
+		return nil, fmt.Errorf("step %d: model returned neither text nor function calls", step)
+	}
+
+	// Nudge: model returned text without calling done after a real analysis.
+	// Save the text, ask the model to call done, and continue.
+	if handler.DiagnosisCategory() == "" && s.hasCalledTools && !s.doneNudged && iteration < maxIterations-1 {
+		s.savedText = strings.Join(texts, "\n")
+		s.doneNudged = true
+		s.history = append(s.history, Content{
+			Role:  "user",
+			Parts: []Part{{Text: "You provided your analysis but forgot to call the 'done' tool. Please call the 'done' tool now with your confidence and missing_information_sensitivity assessment. Do not repeat your analysis text."}},
+		})
+		emit(handler, ProgressEvent{Type: "step", Step: step, MaxStep: maxIterations, Message: "Requesting structured metadata..."})
+		return nil, nil
+	}
+
+	return buildResult(texts, handler), nil
+}
+
+// handleToolResponse executes tool calls and handles done signalling,
+// pending traces, and nudge-based early returns.
+func (c *Client) handleToolResponse(ctx context.Context, s *loopState, handler *ToolHandler, calls []FunctionCall, step int, verbose bool, modelMs, tokens int) (*AnalysisResult, error) {
+	responseParts, done, err := c.executeCalls(ctx, handler, calls, step, verbose, modelMs, tokens)
+	if err != nil {
+		return nil, err
+	}
+	s.hasCalledTools = true
+	s.history = append(s.history, Content{Role: "user", Parts: responseParts})
+
+	// If model called done but traces are pending, inject trace data first.
+	if done && handler.HasPendingTraces() {
+		traceResult := c.forceTraces(ctx, handler, step, maxIterations, verbose)
+		s.history = append(s.history, Content{
+			Role:  "user",
+			Parts: []Part{{Text: "Before your final analysis, here is Playwright trace data you must incorporate:\n\n" + traceResult}},
+		})
+		return nil, nil
+	}
+
+	// If model called done after a nudge, return the saved analysis text
+	// with the structured metadata from the done call.
+	if done && s.savedText != "" {
+		return buildResult([]string{s.savedText}, handler), nil
+	}
+
+	if done {
+		s.pendingDone = true
+	}
+
+	return nil, nil
 }
 
 // buildResult creates an AnalysisResult from collected text parts, applying
@@ -412,12 +460,7 @@ func (c *Client) generateFinal(
 		emit(handler, ProgressEvent{Type: "result", Step: maxIterations, MaxStep: maxIterations, ModelMs: finalModelMs, Tokens: finalTokens})
 	}
 	if len(resp.Candidates) > 0 {
-		var texts []string
-		for _, p := range resp.Candidates[0].Content.Parts {
-			if p.Text != "" {
-				texts = append(texts, p.Text)
-			}
-		}
+		texts := collectTexts(resp.Candidates[0].Content)
 		if len(texts) > 0 {
 			return buildResult(texts, handler), nil
 		}
