@@ -130,7 +130,7 @@ func (e *TextEmitter) Emit(ev ProgressEvent) {
 
 // humanizeArgs converts JSON args to a readable format like "(key: value, key2: value2)".
 func humanizeArgs(argsJSON string) string {
-	var args map[string]any
+	args := map[string]any{}
 	if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
 		return argsJSON
 	}
