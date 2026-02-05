@@ -1,10 +1,104 @@
 package llm
 
 import (
+	"bytes"
 	"testing"
 
+	"github.com/fatih/color"
 	"github.com/stretchr/testify/assert"
 )
+
+func init() {
+	// Disable colors in tests for predictable output.
+	color.NoColor = true
+}
+
+func newTestEmitter() (*TextEmitter, *bytes.Buffer) {
+	var buf bytes.Buffer
+	return &TextEmitter{w: &buf, tty: false}, &buf
+}
+
+func TestEmit_Step(t *testing.T) {
+	e, buf := newTestEmitter()
+	e.Emit(ProgressEvent{Type: "step", Step: 1, MaxStep: 10, Message: "Calling model..."})
+	assert.Contains(t, buf.String(), "Calling model...")
+}
+
+func TestEmit_Tool(t *testing.T) {
+	e, buf := newTestEmitter()
+	e.Emit(ProgressEvent{Type: "tool", Step: 1, MaxStep: 10, Tool: "get_job_logs"})
+	out := buf.String()
+	assert.Contains(t, out, "✓")
+	assert.Contains(t, out, "get_job_logs")
+	assert.Contains(t, out, "1/10")
+}
+
+func TestEmit_ToolWithArgs(t *testing.T) {
+	e, buf := newTestEmitter()
+	e.Emit(ProgressEvent{Type: "tool", Step: 2, MaxStep: 10, Tool: "get_artifact", Args: `{"artifact_name":"html-report"}`})
+	out := buf.String()
+	assert.Contains(t, out, "get_artifact")
+	assert.Contains(t, out, "artifact: html-report")
+	assert.Contains(t, out, "2/10")
+}
+
+func TestEmit_ToolDoneSkipsArgs(t *testing.T) {
+	e, buf := newTestEmitter()
+	e.Emit(ProgressEvent{Type: "tool", Step: 3, MaxStep: 10, Tool: "done", Args: `{"category":"diagnosis","confidence":85}`})
+	out := buf.String()
+	assert.Contains(t, out, "done")
+	assert.NotContains(t, out, "category")
+	assert.NotContains(t, out, "confidence")
+}
+
+func TestEmit_Result(t *testing.T) {
+	e, buf := newTestEmitter()
+	e.Emit(ProgressEvent{Type: "result", ModelMs: 3200, Tokens: 12847, Chars: 80000})
+	out := buf.String()
+	assert.Contains(t, out, "↳")
+	assert.Contains(t, out, "model 3.2s, 12,847 tok")
+	assert.Contains(t, out, "result 80,000 chars")
+}
+
+func TestEmit_ResultModelOnly(t *testing.T) {
+	e, buf := newTestEmitter()
+	e.Emit(ProgressEvent{Type: "result", ModelMs: 2800, Tokens: 19105})
+	out := buf.String()
+	assert.Contains(t, out, "model 2.8s, 19,105 tok")
+	assert.NotContains(t, out, "result")
+}
+
+func TestEmit_Info(t *testing.T) {
+	e, buf := newTestEmitter()
+	e.Emit(ProgressEvent{Type: "info", Message: "Analyzing run 123..."})
+	assert.Contains(t, buf.String(), "Analyzing run 123...")
+}
+
+func TestEmit_Error(t *testing.T) {
+	e, buf := newTestEmitter()
+	e.Emit(ProgressEvent{Type: "error", Message: "something failed"})
+	assert.Contains(t, buf.String(), "Error: something failed")
+}
+
+func TestEmit_Close(t *testing.T) {
+	e, _ := newTestEmitter()
+	e.Close() // should not panic
+}
+
+func TestEmit_ToolCounterAlignment(t *testing.T) {
+	e, buf := newTestEmitter()
+	e.Emit(ProgressEvent{Type: "tool", Step: 1, MaxStep: 10, Tool: "get_job_logs"})
+	line1 := buf.String()
+	buf.Reset()
+
+	e.Emit(ProgressEvent{Type: "tool", Step: 2, MaxStep: 10, Tool: "done"})
+	line2 := buf.String()
+
+	// Both lines should have their counters at approximately the same position
+	idx1 := bytes.Index([]byte(line1), []byte("1/10"))
+	idx2 := bytes.Index([]byte(line2), []byte("2/10"))
+	assert.InDelta(t, idx1, idx2, 1, "counters should be aligned")
+}
 
 func TestFormatDuration(t *testing.T) {
 	tests := []struct {
