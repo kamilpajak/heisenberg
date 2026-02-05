@@ -151,6 +151,15 @@ func collectTexts(c Content) []string {
 	return texts
 }
 
+// stepInfo bundles per-step metadata threaded through the agent loop.
+type stepInfo struct {
+	step      int
+	iteration int
+	verbose   bool
+	modelMs   int
+	tokens    int
+}
+
 // loopState tracks mutable state across agent loop iterations.
 type loopState struct {
 	history        []Content
@@ -173,14 +182,14 @@ func (c *Client) RunAgentLoop(ctx context.Context, handler *ToolHandler, initial
 	}
 
 	for i := range maxIterations {
-		step := i + 1
+		si := &stepInfo{step: i + 1, iteration: i, verbose: verbose}
 		stepMsg := "Calling model..."
 		if s.pendingDone {
 			stepMsg = "Generating final analysis..."
 		}
-		emit(handler, ProgressEvent{Type: "step", Step: step, MaxStep: maxIterations, Message: stepMsg})
+		emit(handler, ProgressEvent{Type: "step", Step: si.step, MaxStep: maxIterations, Message: stepMsg})
 
-		candidate, modelMs, tokens, err := c.callModel(ctx, s, tools, system, handler, step, verbose)
+		candidate, err := c.callModel(ctx, s, tools, system, handler, si)
 		if err != nil {
 			return nil, err
 		}
@@ -189,7 +198,7 @@ func (c *Client) RunAgentLoop(ctx context.Context, handler *ToolHandler, initial
 		modelContent.Role = "model"
 		s.history = append(s.history, modelContent)
 
-		result, err := c.processResponse(ctx, s, handler, modelContent, step, i, verbose, modelMs, tokens)
+		result, err := c.processResponse(ctx, s, handler, modelContent, si)
 		if err != nil {
 			return nil, err
 		}
@@ -206,54 +215,54 @@ func (c *Client) RunAgentLoop(ctx context.Context, handler *ToolHandler, initial
 }
 
 // callModel calls the LLM and handles empty response retries.
-func (c *Client) callModel(ctx context.Context, s *loopState, tools []Tool, system *Content, handler *ToolHandler, step int, verbose bool) (*Candidate, int, int, error) {
+// It populates si.modelMs and si.tokens.
+func (c *Client) callModel(ctx context.Context, s *loopState, tools []Tool, system *Content, handler *ToolHandler, si *stepInfo) (*Candidate, error) {
 	t0 := time.Now()
 	resp, err := c.generate(ctx, s.history, tools, system)
-	modelMs := int(time.Since(t0).Milliseconds())
+	si.modelMs = int(time.Since(t0).Milliseconds())
 	if err != nil {
-		return nil, 0, 0, fmt.Errorf("step %d: %w", step, err)
+		return nil, fmt.Errorf("step %d: %w", si.step, err)
 	}
 
-	tokens := 0
 	if resp.UsageMetadata != nil {
-		tokens = resp.UsageMetadata.PromptTokenCount
+		si.tokens = resp.UsageMetadata.PromptTokenCount
 	}
 
 	if len(resp.Candidates) == 0 {
-		return nil, 0, 0, fmt.Errorf("step %d: empty response from model", step)
+		return nil, fmt.Errorf("step %d: empty response from model", si.step)
 	}
 
 	candidate := &resp.Candidates[0]
 	if isEmptyResponse(candidate) {
-		s.history, candidate, modelMs, tokens, err = c.handleEmptyResponse(ctx, s.history, tools, system, handler, step, verbose, modelMs, tokens, candidate)
+		candidate, err = c.handleEmptyResponse(ctx, s, tools, system, handler, si, candidate)
 		if err != nil {
-			return nil, 0, 0, err
+			return nil, err
 		}
 	}
 
-	return candidate, modelMs, tokens, nil
+	return candidate, nil
 }
 
 // processResponse dispatches the model response to text or tool handling.
 // Returns a non-nil result when the loop should return, nil when it should continue.
-func (c *Client) processResponse(ctx context.Context, s *loopState, handler *ToolHandler, content Content, step, iteration int, verbose bool, modelMs, tokens int) (*AnalysisResult, error) {
+func (c *Client) processResponse(ctx context.Context, s *loopState, handler *ToolHandler, content Content, si *stepInfo) (*AnalysisResult, error) {
 	calls := extractCalls(content)
 	if len(calls) == 0 {
-		return c.handleTextResponse(ctx, s, handler, content, step, iteration, verbose, modelMs, tokens)
+		return c.handleTextResponse(ctx, s, handler, content, si)
 	}
-	return c.handleToolResponse(ctx, s, handler, calls, step, verbose, modelMs, tokens)
+	return c.handleToolResponse(ctx, s, handler, calls, si)
 }
 
 // handleTextResponse processes a text-only model response, handling pending
 // traces, done-nudge logic, and result building.
-func (c *Client) handleTextResponse(ctx context.Context, s *loopState, handler *ToolHandler, content Content, step, iteration int, verbose bool, modelMs, tokens int) (*AnalysisResult, error) {
-	if verbose {
-		emit(handler, ProgressEvent{Type: "result", Step: step, MaxStep: maxIterations, ModelMs: modelMs, Tokens: tokens})
+func (c *Client) handleTextResponse(ctx context.Context, s *loopState, handler *ToolHandler, content Content, si *stepInfo) (*AnalysisResult, error) {
+	if si.verbose {
+		emit(handler, ProgressEvent{Type: "result", Step: si.step, MaxStep: maxIterations, ModelMs: si.modelMs, Tokens: si.tokens})
 	}
 
 	// If traces are pending, force a trace fetch before finishing.
 	if handler.HasPendingTraces() {
-		traceResult := c.forceTraces(ctx, handler, step, maxIterations, verbose)
+		traceResult := c.forceTraces(ctx, handler, si.step, maxIterations, si.verbose)
 		s.history = append(s.history, Content{
 			Role:  "user",
 			Parts: []Part{{Text: "I also fetched the Playwright traces. Incorporate this data into your analysis:\n\n" + traceResult}},
@@ -269,19 +278,19 @@ func (c *Client) handleTextResponse(ctx context.Context, s *loopState, handler *
 
 	texts := collectTexts(content)
 	if len(texts) == 0 {
-		return nil, fmt.Errorf("step %d: model returned neither text nor function calls", step)
+		return nil, fmt.Errorf("step %d: model returned neither text nor function calls", si.step)
 	}
 
 	// Nudge: model returned text without calling done after a real analysis.
 	// Save the text, ask the model to call done, and continue.
-	if handler.DiagnosisCategory() == "" && s.hasCalledTools && !s.doneNudged && iteration < maxIterations-1 {
+	if handler.DiagnosisCategory() == "" && s.hasCalledTools && !s.doneNudged && si.iteration < maxIterations-1 {
 		s.savedText = strings.Join(texts, "\n")
 		s.doneNudged = true
 		s.history = append(s.history, Content{
 			Role:  "user",
 			Parts: []Part{{Text: "You provided your analysis but forgot to call the 'done' tool. Please call the 'done' tool now with your confidence and missing_information_sensitivity assessment. Do not repeat your analysis text."}},
 		})
-		emit(handler, ProgressEvent{Type: "step", Step: step, MaxStep: maxIterations, Message: "Requesting structured metadata..."})
+		emit(handler, ProgressEvent{Type: "step", Step: si.step, MaxStep: maxIterations, Message: "Requesting structured metadata..."})
 		return nil, nil
 	}
 
@@ -290,8 +299,8 @@ func (c *Client) handleTextResponse(ctx context.Context, s *loopState, handler *
 
 // handleToolResponse executes tool calls and handles done signalling,
 // pending traces, and nudge-based early returns.
-func (c *Client) handleToolResponse(ctx context.Context, s *loopState, handler *ToolHandler, calls []FunctionCall, step int, verbose bool, modelMs, tokens int) (*AnalysisResult, error) {
-	responseParts, done, err := c.executeCalls(ctx, handler, calls, step, verbose, modelMs, tokens)
+func (c *Client) handleToolResponse(ctx context.Context, s *loopState, handler *ToolHandler, calls []FunctionCall, si *stepInfo) (*AnalysisResult, error) {
+	responseParts, done, err := c.executeCalls(ctx, handler, calls, si)
 	if err != nil {
 		return nil, err
 	}
@@ -300,7 +309,7 @@ func (c *Client) handleToolResponse(ctx context.Context, s *loopState, handler *
 
 	// If model called done but traces are pending, inject trace data first.
 	if done && handler.HasPendingTraces() {
-		traceResult := c.forceTraces(ctx, handler, step, maxIterations, verbose)
+		traceResult := c.forceTraces(ctx, handler, si.step, maxIterations, si.verbose)
 		s.history = append(s.history, Content{
 			Role:  "user",
 			Parts: []Part{{Text: "Before your final analysis, here is Playwright trace data you must incorporate:\n\n" + traceResult}},
@@ -340,55 +349,47 @@ func buildResult(texts []string, handler *ToolHandler) *AnalysisResult {
 
 // handleEmptyResponse retries once when the model returns an empty response
 // (a known Gemini issue with reasoning tokens consuming the output budget).
+// It mutates s.history and si.modelMs/si.tokens in place.
 func (c *Client) handleEmptyResponse(
 	ctx context.Context,
-	history []Content,
+	s *loopState,
 	tools []Tool,
 	system *Content,
 	handler *ToolHandler,
-	step int,
-	verbose bool,
-	modelMs, tokens int,
+	si *stepInfo,
 	candidate *Candidate,
-) ([]Content, *Candidate, int, int, error) {
+) (*Candidate, error) {
 	diag := describeEmptyResponse(candidate)
-	if verbose {
-		emit(handler, ProgressEvent{Type: "result", Step: step, MaxStep: maxIterations, ModelMs: modelMs, Tokens: tokens})
+	if si.verbose {
+		emit(handler, ProgressEvent{Type: "result", Step: si.step, MaxStep: maxIterations, ModelMs: si.modelMs, Tokens: si.tokens})
 	}
-	history = append(history, Content{
+	s.history = append(s.history, Content{
 		Role:  "user",
 		Parts: []Part{{Text: "Please provide your analysis or call a tool. Do not respond with empty content."}},
 	})
-	emit(handler, ProgressEvent{Type: "step", Step: step, MaxStep: maxIterations, Message: "Retrying (empty response)..."})
+	emit(handler, ProgressEvent{Type: "step", Step: si.step, MaxStep: maxIterations, Message: "Retrying (empty response)..."})
 	t0 := time.Now()
-	resp, err := c.generate(ctx, history, tools, system)
-	modelMs = int(time.Since(t0).Milliseconds())
+	resp, err := c.generate(ctx, s.history, tools, system)
+	si.modelMs = int(time.Since(t0).Milliseconds())
 	if err != nil {
-		return nil, nil, 0, 0, fmt.Errorf("step %d retry: %w", step, err)
+		return nil, fmt.Errorf("step %d retry: %w", si.step, err)
 	}
 	if resp.UsageMetadata != nil {
-		tokens = resp.UsageMetadata.PromptTokenCount
+		si.tokens = resp.UsageMetadata.PromptTokenCount
 	}
 	if len(resp.Candidates) == 0 || isEmptyResponse(&resp.Candidates[0]) {
-		return nil, nil, 0, 0, fmt.Errorf("step %d: model returned empty response after retry (%s)", step, diag)
+		return nil, fmt.Errorf("step %d: model returned empty response after retry (%s)", si.step, diag)
 	}
-	return history, &resp.Candidates[0], modelMs, tokens, nil
+	return &resp.Candidates[0], nil
 }
 
 // executeCalls runs each function call, emitting progress events and collecting responses.
-func (c *Client) executeCalls(
-	ctx context.Context,
-	handler *ToolHandler,
-	calls []FunctionCall,
-	step int,
-	verbose bool,
-	modelMs, tokens int,
-) ([]Part, bool, error) {
+func (c *Client) executeCalls(ctx context.Context, handler *ToolHandler, calls []FunctionCall, si *stepInfo) ([]Part, bool, error) {
 	var responseParts []Part
 	done := false
 	for ci, call := range calls {
-		toolEvent := ProgressEvent{Type: "tool", Step: step, MaxStep: maxIterations, Tool: call.Name}
-		if verbose && len(call.Args) > 0 {
+		toolEvent := ProgressEvent{Type: "tool", Step: si.step, MaxStep: maxIterations, Tool: call.Name}
+		if si.verbose && len(call.Args) > 0 {
 			argsJSON, _ := json.Marshal(call.Args)
 			toolEvent.Args = string(argsJSON)
 		}
@@ -398,32 +399,14 @@ func (c *Client) executeCalls(
 		result, isDone, err := handler.Execute(ctx, call)
 		toolMs := int(time.Since(t1).Milliseconds())
 		if err != nil {
-			return nil, false, fmt.Errorf("step %d, tool %s: %w", step, call.Name, err)
+			return nil, false, fmt.Errorf("step %d, tool %s: %w", si.step, call.Name, err)
 		}
 
 		if isDone {
 			done = true
 		}
 
-		if verbose {
-			ev := ProgressEvent{
-				Type:    "result",
-				Step:    step,
-				MaxStep: maxIterations,
-				Chars:   len(result),
-				ToolMs:  toolMs,
-			}
-			// Attach model stats to the last tool call in this step
-			if ci == len(calls)-1 {
-				ev.ModelMs = modelMs
-				ev.Tokens = tokens
-			}
-			// Keep Preview for SSE backward compat
-			if len(result) > 0 {
-				ev.Preview = previewExcerpt(result, 200)
-			}
-			emit(handler, ev)
-		}
+		emitToolResult(handler, si, ci, len(calls), toolMs, result)
 
 		responseParts = append(responseParts, Part{
 			FunctionResponse: &FunctionResponse{
@@ -433,6 +416,30 @@ func (c *Client) executeCalls(
 		})
 	}
 	return responseParts, done, nil
+}
+
+// emitToolResult sends a verbose progress event for a completed tool call.
+func emitToolResult(handler *ToolHandler, si *stepInfo, ci, totalCalls, toolMs int, result string) {
+	if !si.verbose {
+		return
+	}
+	ev := ProgressEvent{
+		Type:    "result",
+		Step:    si.step,
+		MaxStep: maxIterations,
+		Chars:   len(result),
+		ToolMs:  toolMs,
+	}
+	// Attach model stats to the last tool call in this step
+	if ci == totalCalls-1 {
+		ev.ModelMs = si.modelMs
+		ev.Tokens = si.tokens
+	}
+	// Keep Preview for SSE backward compat
+	if len(result) > 0 {
+		ev.Preview = previewExcerpt(result, 200)
+	}
+	emit(handler, ev)
 }
 
 // generateFinal performs one last model call after the done tool was signalled,
