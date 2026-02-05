@@ -199,8 +199,11 @@ func formatDuration(ms int) string {
 	return fmt.Sprintf("%.1fs", float64(ms)/1000)
 }
 
-// formatNumber formats an integer with thousands separators.
+// formatNumber formats a non-negative integer with thousands separators.
 func formatNumber(n int) string {
+	if n < 0 {
+		n = -n
+	}
 	s := fmt.Sprintf("%d", n)
 	if len(s) <= 3 {
 		return s
