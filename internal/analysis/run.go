@@ -121,7 +121,7 @@ func buildInitialContext(run *gh.WorkflowRun, jobs []gh.Job, artifacts []gh.Arti
 	b.WriteString("\n## Instructions\n")
 	b.WriteString("Analyze this workflow run to determine why it failed.\n")
 	b.WriteString("Use the available tools to fetch artifacts, logs, and source files as needed.\n")
-	b.WriteString("When you have enough information, call the 'done' tool, then provide your final root cause analysis.\n")
+	b.WriteString("When you have enough information, you MUST call the 'done' tool first, then provide your final root cause analysis.\n")
 
 	return b.String()
 }

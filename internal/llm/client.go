@@ -111,7 +111,7 @@ Strategy:
 3. Focus on FAILED jobs and their logs
 4. For Playwright test failures, fetch the HTML report artifact first
 5. Use get_test_traces on test-results artifacts to get browser actions, console errors, and failed HTTP requests from Playwright trace recordings
-6. When you have enough information, call the "done" tool, then provide your analysis
+6. When you have enough information, you MUST call the "done" tool first, then provide your analysis text. Never skip the done tool.
 
 When calling the "done" tool, classify your conclusion:
 - category "diagnosis": you identified a specific failure root cause. Include confidence (0-100) and missing_information_sensitivity.
@@ -137,6 +137,9 @@ Be thorough but efficient. Don't fetch data you don't need.`}},
 	}
 
 	pendingDone := false
+	hasCalledTools := false
+	doneNudged := false
+	var savedText string
 	for i := range maxIterations {
 		step := i + 1
 		stepMsg := "Calling model..."
@@ -198,6 +201,12 @@ Be thorough but efficient. Don't fetch data you don't need.`}},
 				continue
 			}
 
+			// Nudge fallback: model was nudged but still didn't call done.
+			// Return the original analysis text with defaults.
+			if doneNudged && handler.DiagnosisCategory() == "" {
+				return buildResult([]string{savedText}, handler), nil
+			}
+
 			var texts []string
 			for _, p := range modelContent.Parts {
 				if p.Text != "" {
@@ -208,6 +217,20 @@ Be thorough but efficient. Don't fetch data you don't need.`}},
 				// This shouldn't happen after the empty response check above, but guard anyway
 				return nil, fmt.Errorf("step %d: model returned neither text nor function calls", step)
 			}
+
+			// Nudge: model returned text without calling done after a real analysis.
+			// Save the text, ask the model to call done, and continue.
+			if handler.DiagnosisCategory() == "" && hasCalledTools && !doneNudged && i < maxIterations-1 {
+				savedText = strings.Join(texts, "\n")
+				doneNudged = true
+				history = append(history, Content{
+					Role:  "user",
+					Parts: []Part{{Text: "You provided your analysis but forgot to call the 'done' tool. Please call the 'done' tool now with your confidence and missing_information_sensitivity assessment. Do not repeat your analysis text."}},
+				})
+				emit(handler, ProgressEvent{Type: "step", Step: step, MaxStep: maxIterations, Message: "Requesting structured metadata..."})
+				continue
+			}
+
 			return buildResult(texts, handler), nil
 		}
 
@@ -215,6 +238,7 @@ Be thorough but efficient. Don't fetch data you don't need.`}},
 		if err != nil {
 			return nil, err
 		}
+		hasCalledTools = true
 
 		history = append(history, Content{Role: "user", Parts: responseParts})
 
@@ -227,6 +251,12 @@ Be thorough but efficient. Don't fetch data you don't need.`}},
 			})
 			// Don't set done — let the model regenerate with trace data.
 			continue
+		}
+
+		// If model called done after a nudge, return the saved analysis text
+		// with the structured metadata from the done call.
+		if done && savedText != "" {
+			return buildResult([]string{savedText}, handler), nil
 		}
 
 		if done {

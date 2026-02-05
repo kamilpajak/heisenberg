@@ -372,11 +372,22 @@ func TestRunAgentLoop_ToolCallVerbose(t *testing.T) {
 				}}}}},
 				UsageMetadata: &UsageMetadata{PromptTokenCount: 800, TotalTokenCount: 900},
 			}
-		default:
-			// Model returns final text
+		case 1:
+			// Model returns text without calling done → triggers nudge
 			resp = GenerateResponse{
 				Candidates:    []Candidate{{Content: Content{Parts: []Part{{Text: "diagnosis text"}}}}},
 				UsageMetadata: &UsageMetadata{PromptTokenCount: 1000},
+			}
+		default:
+			// After nudge: model calls done with structured metadata
+			resp = GenerateResponse{
+				Candidates: []Candidate{{Content: Content{Parts: []Part{{
+					FunctionCall: &FunctionCall{
+						Name: "done",
+						Args: map[string]any{"category": "diagnosis", "confidence": float64(85), "missing_information_sensitivity": "low"},
+					},
+				}}}}},
+				UsageMetadata: &UsageMetadata{PromptTokenCount: 1100},
 			}
 		}
 		_ = json.NewEncoder(w).Encode(resp)
@@ -391,6 +402,56 @@ func TestRunAgentLoop_ToolCallVerbose(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, "diagnosis text", result.Text)
+	assert.Equal(t, CategoryDiagnosis, result.Category)
+	assert.Equal(t, 85, result.Confidence)
+	assert.Equal(t, "low", result.Sensitivity)
+}
+
+func TestRunAgentLoop_DoneNudgeFallback(t *testing.T) {
+	call := 0
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		var resp GenerateResponse
+		switch call {
+		case 0:
+			// Model calls a tool (establishes hasCalledTools)
+			resp = GenerateResponse{
+				Candidates: []Candidate{{Content: Content{Parts: []Part{{
+					FunctionCall: &FunctionCall{
+						Name: "fake_tool",
+						Args: map[string]any{},
+					},
+				}}}}},
+				UsageMetadata: &UsageMetadata{PromptTokenCount: 500},
+			}
+		case 1:
+			// Model returns text without done → triggers nudge
+			resp = GenerateResponse{
+				Candidates:    []Candidate{{Content: Content{Parts: []Part{{Text: "my analysis"}}}}},
+				UsageMetadata: &UsageMetadata{PromptTokenCount: 700},
+			}
+		default:
+			// After nudge: model returns text again instead of calling done
+			resp = GenerateResponse{
+				Candidates:    []Candidate{{Content: Content{Parts: []Part{{Text: "still no done call"}}}}},
+				UsageMetadata: &UsageMetadata{PromptTokenCount: 800},
+			}
+		}
+		_ = json.NewEncoder(w).Encode(resp)
+		call++
+	}))
+	defer ts.Close()
+
+	c := &Client{apiKey: "test", baseURL: ts.URL, model: "m"}
+	handler := &ToolHandler{Emitter: noopEmitter{}}
+
+	result, err := c.RunAgentLoop(context.Background(), handler, "context", false)
+
+	require.NoError(t, err)
+	assert.Equal(t, "my analysis", result.Text, "should return the original saved text")
+	assert.Equal(t, CategoryDiagnosis, result.Category)
+	assert.Equal(t, 50, result.Confidence, "should use default confidence")
+	assert.Equal(t, "medium", result.Sensitivity, "should use default sensitivity")
 }
 
 func TestRunAgentLoop_GenerateErrorMidLoop(t *testing.T) {
