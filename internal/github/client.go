@@ -13,6 +13,11 @@ import (
 	"strings"
 )
 
+const (
+	authHeaderPrefix = "Bearer "
+	githubAcceptType = "application/vnd.github+json"
+)
+
 // Client handles GitHub API interactions
 type Client struct {
 	token      string
@@ -26,6 +31,15 @@ func NewClient() *Client {
 		token:      os.Getenv("GITHUB_TOKEN"),
 		httpClient: &http.Client{},
 		baseURL:    "https://api.github.com",
+	}
+}
+
+// NewTestClient creates a client for testing with custom baseURL and httpClient.
+func NewTestClient(baseURL string, httpClient *http.Client) *Client {
+	return &Client{
+		token:      "test-token",
+		httpClient: httpClient,
+		baseURL:    baseURL,
 	}
 }
 
@@ -141,58 +155,67 @@ func ClassifyArtifact(name string) ArtifactType {
 	}
 }
 
-func (c *Client) selectAndFetch(ctx context.Context, owner, repo string, artifacts []Artifact) *ArtifactResult {
-	var htmlArtifacts, jsonArtifacts, blobArtifacts []Artifact
+type classifiedArtifacts struct {
+	html []Artifact
+	json []Artifact
+	blob []Artifact
+}
 
+func classifyAll(artifacts []Artifact) classifiedArtifacts {
+	var c classifiedArtifacts
 	for _, a := range artifacts {
 		if a.Expired {
 			continue
 		}
 		switch ClassifyArtifact(a.Name) {
 		case ArtifactHTML:
-			htmlArtifacts = append(htmlArtifacts, a)
+			c.html = append(c.html, a)
 		case ArtifactJSON:
-			jsonArtifacts = append(jsonArtifacts, a)
+			c.json = append(c.json, a)
 		case ArtifactBlob:
-			blobArtifacts = append(blobArtifacts, a)
+			c.blob = append(c.blob, a)
 		}
 	}
+	return c
+}
 
-	// Priority 1: HTML report
-	for _, a := range htmlArtifacts {
+func (c *Client) selectAndFetch(ctx context.Context, owner, repo string, artifacts []Artifact) *ArtifactResult {
+	classified := classifyAll(artifacts)
+	if r := c.fetchFirstContent(ctx, owner, repo, classified.html, ArtifactHTML); r != nil {
+		return r
+	}
+	if r := c.fetchFirstContent(ctx, owner, repo, classified.json, ArtifactJSON); r != nil {
+		return r
+	}
+	return c.fetchBlobs(ctx, owner, repo, classified.blob)
+}
+
+func (c *Client) fetchFirstContent(ctx context.Context, owner, repo string, artifacts []Artifact, typ ArtifactType) *ArtifactResult {
+	for _, a := range artifacts {
 		content, err := c.DownloadAndExtract(ctx, owner, repo, a.ID)
 		if err == nil && len(content) > 0 {
-			return &ArtifactResult{Type: ArtifactHTML, Content: content, Name: a.Name}
+			return &ArtifactResult{Type: typ, Content: content, Name: a.Name}
 		}
 	}
-
-	// Priority 2: JSON report
-	for _, a := range jsonArtifacts {
-		content, err := c.DownloadAndExtract(ctx, owner, repo, a.ID)
-		if err == nil && len(content) > 0 {
-			return &ArtifactResult{Type: ArtifactJSON, Content: content, Name: a.Name}
-		}
-	}
-
-	// Priority 3: Blob reports (download all shards as raw zips)
-	if len(blobArtifacts) > 0 {
-		var blobs [][]byte
-		for _, a := range blobArtifacts {
-			zipData, err := c.DownloadRawZip(ctx, owner, repo, a.ID)
-			if err == nil && len(zipData) > 0 {
-				blobs = append(blobs, zipData)
-			}
-		}
-		if len(blobs) > 0 {
-			return &ArtifactResult{
-				Type:  ArtifactBlob,
-				Blobs: blobs,
-				Name:  fmt.Sprintf("%d blob-report(s)", len(blobs)),
-			}
-		}
-	}
-
 	return nil
+}
+
+func (c *Client) fetchBlobs(ctx context.Context, owner, repo string, artifacts []Artifact) *ArtifactResult {
+	var blobs [][]byte
+	for _, a := range artifacts {
+		zipData, err := c.DownloadRawZip(ctx, owner, repo, a.ID)
+		if err == nil && len(zipData) > 0 {
+			blobs = append(blobs, zipData)
+		}
+	}
+	if len(blobs) == 0 {
+		return nil
+	}
+	return &ArtifactResult{
+		Type:  ArtifactBlob,
+		Blobs: blobs,
+		Name:  fmt.Sprintf("%d blob-report(s)", len(blobs)),
+	}
 }
 
 // ListWorkflowRuns returns recent completed workflow runs.
@@ -229,15 +252,10 @@ func (c *Client) ListArtifacts(ctx context.Context, owner, repo string, runID in
 func (c *Client) DownloadRawZip(ctx context.Context, owner, repo string, artifactID int64) ([]byte, error) {
 	url := fmt.Sprintf("%s/repos/%s/%s/actions/artifacts/%d/zip", c.baseURL, owner, repo, artifactID)
 
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := c.newAPIRequest(ctx, url)
 	if err != nil {
 		return nil, err
 	}
-
-	if c.token != "" {
-		req.Header.Set("Authorization", "Bearer "+c.token)
-	}
-	req.Header.Set("Accept", "application/vnd.github+json")
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -259,40 +277,39 @@ func (c *Client) DownloadAndExtract(ctx context.Context, owner, repo string, art
 		return nil, err
 	}
 
-	return c.extractFirstFile(zipData)
+	return extractFirstFile(zipData)
 }
 
-func (c *Client) extractFirstFile(zipData []byte) ([]byte, error) {
+func readZipEntry(f *zip.File) []byte {
+	rc, err := f.Open()
+	if err != nil {
+		return nil
+	}
+	content, err := io.ReadAll(rc)
+	rc.Close()
+	if err != nil || len(content) == 0 {
+		return nil
+	}
+	return content
+}
+
+func extractFirstFile(zipData []byte) ([]byte, error) {
 	reader, err := zip.NewReader(bytes.NewReader(zipData), int64(len(zipData)))
 	if err != nil {
 		return nil, err
 	}
 
 	var fallback []byte
-
 	for _, f := range reader.File {
 		if f.FileInfo().IsDir() {
 			continue
 		}
-
+		content := readZipEntry(f)
+		if content == nil {
+			continue
+		}
 		name := strings.ToLower(f.Name)
-		isJSON := strings.HasSuffix(name, ".json")
-		isHTML := strings.HasSuffix(name, ".html")
-
-		rc, err := f.Open()
-		if err != nil {
-			continue
-		}
-		content, err := io.ReadAll(rc)
-		rc.Close()
-		if err != nil || len(content) == 0 {
-			continue
-		}
-
-		if isHTML {
-			return content, nil
-		}
-		if isJSON {
+		if strings.HasSuffix(name, ".html") || strings.HasSuffix(name, ".json") {
 			return content, nil
 		}
 		if fallback == nil {
@@ -303,7 +320,6 @@ func (c *Client) extractFirstFile(zipData []byte) ([]byte, error) {
 	if fallback != nil {
 		return fallback, nil
 	}
-
 	return nil, fmt.Errorf("no files found in artifact")
 }
 
@@ -338,15 +354,10 @@ func (c *Client) ListJobs(ctx context.Context, owner, repo string, runID int64) 
 func (c *Client) GetJobLogs(ctx context.Context, owner, repo string, jobID int64) (string, error) {
 	url := fmt.Sprintf("%s/repos/%s/%s/actions/jobs/%d/logs", c.baseURL, owner, repo, jobID)
 
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := c.newAPIRequest(ctx, url)
 	if err != nil {
 		return "", err
 	}
-
-	if c.token != "" {
-		req.Header.Set("Authorization", "Bearer "+c.token)
-	}
-	req.Header.Set("Accept", "application/vnd.github+json")
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -391,16 +402,24 @@ func (c *Client) GetRepoFile(ctx context.Context, owner, repo, path string) (str
 	return string(decoded), nil
 }
 
-func (c *Client) doRequest(ctx context.Context, url string, result interface{}) error {
+func (c *Client) newAPIRequest(ctx context.Context, url string) (*http.Request, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if c.token != "" {
-		req.Header.Set("Authorization", "Bearer "+c.token)
+		req.Header.Set("Authorization", authHeaderPrefix+c.token)
 	}
-	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("Accept", githubAcceptType)
+	return req, nil
+}
+
+func (c *Client) doRequest(ctx context.Context, url string, result interface{}) error {
+	req, err := c.newAPIRequest(ctx, url)
+	if err != nil {
+		return err
+	}
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {

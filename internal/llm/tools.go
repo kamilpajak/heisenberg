@@ -19,11 +19,11 @@ type ToolHandler struct {
 	SnapshotHTML func([]byte) ([]byte, error)
 	Emitter      ProgressEmitter
 
-	artifacts      []gh.Artifact // cached after first list
-	calledTraces   bool          // whether get_test_traces has been called
-	category       string        // set by done tool
-	confidence     int           // 0-100, set by done tool
-	sensitivity    string        // "high", "medium", "low", set by done tool
+	artifacts    []gh.Artifact // cached after first list
+	calledTraces bool          // whether get_test_traces has been called
+	category     string        // set by done tool
+	confidence   int           // 0-100, set by done tool
+	sensitivity  string        // "high", "medium", "low", set by done tool
 }
 
 // Execute dispatches a function call, returning the result string and whether
@@ -37,30 +37,34 @@ func (h *ToolHandler) Execute(ctx context.Context, call FunctionCall) (string, b
 	case "get_artifact":
 		return h.getArtifact(ctx, call.Args)
 	case "get_workflow_file":
-		return h.getWorkflowFile(ctx, call.Args)
+		return h.getRepoFile(ctx, call.Args)
 	case "get_repo_file":
 		return h.getRepoFile(ctx, call.Args)
 	case "get_test_traces":
 		return h.getTestTraces(ctx, call.Args)
 	case "done":
-		h.category = stringArgOrDefault(call.Args, "category", CategoryDiagnosis)
-		if h.category != CategoryDiagnosis && h.category != CategoryNoFailures && h.category != CategoryNotSupported {
-			h.category = CategoryDiagnosis
-		}
-		h.confidence = intArgOrDefault(call.Args, "confidence", 50)
-		if h.confidence < 0 {
-			h.confidence = 0
-		} else if h.confidence > 100 {
-			h.confidence = 100
-		}
-		h.sensitivity = stringArgOrDefault(call.Args, "missing_information_sensitivity", "medium")
-		if h.sensitivity != "high" && h.sensitivity != "medium" && h.sensitivity != "low" {
-			h.sensitivity = "medium"
-		}
-		return "", true, nil
+		return h.handleDone(call.Args)
 	default:
 		return fmt.Sprintf("unknown tool: %s", call.Name), false, nil
 	}
+}
+
+func (h *ToolHandler) handleDone(args map[string]any) (string, bool, error) {
+	h.category = stringArgOrDefault(args, "category", CategoryDiagnosis)
+	if h.category != CategoryDiagnosis && h.category != CategoryNoFailures && h.category != CategoryNotSupported {
+		h.category = CategoryDiagnosis
+	}
+	h.confidence = intArgOrDefault(args, "confidence", 50)
+	if h.confidence < 0 {
+		h.confidence = 0
+	} else if h.confidence > 100 {
+		h.confidence = 100
+	}
+	h.sensitivity = stringArgOrDefault(args, "missing_information_sensitivity", "medium")
+	if h.sensitivity != "high" && h.sensitivity != "medium" && h.sensitivity != "low" {
+		h.sensitivity = "medium"
+	}
+	return "", true, nil
 }
 
 func (h *ToolHandler) listJobs(ctx context.Context) (string, bool, error) {
@@ -97,82 +101,88 @@ func (h *ToolHandler) getJobLogs(ctx context.Context, args map[string]any) (stri
 	return logs, false, nil
 }
 
+func (h *ToolHandler) cacheArtifacts(ctx context.Context) error {
+	if h.artifacts != nil {
+		return nil
+	}
+	artifacts, err := h.GitHub.ListArtifacts(ctx, h.Owner, h.Repo, h.RunID)
+	if err != nil {
+		return err
+	}
+	h.artifacts = artifacts
+	return nil
+}
+
+func (h *ToolHandler) findArtifactByName(name string) *gh.Artifact {
+	for i, a := range h.artifacts {
+		if a.Name == name {
+			return &h.artifacts[i]
+		}
+	}
+	return nil
+}
+
 func (h *ToolHandler) getArtifact(ctx context.Context, args map[string]any) (string, bool, error) {
 	name, _ := args["artifact_name"].(string)
 	if name == "" {
 		return errorResult(fmt.Errorf("artifact_name is required")), false, nil
 	}
 
-	// Cache artifacts list
-	if h.artifacts == nil {
-		artifacts, err := h.GitHub.ListArtifacts(ctx, h.Owner, h.Repo, h.RunID)
-		if err != nil {
-			return errorResult(err), false, nil
-		}
-		h.artifacts = artifacts
+	if err := h.cacheArtifacts(ctx); err != nil {
+		return errorResult(err), false, nil
 	}
 
-	// Find matching artifact
-	var artifact *gh.Artifact
-	for i, a := range h.artifacts {
-		if a.Name == name {
-			artifact = &h.artifacts[i]
-			break
-		}
-	}
+	artifact := h.findArtifactByName(name)
 	if artifact == nil {
 		return errorResult(fmt.Errorf("artifact %q not found", name)), false, nil
 	}
 
-	artifactType := gh.ClassifyArtifact(artifact.Name)
+	return h.fetchArtifactContent(ctx, artifact)
+}
 
-	switch artifactType {
+func (h *ToolHandler) fetchArtifactContent(ctx context.Context, artifact *gh.Artifact) (string, bool, error) {
+	switch gh.ClassifyArtifact(artifact.Name) {
 	case gh.ArtifactHTML:
-		content, err := h.GitHub.DownloadAndExtract(ctx, h.Owner, h.Repo, artifact.ID)
-		if err != nil {
-			return errorResult(err), false, nil
-		}
-		if h.SnapshotHTML == nil {
-			return errorResult(fmt.Errorf("HTML rendering not available")), false, nil
-		}
-		snapshot, err := h.SnapshotHTML(content)
-		if err != nil {
-			return errorResult(err), false, nil
-		}
-		return string(snapshot), false, nil
-
+		return h.fetchHTMLArtifact(ctx, artifact.ID)
 	case gh.ArtifactBlob:
-		zipData, err := h.GitHub.DownloadRawZip(ctx, h.Owner, h.Repo, artifact.ID)
-		if err != nil {
-			return errorResult(err), false, nil
-		}
-		return fmt.Sprintf("[blob-report: %d bytes downloaded, name=%s]", len(zipData), artifact.Name), false, nil
-
+		return h.fetchBlobInfo(ctx, artifact)
 	default:
-		content, err := h.GitHub.DownloadAndExtract(ctx, h.Owner, h.Repo, artifact.ID)
-		if err != nil {
-			return errorResult(err), false, nil
-		}
-		// Truncate large content
-		if len(content) > 100000 {
-			content = content[:100000]
-		}
-		return string(content), false, nil
+		return h.fetchDefaultArtifact(ctx, artifact.ID)
 	}
 }
 
-func (h *ToolHandler) getWorkflowFile(ctx context.Context, args map[string]any) (string, bool, error) {
-	path, _ := args["path"].(string)
-	if path == "" {
-		return errorResult(fmt.Errorf("path is required")), false, nil
-	}
-
-	content, err := h.GitHub.GetRepoFile(ctx, h.Owner, h.Repo, path)
+func (h *ToolHandler) fetchHTMLArtifact(ctx context.Context, artifactID int64) (string, bool, error) {
+	content, err := h.GitHub.DownloadAndExtract(ctx, h.Owner, h.Repo, artifactID)
 	if err != nil {
 		return errorResult(err), false, nil
 	}
+	if h.SnapshotHTML == nil {
+		return errorResult(fmt.Errorf("HTML rendering not available")), false, nil
+	}
+	snapshot, err := h.SnapshotHTML(content)
+	if err != nil {
+		return errorResult(err), false, nil
+	}
+	return string(snapshot), false, nil
+}
 
-	return content, false, nil
+func (h *ToolHandler) fetchBlobInfo(ctx context.Context, artifact *gh.Artifact) (string, bool, error) {
+	zipData, err := h.GitHub.DownloadRawZip(ctx, h.Owner, h.Repo, artifact.ID)
+	if err != nil {
+		return errorResult(err), false, nil
+	}
+	return fmt.Sprintf("[blob-report: %d bytes downloaded, name=%s]", len(zipData), artifact.Name), false, nil
+}
+
+func (h *ToolHandler) fetchDefaultArtifact(ctx context.Context, artifactID int64) (string, bool, error) {
+	content, err := h.GitHub.DownloadAndExtract(ctx, h.Owner, h.Repo, artifactID)
+	if err != nil {
+		return errorResult(err), false, nil
+	}
+	if len(content) > 100000 {
+		content = content[:100000]
+	}
+	return string(content), false, nil
 }
 
 func (h *ToolHandler) getRepoFile(ctx context.Context, args map[string]any) (string, bool, error) {
@@ -189,34 +199,30 @@ func (h *ToolHandler) getRepoFile(ctx context.Context, args map[string]any) (str
 	return content, false, nil
 }
 
-func (h *ToolHandler) getTestTraces(ctx context.Context, args map[string]any) (string, bool, error) {
-	h.calledTraces = true
-	name, _ := args["artifact_name"].(string)
-
-	// Cache artifacts list
-	if h.artifacts == nil {
-		artifacts, err := h.GitHub.ListArtifacts(ctx, h.Owner, h.Repo, h.RunID)
-		if err != nil {
-			return errorResult(err), false, nil
-		}
-		h.artifacts = artifacts
-	}
-
-	// Find matching artifact: exact name or first "test-results*"
-	var artifact *gh.Artifact
+func (h *ToolHandler) findTraceArtifact(name string) *gh.Artifact {
 	for i, a := range h.artifacts {
 		if a.Expired {
 			continue
 		}
 		if name != "" && a.Name == name {
-			artifact = &h.artifacts[i]
-			break
+			return &h.artifacts[i]
 		}
 		if name == "" && strings.Contains(strings.ToLower(a.Name), "test-results") {
-			artifact = &h.artifacts[i]
-			break
+			return &h.artifacts[i]
 		}
 	}
+	return nil
+}
+
+func (h *ToolHandler) getTestTraces(ctx context.Context, args map[string]any) (string, bool, error) {
+	h.calledTraces = true
+	name, _ := args["artifact_name"].(string)
+
+	if err := h.cacheArtifacts(ctx); err != nil {
+		return errorResult(err), false, nil
+	}
+
+	artifact := h.findTraceArtifact(name)
 	if artifact == nil {
 		if name != "" {
 			return errorResult(fmt.Errorf("artifact %q not found", name)), false, nil
