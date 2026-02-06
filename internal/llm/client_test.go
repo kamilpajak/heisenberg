@@ -547,3 +547,172 @@ func TestEmit_NilEmitter(t *testing.T) {
 func repeat(s string, n int) string {
 	return strings.Repeat(s, n)
 }
+
+// mockToolHandlerWithTraces is a mock that returns pending traces.
+type mockToolHandlerWithTraces struct {
+	mockToolHandler
+	pendingTraces bool
+	tracesResult  string
+}
+
+func (m *mockToolHandlerWithTraces) HasPendingTraces() bool { return m.pendingTraces }
+func (m *mockToolHandlerWithTraces) Execute(_ context.Context, call FunctionCall) (string, bool, error) {
+	if call.Name == "get_test_traces" {
+		m.pendingTraces = false // Mark traces as fetched
+		return m.tracesResult, false, nil
+	}
+	return m.mockToolHandler.Execute(context.Background(), call)
+}
+
+func TestRunAgentLoop_ForceTraces(t *testing.T) {
+	call := 0
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		var resp GenerateResponse
+		switch call {
+		case 0:
+			// Model returns text response - triggers forceTraces because handler has pending traces
+			resp = GenerateResponse{
+				Candidates:    []Candidate{{Content: Content{Parts: []Part{{Text: "initial analysis"}}}}},
+				UsageMetadata: &UsageMetadata{PromptTokenCount: 500},
+			}
+		default:
+			// After forceTraces, model returns final analysis
+			resp = GenerateResponse{
+				Candidates:    []Candidate{{Content: Content{Parts: []Part{{Text: "final analysis with traces"}}}}},
+				UsageMetadata: &UsageMetadata{PromptTokenCount: 700},
+			}
+		}
+		_ = json.NewEncoder(w).Encode(resp)
+		call++
+	}))
+	defer ts.Close()
+
+	c := &Client{apiKey: "test", baseURL: ts.URL, model: "m"}
+	handler := &mockToolHandlerWithTraces{
+		mockToolHandler: mockToolHandler{emitter: noopEmitter{}},
+		pendingTraces:   true,
+		tracesResult:    "trace data here",
+	}
+
+	result, err := c.RunAgentLoop(context.Background(), handler, testToolDeclarations(), "context", true)
+
+	require.NoError(t, err)
+	assert.Equal(t, "final analysis with traces", result.Text)
+}
+
+func TestRunAgentLoop_DoneWithPendingTraces(t *testing.T) {
+	call := 0
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		var resp GenerateResponse
+		switch call {
+		case 0:
+			// Model calls done but there are pending traces
+			resp = GenerateResponse{
+				Candidates: []Candidate{{Content: Content{Parts: []Part{{
+					FunctionCall: &FunctionCall{
+						Name: "done",
+						Args: map[string]any{"category": "diagnosis", "confidence": float64(85), "missing_information_sensitivity": "low"},
+					},
+				}}}}},
+				UsageMetadata: &UsageMetadata{PromptTokenCount: 500},
+			}
+		default:
+			// After forceTraces, model returns final text
+			resp = GenerateResponse{
+				Candidates:    []Candidate{{Content: Content{Parts: []Part{{Text: "analysis with forced traces"}}}}},
+				UsageMetadata: &UsageMetadata{PromptTokenCount: 800},
+			}
+		}
+		_ = json.NewEncoder(w).Encode(resp)
+		call++
+	}))
+	defer ts.Close()
+
+	c := &Client{apiKey: "test", baseURL: ts.URL, model: "m"}
+	handler := &mockToolHandlerWithTraces{
+		mockToolHandler: mockToolHandler{emitter: noopEmitter{}},
+		pendingTraces:   true,
+		tracesResult:    "trace data",
+	}
+
+	result, err := c.RunAgentLoop(context.Background(), handler, testToolDeclarations(), "context", true)
+
+	require.NoError(t, err)
+	assert.Equal(t, "analysis with forced traces", result.Text)
+	assert.Equal(t, 85, result.Confidence)
+}
+
+func TestRunAgentLoop_GenerateFinalEmptyResponse(t *testing.T) {
+	call := 0
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		var resp GenerateResponse
+		switch call {
+		case 0:
+			// Step 1: model calls done
+			resp = GenerateResponse{
+				Candidates: []Candidate{{Content: Content{Parts: []Part{{
+					FunctionCall: &FunctionCall{
+						Name: "done",
+						Args: map[string]any{"category": "diagnosis", "confidence": float64(80), "missing_information_sensitivity": "low"},
+					},
+				}}}}},
+				UsageMetadata: &UsageMetadata{PromptTokenCount: 500},
+			}
+		case 1:
+			// Step 2: final response has no text (triggers retry in handleEmptyResponse)
+			resp = GenerateResponse{
+				Candidates:    []Candidate{{Content: Content{Parts: []Part{{}}}, FinishReason: "STOP"}},
+				UsageMetadata: &UsageMetadata{PromptTokenCount: 600},
+			}
+		default:
+			// Retry also returns empty
+			resp = GenerateResponse{
+				Candidates:    []Candidate{{Content: Content{Parts: []Part{{}}}, FinishReason: "STOP"}},
+				UsageMetadata: &UsageMetadata{PromptTokenCount: 600},
+			}
+		}
+		_ = json.NewEncoder(w).Encode(resp)
+		call++
+	}))
+	defer ts.Close()
+
+	c := &Client{apiKey: "test", baseURL: ts.URL, model: "m"}
+	handler := &mockToolHandler{emitter: noopEmitter{}}
+
+	_, err := c.RunAgentLoop(context.Background(), handler, testToolDeclarations(), "context", false)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "empty response")
+}
+
+func TestRunAgentLoop_GenerateFinalNoCandidates(t *testing.T) {
+	ts := mockServer(t, []GenerateResponse{
+		// Step 1: model calls done
+		{
+			Candidates: []Candidate{{Content: Content{Parts: []Part{{
+				FunctionCall: &FunctionCall{
+					Name: "done",
+					Args: map[string]any{"category": "diagnosis", "confidence": float64(80), "missing_information_sensitivity": "low"},
+				},
+			}}}}},
+			UsageMetadata: &UsageMetadata{PromptTokenCount: 500},
+		},
+		// Step 2: final response has no candidates
+		{
+			Candidates:    []Candidate{},
+			UsageMetadata: &UsageMetadata{PromptTokenCount: 600},
+		},
+	})
+	defer ts.Close()
+
+	c := &Client{apiKey: "test", baseURL: ts.URL, model: "m"}
+	handler := &mockToolHandler{emitter: noopEmitter{}}
+
+	_, err := c.RunAgentLoop(context.Background(), handler, testToolDeclarations(), "context", false)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "empty response")
+}
