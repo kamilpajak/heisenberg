@@ -63,6 +63,24 @@ func TestExtractSnapshotZipInvalidZip(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestExtractSnapshotZipSlipPrevention(t *testing.T) {
+	// Create a zip with path traversal attempt
+	var buf bytes.Buffer
+	w := zip.NewWriter(&buf)
+
+	// Attempt to write outside destDir using ../
+	fw, err := w.Create("../../../tmp/malicious.txt")
+	require.NoError(t, err)
+	_, err = fw.Write([]byte("malicious content"))
+	require.NoError(t, err)
+	require.NoError(t, w.Close())
+
+	destDir := t.TempDir()
+	err = extractSnapshotZip(buf.Bytes(), destDir)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "illegal file path")
+}
+
 func TestExtractSnapshotZipEmpty(t *testing.T) {
 	var buf bytes.Buffer
 	w := zip.NewWriter(&buf)

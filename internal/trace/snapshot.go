@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/kamilpajak/heisenberg/internal/server"
 	"github.com/playwright-community/playwright-go"
@@ -145,8 +146,16 @@ func extractSnapshotZip(zipData []byte, destDir string) error {
 		return err
 	}
 
+	// Clean destDir for consistent comparison
+	cleanDest := filepath.Clean(destDir) + string(os.PathSeparator)
+
 	for _, f := range reader.File {
 		path := filepath.Join(destDir, f.Name)
+
+		// Prevent zip slip: ensure path is within destDir
+		if !strings.HasPrefix(filepath.Clean(path)+string(os.PathSeparator), cleanDest) {
+			return fmt.Errorf("illegal file path in zip: %s", f.Name)
+		}
 
 		if f.FileInfo().IsDir() {
 			os.MkdirAll(path, 0755)
