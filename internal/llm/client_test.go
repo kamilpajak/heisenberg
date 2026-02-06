@@ -209,6 +209,50 @@ type noopEmitter struct{}
 
 func (noopEmitter) Emit(ProgressEvent) {}
 
+// mockToolHandler is a test double for ToolExecutor that handles the done tool.
+type mockToolHandler struct {
+	emitter     ProgressEmitter
+	category    string
+	confidence  int
+	sensitivity string
+}
+
+func (m *mockToolHandler) Execute(_ context.Context, call FunctionCall) (string, bool, error) {
+	if call.Name == "done" {
+		if cat, ok := call.Args["category"].(string); ok {
+			m.category = cat
+		} else {
+			m.category = CategoryDiagnosis
+		}
+		if conf, ok := call.Args["confidence"].(float64); ok {
+			m.confidence = int(conf)
+		} else {
+			m.confidence = 50
+		}
+		if sens, ok := call.Args["missing_information_sensitivity"].(string); ok {
+			m.sensitivity = sens
+		} else {
+			m.sensitivity = "medium"
+		}
+		return "", true, nil
+	}
+	return "unknown tool: " + call.Name, false, nil
+}
+
+func (m *mockToolHandler) HasPendingTraces() bool       { return false }
+func (m *mockToolHandler) DiagnosisCategory() string    { return m.category }
+func (m *mockToolHandler) DiagnosisConfidence() int     { return m.confidence }
+func (m *mockToolHandler) DiagnosisSensitivity() string { return m.sensitivity }
+func (m *mockToolHandler) GetEmitter() ProgressEmitter  { return m.emitter }
+
+// testToolDeclarations returns minimal tool declarations for tests.
+func testToolDeclarations() []FunctionDeclaration {
+	return []FunctionDeclaration{
+		{Name: "done", Description: "Signal done"},
+		{Name: "fake_tool", Description: "Test tool"},
+	}
+}
+
 // mockServer creates a test server that returns responses in sequence.
 func mockServer(t *testing.T, responses []GenerateResponse) *httptest.Server {
 	t.Helper()
@@ -233,9 +277,9 @@ func TestRunAgentLoop_TextOnlyResponse(t *testing.T) {
 	defer ts.Close()
 
 	c := &Client{apiKey: "test", baseURL: ts.URL, model: "m"}
-	handler := &ToolHandler{Emitter: noopEmitter{}}
+	handler := &mockToolHandler{emitter: noopEmitter{}}
 
-	result, err := c.RunAgentLoop(context.Background(), handler, "initial context", false)
+	result, err := c.RunAgentLoop(context.Background(), handler, testToolDeclarations(), "initial context", false)
 
 	require.NoError(t, err)
 	assert.Equal(t, "The test failed because...", result.Text)
@@ -253,9 +297,9 @@ func TestRunAgentLoop_TextOnlyVerbose(t *testing.T) {
 	defer ts.Close()
 
 	c := &Client{apiKey: "test", baseURL: ts.URL, model: "m"}
-	handler := &ToolHandler{Emitter: noopEmitter{}}
+	handler := &mockToolHandler{emitter: noopEmitter{}}
 
-	result, err := c.RunAgentLoop(context.Background(), handler, "context", true)
+	result, err := c.RunAgentLoop(context.Background(), handler, testToolDeclarations(), "context", true)
 
 	require.NoError(t, err)
 	assert.Equal(t, "analysis", result.Text)
@@ -282,9 +326,9 @@ func TestRunAgentLoop_DoneThenText(t *testing.T) {
 	defer ts.Close()
 
 	c := &Client{apiKey: "test", baseURL: ts.URL, model: "m"}
-	handler := &ToolHandler{Emitter: noopEmitter{}}
+	handler := &mockToolHandler{emitter: noopEmitter{}}
 
-	result, err := c.RunAgentLoop(context.Background(), handler, "context", true)
+	result, err := c.RunAgentLoop(context.Background(), handler, testToolDeclarations(), "context", true)
 
 	require.NoError(t, err)
 	assert.Equal(t, "Root cause: timeout", result.Text)
@@ -309,9 +353,9 @@ func TestRunAgentLoop_EmptyResponseRetry(t *testing.T) {
 	defer ts.Close()
 
 	c := &Client{apiKey: "test", baseURL: ts.URL, model: "m"}
-	handler := &ToolHandler{Emitter: noopEmitter{}}
+	handler := &mockToolHandler{emitter: noopEmitter{}}
 
-	result, err := c.RunAgentLoop(context.Background(), handler, "context", true)
+	result, err := c.RunAgentLoop(context.Background(), handler, testToolDeclarations(), "context", true)
 
 	require.NoError(t, err)
 	assert.Equal(t, "Recovered analysis", result.Text)
@@ -332,9 +376,9 @@ func TestRunAgentLoop_EmptyResponseRetryFails(t *testing.T) {
 	defer ts.Close()
 
 	c := &Client{apiKey: "test", baseURL: ts.URL, model: "m"}
-	handler := &ToolHandler{Emitter: noopEmitter{}}
+	handler := &mockToolHandler{emitter: noopEmitter{}}
 
-	_, err := c.RunAgentLoop(context.Background(), handler, "context", false)
+	_, err := c.RunAgentLoop(context.Background(), handler, testToolDeclarations(), "context", false)
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "empty response after retry")
@@ -347,9 +391,9 @@ func TestRunAgentLoop_NoCandidates(t *testing.T) {
 	defer ts.Close()
 
 	c := &Client{apiKey: "test", baseURL: ts.URL, model: "m"}
-	handler := &ToolHandler{Emitter: noopEmitter{}}
+	handler := &mockToolHandler{emitter: noopEmitter{}}
 
-	_, err := c.RunAgentLoop(context.Background(), handler, "context", false)
+	_, err := c.RunAgentLoop(context.Background(), handler, testToolDeclarations(), "context", false)
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "empty response from model")
@@ -396,9 +440,9 @@ func TestRunAgentLoop_ToolCallVerbose(t *testing.T) {
 	defer ts.Close()
 
 	c := &Client{apiKey: "test", baseURL: ts.URL, model: "m"}
-	handler := &ToolHandler{Emitter: noopEmitter{}}
+	handler := &mockToolHandler{emitter: noopEmitter{}}
 
-	result, err := c.RunAgentLoop(context.Background(), handler, "context", true)
+	result, err := c.RunAgentLoop(context.Background(), handler, testToolDeclarations(), "context", true)
 
 	require.NoError(t, err)
 	assert.Equal(t, "diagnosis text", result.Text)
@@ -443,9 +487,9 @@ func TestRunAgentLoop_DoneNudgeFallback(t *testing.T) {
 	defer ts.Close()
 
 	c := &Client{apiKey: "test", baseURL: ts.URL, model: "m"}
-	handler := &ToolHandler{Emitter: noopEmitter{}}
+	handler := &mockToolHandler{emitter: noopEmitter{}}
 
-	result, err := c.RunAgentLoop(context.Background(), handler, "context", false)
+	result, err := c.RunAgentLoop(context.Background(), handler, testToolDeclarations(), "context", false)
 
 	require.NoError(t, err)
 	assert.Equal(t, "my analysis", result.Text, "should return the original saved text")
@@ -480,9 +524,9 @@ func TestRunAgentLoop_GenerateErrorMidLoop(t *testing.T) {
 	defer ts.Close()
 
 	c := &Client{apiKey: "test", baseURL: ts.URL, model: "m"}
-	handler := &ToolHandler{Emitter: noopEmitter{}}
+	handler := &mockToolHandler{emitter: noopEmitter{}}
 
-	_, err := c.RunAgentLoop(context.Background(), handler, "context", false)
+	_, err := c.RunAgentLoop(context.Background(), handler, testToolDeclarations(), "context", false)
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "gemini API error")
@@ -494,7 +538,7 @@ func TestEmit_NilHandler(t *testing.T) {
 }
 
 func TestEmit_NilEmitter(t *testing.T) {
-	h := &ToolHandler{}
+	h := &mockToolHandler{}
 	// Should not panic
 	emit(h, ProgressEvent{Type: "info", Message: "test"})
 }

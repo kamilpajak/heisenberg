@@ -1,4 +1,4 @@
-package llm
+package analysis
 
 import (
 	"archive/zip"
@@ -10,13 +10,14 @@ import (
 	"testing"
 
 	gh "github.com/kamilpajak/heisenberg/internal/github"
+	"github.com/kamilpajak/heisenberg/internal/llm"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestDoneDiagnosis(t *testing.T) {
 	h := &ToolHandler{}
-	_, isDone, err := h.Execute(context.Background(), FunctionCall{
+	_, isDone, err := h.Execute(context.Background(), llm.FunctionCall{
 		Name: "done",
 		Args: map[string]any{
 			"category":                        "diagnosis",
@@ -26,49 +27,49 @@ func TestDoneDiagnosis(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.True(t, isDone)
-	assert.Equal(t, CategoryDiagnosis, h.DiagnosisCategory())
+	assert.Equal(t, llm.CategoryDiagnosis, h.DiagnosisCategory())
 	assert.Equal(t, 85, h.DiagnosisConfidence())
 	assert.Equal(t, "low", h.DiagnosisSensitivity())
 }
 
 func TestDoneNoFailures(t *testing.T) {
 	h := &ToolHandler{}
-	_, isDone, err := h.Execute(context.Background(), FunctionCall{
+	_, isDone, err := h.Execute(context.Background(), llm.FunctionCall{
 		Name: "done",
 		Args: map[string]any{"category": "no_failures"},
 	})
 	require.NoError(t, err)
 	require.True(t, isDone)
-	assert.Equal(t, CategoryNoFailures, h.DiagnosisCategory())
+	assert.Equal(t, llm.CategoryNoFailures, h.DiagnosisCategory())
 }
 
 func TestDoneNotSupported(t *testing.T) {
 	h := &ToolHandler{}
-	_, isDone, err := h.Execute(context.Background(), FunctionCall{
+	_, isDone, err := h.Execute(context.Background(), llm.FunctionCall{
 		Name: "done",
 		Args: map[string]any{"category": "not_supported"},
 	})
 	require.NoError(t, err)
 	require.True(t, isDone)
-	assert.Equal(t, CategoryNotSupported, h.DiagnosisCategory())
+	assert.Equal(t, llm.CategoryNotSupported, h.DiagnosisCategory())
 }
 
 func TestDoneWithNoArgs(t *testing.T) {
 	h := &ToolHandler{}
-	_, isDone, err := h.Execute(context.Background(), FunctionCall{
+	_, isDone, err := h.Execute(context.Background(), llm.FunctionCall{
 		Name: "done",
 		Args: map[string]any{},
 	})
 	require.NoError(t, err)
 	require.True(t, isDone)
-	assert.Equal(t, CategoryDiagnosis, h.DiagnosisCategory())
+	assert.Equal(t, llm.CategoryDiagnosis, h.DiagnosisCategory())
 	assert.Equal(t, 50, h.DiagnosisConfidence())
 	assert.Equal(t, "medium", h.DiagnosisSensitivity())
 }
 
 func TestDoneWithFloat64Confidence(t *testing.T) {
 	h := &ToolHandler{}
-	_, isDone, err := h.Execute(context.Background(), FunctionCall{
+	_, isDone, err := h.Execute(context.Background(), llm.FunctionCall{
 		Name: "done",
 		Args: map[string]any{
 			"category":                        "diagnosis",
@@ -83,7 +84,7 @@ func TestDoneWithFloat64Confidence(t *testing.T) {
 
 func TestDoneWithInvalidSensitivity(t *testing.T) {
 	h := &ToolHandler{}
-	_, isDone, err := h.Execute(context.Background(), FunctionCall{
+	_, isDone, err := h.Execute(context.Background(), llm.FunctionCall{
 		Name: "done",
 		Args: map[string]any{
 			"category":                        "diagnosis",
@@ -98,18 +99,18 @@ func TestDoneWithInvalidSensitivity(t *testing.T) {
 
 func TestDoneWithInvalidCategory(t *testing.T) {
 	h := &ToolHandler{}
-	_, isDone, err := h.Execute(context.Background(), FunctionCall{
+	_, isDone, err := h.Execute(context.Background(), llm.FunctionCall{
 		Name: "done",
 		Args: map[string]any{"category": "unknown_value"},
 	})
 	require.NoError(t, err)
 	require.True(t, isDone)
-	assert.Equal(t, CategoryDiagnosis, h.DiagnosisCategory(), "invalid category should fall back to diagnosis")
+	assert.Equal(t, llm.CategoryDiagnosis, h.DiagnosisCategory(), "invalid category should fall back to diagnosis")
 }
 
 func TestDoneConfidenceClampedAbove100(t *testing.T) {
 	h := &ToolHandler{}
-	_, _, err := h.Execute(context.Background(), FunctionCall{
+	_, _, err := h.Execute(context.Background(), llm.FunctionCall{
 		Name: "done",
 		Args: map[string]any{"category": "diagnosis", "confidence": float64(150)},
 	})
@@ -119,7 +120,7 @@ func TestDoneConfidenceClampedAbove100(t *testing.T) {
 
 func TestDoneConfidenceClampedBelowZero(t *testing.T) {
 	h := &ToolHandler{}
-	_, _, err := h.Execute(context.Background(), FunctionCall{
+	_, _, err := h.Execute(context.Background(), llm.FunctionCall{
 		Name: "done",
 		Args: map[string]any{"category": "diagnosis", "confidence": float64(-10)},
 	})
@@ -506,7 +507,7 @@ func TestExecuteGetWorkflowFile(t *testing.T) {
 	ghClient := gh.NewTestClient(srv.URL, srv.Client())
 	h := &ToolHandler{GitHub: ghClient, Owner: "owner", Repo: "repo"}
 
-	result, isDone, err := h.Execute(context.Background(), FunctionCall{
+	result, isDone, err := h.Execute(context.Background(), llm.FunctionCall{
 		Name: "get_workflow_file",
 		Args: map[string]any{"path": ".github/workflows/ci.yml"},
 	})
@@ -536,7 +537,7 @@ func TestExecuteGetArtifact(t *testing.T) {
 	ghClient := gh.NewTestClient(srv.URL, srv.Client())
 	h := &ToolHandler{GitHub: ghClient, Owner: "owner", Repo: "repo", RunID: 123}
 
-	result, isDone, err := h.Execute(context.Background(), FunctionCall{
+	result, isDone, err := h.Execute(context.Background(), llm.FunctionCall{
 		Name: "get_artifact",
 		Args: map[string]any{"artifact_name": "test-artifact"},
 	})
@@ -571,7 +572,7 @@ func TestExecuteGetTestTraces(t *testing.T) {
 	ghClient := gh.NewTestClient(srv.URL, srv.Client())
 	h := &ToolHandler{GitHub: ghClient, Owner: "owner", Repo: "repo", RunID: 123}
 
-	result, isDone, err := h.Execute(context.Background(), FunctionCall{
+	result, isDone, err := h.Execute(context.Background(), llm.FunctionCall{
 		Name: "get_test_traces",
 		Args: map[string]any{},
 	})
@@ -584,7 +585,7 @@ func TestExecuteGetTestTraces(t *testing.T) {
 
 func TestExecuteGetArtifactMissingName(t *testing.T) {
 	h := &ToolHandler{}
-	result, isDone, err := h.Execute(context.Background(), FunctionCall{
+	result, isDone, err := h.Execute(context.Background(), llm.FunctionCall{
 		Name: "get_artifact",
 		Args: map[string]any{},
 	})
@@ -604,7 +605,7 @@ func TestExecuteGetArtifactNotFound(t *testing.T) {
 	ghClient := gh.NewTestClient(srv.URL, srv.Client())
 	h := &ToolHandler{GitHub: ghClient, Owner: "owner", Repo: "repo", RunID: 123}
 
-	result, isDone, err := h.Execute(context.Background(), FunctionCall{
+	result, isDone, err := h.Execute(context.Background(), llm.FunctionCall{
 		Name: "get_artifact",
 		Args: map[string]any{"artifact_name": "nonexistent"},
 	})
@@ -624,7 +625,7 @@ func TestExecuteGetTestTracesNotFound(t *testing.T) {
 	ghClient := gh.NewTestClient(srv.URL, srv.Client())
 	h := &ToolHandler{GitHub: ghClient, Owner: "owner", Repo: "repo", RunID: 123}
 
-	result, _, _ := h.Execute(context.Background(), FunctionCall{
+	result, _, _ := h.Execute(context.Background(), llm.FunctionCall{
 		Name: "get_test_traces",
 		Args: map[string]any{},
 	})
@@ -642,7 +643,7 @@ func TestExecuteGetTestTracesWithNameNotFound(t *testing.T) {
 	ghClient := gh.NewTestClient(srv.URL, srv.Client())
 	h := &ToolHandler{GitHub: ghClient, Owner: "owner", Repo: "repo", RunID: 123}
 
-	result, _, _ := h.Execute(context.Background(), FunctionCall{
+	result, _, _ := h.Execute(context.Background(), llm.FunctionCall{
 		Name: "get_test_traces",
 		Args: map[string]any{"artifact_name": "nonexistent"},
 	})
@@ -652,7 +653,7 @@ func TestExecuteGetTestTracesWithNameNotFound(t *testing.T) {
 
 func TestExecuteGetRepoFileMissingPath(t *testing.T) {
 	h := &ToolHandler{}
-	result, isDone, err := h.Execute(context.Background(), FunctionCall{
+	result, isDone, err := h.Execute(context.Background(), llm.FunctionCall{
 		Name: "get_repo_file",
 		Args: map[string]any{},
 	})

@@ -1,4 +1,4 @@
-package llm
+package analysis
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	gh "github.com/kamilpajak/heisenberg/internal/github"
+	"github.com/kamilpajak/heisenberg/internal/llm"
 	"github.com/kamilpajak/heisenberg/internal/trace"
 )
 
@@ -17,7 +18,7 @@ type ToolHandler struct {
 	Repo         string
 	RunID        int64
 	SnapshotHTML func([]byte) ([]byte, error)
-	Emitter      ProgressEmitter
+	Emitter      llm.ProgressEmitter
 
 	artifacts    []gh.Artifact // cached after first list
 	calledTraces bool          // whether get_test_traces has been called
@@ -28,7 +29,7 @@ type ToolHandler struct {
 
 // Execute dispatches a function call, returning the result string and whether
 // the model signalled it is done (via the "done" tool).
-func (h *ToolHandler) Execute(ctx context.Context, call FunctionCall) (string, bool, error) {
+func (h *ToolHandler) Execute(ctx context.Context, call llm.FunctionCall) (string, bool, error) {
 	switch call.Name {
 	case "list_jobs":
 		return h.listJobs(ctx)
@@ -50,9 +51,9 @@ func (h *ToolHandler) Execute(ctx context.Context, call FunctionCall) (string, b
 }
 
 func (h *ToolHandler) handleDone(args map[string]any) (string, bool, error) {
-	h.category = stringArgOrDefault(args, "category", CategoryDiagnosis)
-	if h.category != CategoryDiagnosis && h.category != CategoryNoFailures && h.category != CategoryNotSupported {
-		h.category = CategoryDiagnosis
+	h.category = stringArgOrDefault(args, "category", llm.CategoryDiagnosis)
+	if h.category != llm.CategoryDiagnosis && h.category != llm.CategoryNoFailures && h.category != llm.CategoryNotSupported {
+		h.category = llm.CategoryDiagnosis
 	}
 	h.confidence = intArgOrDefault(args, "confidence", 50)
 	if h.confidence < 0 {
@@ -273,6 +274,9 @@ func (h *ToolHandler) DiagnosisConfidence() int { return h.confidence }
 // DiagnosisSensitivity returns the missing information sensitivity set by the done tool.
 func (h *ToolHandler) DiagnosisSensitivity() string { return h.sensitivity }
 
+// GetEmitter returns the progress emitter for this handler.
+func (h *ToolHandler) GetEmitter() llm.ProgressEmitter { return h.Emitter }
+
 func errorResult(err error) string {
 	b, _ := json.Marshal(map[string]string{"error": err.Error()})
 	return string(b)
@@ -326,8 +330,8 @@ func stringArgOrDefault(args map[string]any, key string, def string) string {
 }
 
 // ToolDeclarations returns the function declarations for all available tools.
-func ToolDeclarations() []FunctionDeclaration {
-	return []FunctionDeclaration{
+func ToolDeclarations() []llm.FunctionDeclaration {
+	return []llm.FunctionDeclaration{
 		{
 			Name:        "list_jobs",
 			Description: "List all jobs in the workflow run with their status and conclusion.",
@@ -335,9 +339,9 @@ func ToolDeclarations() []FunctionDeclaration {
 		{
 			Name:        "get_job_logs",
 			Description: "Fetch the plain-text log output for a specific job. Use this to see error messages, stack traces, and test output.",
-			Parameters: &Schema{
+			Parameters: &llm.Schema{
 				Type: "object",
-				Properties: map[string]Schema{
+				Properties: map[string]llm.Schema{
 					"job_id": {Type: "number"},
 				},
 				Required: []string{"job_id"},
@@ -346,9 +350,9 @@ func ToolDeclarations() []FunctionDeclaration {
 		{
 			Name:        "get_artifact",
 			Description: "Download and extract a test artifact by name. For HTML reports, returns the rendered page text. For JSON, returns the raw content.",
-			Parameters: &Schema{
+			Parameters: &llm.Schema{
 				Type: "object",
-				Properties: map[string]Schema{
+				Properties: map[string]llm.Schema{
 					"artifact_name": {Type: "string"},
 				},
 				Required: []string{"artifact_name"},
@@ -357,9 +361,9 @@ func ToolDeclarations() []FunctionDeclaration {
 		{
 			Name:        "get_workflow_file",
 			Description: "Fetch a workflow YAML file from the repository (e.g. .github/workflows/ci.yml).",
-			Parameters: &Schema{
+			Parameters: &llm.Schema{
 				Type: "object",
-				Properties: map[string]Schema{
+				Properties: map[string]llm.Schema{
 					"path": {Type: "string"},
 				},
 				Required: []string{"path"},
@@ -368,9 +372,9 @@ func ToolDeclarations() []FunctionDeclaration {
 		{
 			Name:        "get_repo_file",
 			Description: "Fetch any file from the repository by path (e.g. package.json, playwright.config.ts).",
-			Parameters: &Schema{
+			Parameters: &llm.Schema{
 				Type: "object",
-				Properties: map[string]Schema{
+				Properties: map[string]llm.Schema{
 					"path": {Type: "string"},
 				},
 				Required: []string{"path"},
@@ -379,9 +383,9 @@ func ToolDeclarations() []FunctionDeclaration {
 		{
 			Name:        "get_test_traces",
 			Description: "Download a Playwright test-results artifact and extract trace data: browser action sequence, console errors, failed HTTP requests, and error context snapshots. Use this for detailed failure analysis.",
-			Parameters: &Schema{
+			Parameters: &llm.Schema{
 				Type: "object",
-				Properties: map[string]Schema{
+				Properties: map[string]llm.Schema{
 					"artifact_name": {Type: "string"},
 				},
 			},
@@ -389,9 +393,9 @@ func ToolDeclarations() []FunctionDeclaration {
 		{
 			Name:        "done",
 			Description: "Signal that you have gathered enough information. After calling this, provide your final analysis as text.",
-			Parameters: &Schema{
+			Parameters: &llm.Schema{
 				Type: "object",
-				Properties: map[string]Schema{
+				Properties: map[string]llm.Schema{
 					"category": {
 						Type:        "string",
 						Description: "The type of conclusion reached. diagnosis: a specific failure root cause was identified. no_failures: all tests are passing, no failures to diagnose. not_supported: the test framework or artifact format is not supported for analysis.",

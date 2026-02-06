@@ -7,7 +7,7 @@ import (
 
 	"github.com/kamilpajak/heisenberg/internal/analysis"
 	"github.com/kamilpajak/heisenberg/internal/llm"
-	"github.com/kamilpajak/heisenberg/internal/playwright"
+	"github.com/kamilpajak/heisenberg/internal/trace"
 )
 
 func (h *Handler) handleAnalyze(w http.ResponseWriter, r *http.Request) {
@@ -50,7 +50,7 @@ func (h *Handler) handleAnalyze(w http.ResponseWriter, r *http.Request) {
 		RunID:        runID,
 		Verbose:      true,
 		Emitter:      emitter,
-		SnapshotHTML: playwright.SnapshotHTML,
+		SnapshotHTML: trace.SnapshotHTML,
 	})
 	if err != nil {
 		emitter.Emit(llm.ProgressEvent{Type: "error", Message: err.Error()})
@@ -59,4 +59,3 @@ func (h *Handler) handleAnalyze(w http.ResponseWriter, r *http.Request) {
 
 	emitter.Emit(llm.ProgressEvent{Type: "done", Analysis: result})
 }
-

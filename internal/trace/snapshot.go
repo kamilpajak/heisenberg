@@ -1,4 +1,4 @@
-package playwright
+package trace
 
 import (
 	"archive/zip"
@@ -87,7 +87,7 @@ func MergeBlobReports(blobZips [][]byte) (string, error) {
 
 	// Extract all blob zips directly into the blob dir
 	for i, zipData := range blobZips {
-		if err := extractZip(zipData, blobDir); err != nil {
+		if err := extractSnapshotZip(zipData, blobDir); err != nil {
 			os.RemoveAll(blobDir)
 			return "", fmt.Errorf("failed to extract blob %d: %w", i, err)
 		}
@@ -117,7 +117,7 @@ func MergeBlobReports(blobZips [][]byte) (string, error) {
 	return outputDir, nil
 }
 
-func extractZip(zipData []byte, destDir string) error {
+func extractSnapshotZip(zipData []byte, destDir string) error {
 	reader, err := zip.NewReader(bytes.NewReader(zipData), int64(len(zipData)))
 	if err != nil {
 		return err
@@ -155,14 +155,14 @@ func extractZip(zipData []byte, destDir string) error {
 	return nil
 }
 
-// Install installs playwright browsers
-func Install() error {
+// InstallPlaywright installs playwright browsers
+func InstallPlaywright() error {
 	return playwright.Install()
 }
 
 // SnapshotHTML serves HTML content locally and captures page text via headless browser.
 func SnapshotHTML(htmlContent []byte) ([]byte, error) {
-	if !IsAvailable() {
+	if !IsPlaywrightAvailable() {
 		return nil, fmt.Errorf("playwright not installed. Run: go run github.com/playwright-community/playwright-go/cmd/playwright install chromium")
 	}
 
@@ -180,8 +180,8 @@ func SnapshotHTML(htmlContent []byte) ([]byte, error) {
 	return snapshot, nil
 }
 
-// IsAvailable checks if playwright browsers are installed
-func IsAvailable() bool {
+// IsPlaywrightAvailable checks if playwright browsers are installed
+func IsPlaywrightAvailable() bool {
 	pw, err := playwright.Run()
 	if err != nil {
 		return false

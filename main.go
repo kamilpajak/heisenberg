@@ -13,7 +13,7 @@ import (
 	"github.com/fatih/color"
 	"github.com/kamilpajak/heisenberg/internal/analysis"
 	"github.com/kamilpajak/heisenberg/internal/llm"
-	"github.com/kamilpajak/heisenberg/internal/playwright"
+	"github.com/kamilpajak/heisenberg/internal/trace"
 	"github.com/kamilpajak/heisenberg/internal/web"
 	"github.com/spf13/cobra"
 )
@@ -68,7 +68,7 @@ func run(cmd *cobra.Command, args []string) error {
 		RunID:        runID,
 		Verbose:      verbose,
 		Emitter:      emitter,
-		SnapshotHTML: playwright.SnapshotHTML,
+		SnapshotHTML: trace.SnapshotHTML,
 	})
 	if err != nil {
 		emitter.Close()
