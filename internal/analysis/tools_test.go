@@ -663,6 +663,285 @@ func TestExecuteGetRepoFileMissingPath(t *testing.T) {
 	assert.Contains(t, result, "path is required")
 }
 
+func TestExecuteListJobs(t *testing.T) {
+	jobs := []gh.Job{
+		{ID: 1, Name: "build", Status: "completed", Conclusion: "success"},
+		{ID: 2, Name: "test", Status: "completed", Conclusion: "failure"},
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{"jobs": jobs})
+	}))
+	defer srv.Close()
+
+	ghClient := gh.NewTestClient(srv.URL, srv.Client())
+	h := &ToolHandler{GitHub: ghClient, Owner: "owner", Repo: "repo", RunID: 123}
+
+	result, isDone, err := h.Execute(context.Background(), llm.FunctionCall{
+		Name: "list_jobs",
+		Args: map[string]any{},
+	})
+
+	require.NoError(t, err)
+	assert.False(t, isDone)
+	assert.Contains(t, result, "build")
+	assert.Contains(t, result, "test")
+	assert.Contains(t, result, "failure")
+}
+
+func TestExecuteListJobsError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+
+	ghClient := gh.NewTestClient(srv.URL, srv.Client())
+	h := &ToolHandler{GitHub: ghClient, Owner: "owner", Repo: "repo", RunID: 123}
+
+	result, isDone, err := h.Execute(context.Background(), llm.FunctionCall{
+		Name: "list_jobs",
+		Args: map[string]any{},
+	})
+
+	require.NoError(t, err)
+	assert.False(t, isDone)
+	assert.Contains(t, result, "error")
+}
+
+func TestExecuteGetJobLogs(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("Build started\nTest failed: expected 1, got 2\nBuild finished"))
+	}))
+	defer srv.Close()
+
+	ghClient := gh.NewTestClient(srv.URL, srv.Client())
+	h := &ToolHandler{GitHub: ghClient, Owner: "owner", Repo: "repo", RunID: 123}
+
+	result, isDone, err := h.Execute(context.Background(), llm.FunctionCall{
+		Name: "get_job_logs",
+		Args: map[string]any{"job_id": float64(456)},
+	})
+
+	require.NoError(t, err)
+	assert.False(t, isDone)
+	assert.Contains(t, result, "Test failed")
+}
+
+func TestExecuteGetJobLogsMissingJobID(t *testing.T) {
+	h := &ToolHandler{}
+	result, isDone, err := h.Execute(context.Background(), llm.FunctionCall{
+		Name: "get_job_logs",
+		Args: map[string]any{},
+	})
+
+	require.NoError(t, err)
+	assert.False(t, isDone)
+	assert.Contains(t, result, "job_id is required")
+}
+
+func TestExecuteGetJobLogsInvalidJobID(t *testing.T) {
+	h := &ToolHandler{}
+	result, isDone, err := h.Execute(context.Background(), llm.FunctionCall{
+		Name: "get_job_logs",
+		Args: map[string]any{"job_id": "not a number"},
+	})
+
+	require.NoError(t, err)
+	assert.False(t, isDone)
+	assert.Contains(t, result, "must be a number")
+}
+
+func TestExecuteGetJobLogsError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	ghClient := gh.NewTestClient(srv.URL, srv.Client())
+	h := &ToolHandler{GitHub: ghClient, Owner: "owner", Repo: "repo", RunID: 123}
+
+	result, isDone, err := h.Execute(context.Background(), llm.FunctionCall{
+		Name: "get_job_logs",
+		Args: map[string]any{"job_id": float64(999)},
+	})
+
+	require.NoError(t, err)
+	assert.False(t, isDone)
+	assert.Contains(t, result, "error")
+}
+
+func TestExecuteGetJobLogsTruncate(t *testing.T) {
+	// Create logs larger than 80000 bytes
+	largeLogs := make([]byte, 100000)
+	for i := range largeLogs {
+		largeLogs[i] = 'x'
+	}
+	// Add marker at the end
+	copy(largeLogs[len(largeLogs)-10:], []byte("END_MARKER"))
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write(largeLogs)
+	}))
+	defer srv.Close()
+
+	ghClient := gh.NewTestClient(srv.URL, srv.Client())
+	h := &ToolHandler{GitHub: ghClient, Owner: "owner", Repo: "repo", RunID: 123}
+
+	result, _, _ := h.Execute(context.Background(), llm.FunctionCall{
+		Name: "get_job_logs",
+		Args: map[string]any{"job_id": float64(1)},
+	})
+
+	// Should be truncated to last 80000 chars, including the END_MARKER
+	assert.Len(t, result, 80000)
+	assert.Contains(t, result, "END_MARKER")
+}
+
+func TestExecuteUnknownTool(t *testing.T) {
+	h := &ToolHandler{}
+	result, isDone, err := h.Execute(context.Background(), llm.FunctionCall{
+		Name: "unknown_tool",
+		Args: map[string]any{},
+	})
+
+	require.NoError(t, err)
+	assert.False(t, isDone)
+	assert.Contains(t, result, "unknown tool")
+}
+
+func TestGetEmitter(t *testing.T) {
+	emitter := &mockEmitter{}
+	h := &ToolHandler{Emitter: emitter}
+	assert.Equal(t, emitter, h.GetEmitter())
+}
+
+func TestGetEmitterNil(t *testing.T) {
+	h := &ToolHandler{}
+	assert.Nil(t, h.GetEmitter())
+}
+
+func TestIntArg(t *testing.T) {
+	tests := []struct {
+		name    string
+		args    map[string]any
+		key     string
+		want    int64
+		wantErr bool
+	}{
+		{
+			name: "float64 value",
+			args: map[string]any{"job_id": float64(123)},
+			key:  "job_id",
+			want: 123,
+		},
+		{
+			name: "json.Number value",
+			args: map[string]any{"job_id": json.Number("456")},
+			key:  "job_id",
+			want: 456,
+		},
+		{
+			name:    "missing key",
+			args:    map[string]any{},
+			key:     "job_id",
+			wantErr: true,
+		},
+		{
+			name:    "wrong type",
+			args:    map[string]any{"job_id": "not a number"},
+			key:     "job_id",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := intArg(tt.args, tt.key)
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tt.want, got)
+			}
+		})
+	}
+}
+
+func TestIntArgOrDefault(t *testing.T) {
+	tests := []struct {
+		name string
+		args map[string]any
+		key  string
+		def  int
+		want int
+	}{
+		{
+			name: "float64 value",
+			args: map[string]any{"conf": float64(85)},
+			key:  "conf",
+			def:  50,
+			want: 85,
+		},
+		{
+			name: "json.Number value",
+			args: map[string]any{"conf": json.Number("90")},
+			key:  "conf",
+			def:  50,
+			want: 90,
+		},
+		{
+			name: "missing key returns default",
+			args: map[string]any{},
+			key:  "conf",
+			def:  50,
+			want: 50,
+		},
+		{
+			name: "wrong type returns default",
+			args: map[string]any{"conf": "high"},
+			key:  "conf",
+			def:  50,
+			want: 50,
+		},
+		{
+			name: "invalid json.Number returns default",
+			args: map[string]any{"conf": json.Number("invalid")},
+			key:  "conf",
+			def:  50,
+			want: 50,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := intArgOrDefault(tt.args, tt.key, tt.def)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestToolDeclarations(t *testing.T) {
+	decls := ToolDeclarations()
+
+	// Check we have all expected tools
+	names := make([]string, len(decls))
+	for i, d := range decls {
+		names[i] = d.Name
+	}
+
+	assert.Contains(t, names, "list_jobs")
+	assert.Contains(t, names, "get_job_logs")
+	assert.Contains(t, names, "get_artifact")
+	assert.Contains(t, names, "get_workflow_file")
+	assert.Contains(t, names, "get_repo_file")
+	assert.Contains(t, names, "get_test_traces")
+	assert.Contains(t, names, "done")
+	assert.Len(t, decls, 7)
+}
+
+type mockEmitter struct{}
+
+func (m *mockEmitter) Emit(llm.ProgressEvent) {}
+
 func buildZip(t *testing.T, files map[string][]byte) []byte {
 	t.Helper()
 	var buf bytes.Buffer
