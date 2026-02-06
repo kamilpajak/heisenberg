@@ -615,6 +615,25 @@ func TestExecuteGetArtifactNotFound(t *testing.T) {
 	assert.Contains(t, result, "not found")
 }
 
+func TestExecuteGetArtifactCacheError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+
+	ghClient := gh.NewTestClient(srv.URL, srv.Client())
+	h := &ToolHandler{GitHub: ghClient, Owner: "owner", Repo: "repo", RunID: 123}
+
+	result, isDone, err := h.Execute(context.Background(), llm.FunctionCall{
+		Name: "get_artifact",
+		Args: map[string]any{"artifact_name": "test"},
+	})
+
+	require.NoError(t, err)
+	assert.False(t, isDone)
+	assert.Contains(t, result, "error")
+}
+
 func TestExecuteGetTestTracesNotFound(t *testing.T) {
 	artifacts := []gh.Artifact{{ID: 1, Name: "html-report", Expired: false}}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -651,6 +670,72 @@ func TestExecuteGetTestTracesWithNameNotFound(t *testing.T) {
 	assert.Contains(t, result, "not found")
 }
 
+func TestExecuteGetTestTracesCacheError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+
+	ghClient := gh.NewTestClient(srv.URL, srv.Client())
+	h := &ToolHandler{GitHub: ghClient, Owner: "owner", Repo: "repo", RunID: 123}
+
+	result, _, _ := h.Execute(context.Background(), llm.FunctionCall{
+		Name: "get_test_traces",
+		Args: map[string]any{},
+	})
+
+	assert.Contains(t, result, "error")
+}
+
+func TestExecuteGetTestTracesDownloadError(t *testing.T) {
+	artifacts := []gh.Artifact{{ID: 1, Name: "test-results", Expired: false}}
+	requestCount := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+		if requestCount == 1 {
+			_ = json.NewEncoder(w).Encode(map[string]any{"artifacts": artifacts})
+		} else {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	}))
+	defer srv.Close()
+
+	ghClient := gh.NewTestClient(srv.URL, srv.Client())
+	h := &ToolHandler{GitHub: ghClient, Owner: "owner", Repo: "repo", RunID: 123}
+
+	result, _, _ := h.Execute(context.Background(), llm.FunctionCall{
+		Name: "get_test_traces",
+		Args: map[string]any{},
+	})
+
+	assert.Contains(t, result, "error")
+}
+
+func TestExecuteGetTestTracesParseError(t *testing.T) {
+	artifacts := []gh.Artifact{{ID: 1, Name: "test-results", Expired: false}}
+	requestCount := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+		if requestCount == 1 {
+			_ = json.NewEncoder(w).Encode(map[string]any{"artifacts": artifacts})
+		} else {
+			// Return invalid zip
+			w.Write([]byte("not a zip"))
+		}
+	}))
+	defer srv.Close()
+
+	ghClient := gh.NewTestClient(srv.URL, srv.Client())
+	h := &ToolHandler{GitHub: ghClient, Owner: "owner", Repo: "repo", RunID: 123}
+
+	result, _, _ := h.Execute(context.Background(), llm.FunctionCall{
+		Name: "get_test_traces",
+		Args: map[string]any{},
+	})
+
+	assert.Contains(t, result, "error")
+}
+
 func TestExecuteGetRepoFileMissingPath(t *testing.T) {
 	h := &ToolHandler{}
 	result, isDone, err := h.Execute(context.Background(), llm.FunctionCall{
@@ -661,6 +746,64 @@ func TestExecuteGetRepoFileMissingPath(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, isDone)
 	assert.Contains(t, result, "path is required")
+}
+
+func TestExecuteGetRepoFileError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	ghClient := gh.NewTestClient(srv.URL, srv.Client())
+	h := &ToolHandler{GitHub: ghClient, Owner: "owner", Repo: "repo"}
+
+	result, isDone, err := h.Execute(context.Background(), llm.FunctionCall{
+		Name: "get_repo_file",
+		Args: map[string]any{"path": "nonexistent.txt"},
+	})
+
+	require.NoError(t, err)
+	assert.False(t, isDone)
+	assert.Contains(t, result, "error")
+}
+
+func TestStringArgOrDefault(t *testing.T) {
+	tests := []struct {
+		name string
+		args map[string]any
+		key  string
+		def  string
+		want string
+	}{
+		{
+			name: "string value",
+			args: map[string]any{"cat": "diagnosis"},
+			key:  "cat",
+			def:  "default",
+			want: "diagnosis",
+		},
+		{
+			name: "missing key returns default",
+			args: map[string]any{},
+			key:  "cat",
+			def:  "default",
+			want: "default",
+		},
+		{
+			name: "wrong type returns default",
+			args: map[string]any{"cat": 123},
+			key:  "cat",
+			def:  "default",
+			want: "default",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := stringArgOrDefault(tt.args, tt.key, tt.def)
+			assert.Equal(t, tt.want, got)
+		})
+	}
 }
 
 func TestExecuteListJobs(t *testing.T) {
