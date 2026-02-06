@@ -136,3 +136,91 @@ func buildTestZip(t *testing.T, files map[string][]byte) []byte {
 	require.NoError(t, w.Close())
 	return buf.Bytes()
 }
+
+// mockRunner captures command arguments for testing.
+type mockRunner struct {
+	lastCmd  string
+	lastArgs []string
+	lastEnv  []string
+	output   []byte
+	err      error
+}
+
+func (m *mockRunner) Run(name string, args []string, env []string) ([]byte, error) {
+	m.lastCmd = name
+	m.lastArgs = args
+	m.lastEnv = env
+	return m.output, m.err
+}
+
+func TestMergeBlobReportsWithRunner_Success(t *testing.T) {
+	mock := &mockRunner{output: []byte("success")}
+	validZip := buildTestZip(t, map[string][]byte{"report.json": []byte("{}")})
+
+	outputDir, err := MergeBlobReportsWithRunner([][]byte{validZip}, mock)
+	require.NoError(t, err)
+	defer os.RemoveAll(outputDir)
+
+	// Verify correct command was called
+	assert.Equal(t, "npx", mock.lastCmd)
+	assert.Equal(t, "playwright", mock.lastArgs[0])
+	assert.Equal(t, "merge-reports", mock.lastArgs[1])
+	assert.Equal(t, "--reporter", mock.lastArgs[2])
+	assert.Equal(t, "html", mock.lastArgs[3])
+	// lastArgs[4] is the blob dir path
+
+	// Verify env vars
+	assert.Contains(t, mock.lastEnv[0], "PLAYWRIGHT_HTML_OPEN=never")
+	assert.Contains(t, mock.lastEnv[1], "PLAYWRIGHT_HTML_OUTPUT_DIR=")
+}
+
+func TestMergeBlobReportsWithRunner_CommandFails(t *testing.T) {
+	mock := &mockRunner{
+		output: []byte("merge failed: no reports found"),
+		err:    assert.AnError,
+	}
+	validZip := buildTestZip(t, map[string][]byte{"report.json": []byte("{}")})
+
+	_, err := MergeBlobReportsWithRunner([][]byte{validZip}, mock)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "merge-reports failed")
+	assert.Contains(t, err.Error(), "no reports found")
+}
+
+func TestMergeBlobReportsWithRunner_MultipleBlobs(t *testing.T) {
+	mock := &mockRunner{output: []byte("merged")}
+	blob1 := buildTestZip(t, map[string][]byte{"shard1.json": []byte("{}")})
+	blob2 := buildTestZip(t, map[string][]byte{"shard2.json": []byte("{}")})
+
+	outputDir, err := MergeBlobReportsWithRunner([][]byte{blob1, blob2}, mock)
+	require.NoError(t, err)
+	defer os.RemoveAll(outputDir)
+
+	assert.Equal(t, "npx", mock.lastCmd)
+}
+
+func TestExecRunner_Run(t *testing.T) {
+	runner := ExecRunner{}
+
+	// Test with a simple command that should work on all platforms
+	output, err := runner.Run("echo", []string{"hello"}, nil)
+	require.NoError(t, err)
+	assert.Contains(t, string(output), "hello")
+}
+
+func TestExecRunner_RunWithEnv(t *testing.T) {
+	runner := ExecRunner{}
+
+	// Test that env vars are passed (using printenv on unix)
+	output, err := runner.Run("printenv", []string{"TEST_VAR"}, []string{"TEST_VAR=test_value"})
+	require.NoError(t, err)
+	assert.Contains(t, string(output), "test_value")
+}
+
+func TestExecRunner_RunFailure(t *testing.T) {
+	runner := ExecRunner{}
+
+	// Test with a command that doesn't exist
+	_, err := runner.Run("nonexistent_command_12345", []string{}, nil)
+	require.Error(t, err)
+}

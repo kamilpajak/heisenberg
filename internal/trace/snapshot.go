@@ -13,6 +13,26 @@ import (
 	"github.com/playwright-community/playwright-go"
 )
 
+// CommandRunner abstracts command execution for testing.
+type CommandRunner interface {
+	Run(name string, args []string, env []string) ([]byte, error)
+}
+
+// ExecRunner is the default implementation using os/exec.
+type ExecRunner struct{}
+
+// Run executes a command and returns combined output.
+func (ExecRunner) Run(name string, args []string, env []string) ([]byte, error) {
+	cmd := exec.Command(name, args...)
+	if len(env) > 0 {
+		cmd.Env = append(os.Environ(), env...)
+	}
+	return cmd.CombinedOutput()
+}
+
+// DefaultRunner is used when no runner is provided.
+var DefaultRunner CommandRunner = ExecRunner{}
+
 // Snapshot opens a URL in headless browser and captures page content
 func Snapshot(url string) ([]byte, error) {
 	pw, err := playwright.Run()
@@ -79,6 +99,11 @@ func Snapshot(url string) ([]byte, error) {
 // MergeBlobReports merges Playwright blob report ZIPs into an HTML report.
 // Returns the path to a temp directory containing the merged HTML report.
 func MergeBlobReports(blobZips [][]byte) (string, error) {
+	return MergeBlobReportsWithRunner(blobZips, DefaultRunner)
+}
+
+// MergeBlobReportsWithRunner merges blob reports using a custom command runner.
+func MergeBlobReportsWithRunner(blobZips [][]byte, runner CommandRunner) (string, error) {
 	// Create temp dir for blob reports
 	blobDir, err := os.MkdirTemp("", "heisenberg-blobs-*")
 	if err != nil {
@@ -101,13 +126,10 @@ func MergeBlobReports(blobZips [][]byte) (string, error) {
 	}
 
 	// Run npx playwright merge-reports
-	cmd := exec.Command("npx", "playwright", "merge-reports",
-		"--reporter", "html",
-		blobDir,
-	)
-	cmd.Env = append(os.Environ(), "PLAYWRIGHT_HTML_OPEN=never", "PLAYWRIGHT_HTML_OUTPUT_DIR="+outputDir)
+	args := []string{"playwright", "merge-reports", "--reporter", "html", blobDir}
+	env := []string{"PLAYWRIGHT_HTML_OPEN=never", "PLAYWRIGHT_HTML_OUTPUT_DIR=" + outputDir}
 
-	output, err := cmd.CombinedOutput()
+	output, err := runner.Run("npx", args, env)
 	os.RemoveAll(blobDir)
 	if err != nil {
 		os.RemoveAll(outputDir)
