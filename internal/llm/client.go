@@ -13,10 +13,10 @@ import (
 	"time"
 )
 
-// emit sends a progress event via the handler's emitter, if set.
-func emit(h *ToolHandler, ev ProgressEvent) {
-	if h != nil && h.Emitter != nil {
-		h.Emitter.Emit(ev)
+// emit sends a progress event via the executor's emitter, if set.
+func emit(h ToolExecutor, ev ProgressEvent) {
+	if h != nil && h.GetEmitter() != nil {
+		h.GetEmitter().Emit(ev)
 	}
 }
 
@@ -171,8 +171,8 @@ type loopState struct {
 
 // RunAgentLoop runs the agentic conversation loop. The model can call tools
 // iteratively until it produces a text response or hits the iteration limit.
-func (c *Client) RunAgentLoop(ctx context.Context, handler *ToolHandler, initialContext string, verbose bool) (*AnalysisResult, error) {
-	tools := []Tool{{FunctionDeclarations: ToolDeclarations()}}
+func (c *Client) RunAgentLoop(ctx context.Context, handler ToolExecutor, toolDecls []FunctionDeclaration, initialContext string, verbose bool) (*AnalysisResult, error) {
+	tools := []Tool{{FunctionDeclarations: toolDecls}}
 	system := systemPrompt()
 
 	s := &loopState{
@@ -216,7 +216,7 @@ func (c *Client) RunAgentLoop(ctx context.Context, handler *ToolHandler, initial
 
 // callModel calls the LLM and handles empty response retries.
 // It populates si.modelMs and si.tokens.
-func (c *Client) callModel(ctx context.Context, s *loopState, tools []Tool, system *Content, handler *ToolHandler, si *stepInfo) (*Candidate, error) {
+func (c *Client) callModel(ctx context.Context, s *loopState, tools []Tool, system *Content, handler ToolExecutor, si *stepInfo) (*Candidate, error) {
 	t0 := time.Now()
 	resp, err := c.generate(ctx, s.history, tools, system)
 	si.modelMs = int(time.Since(t0).Milliseconds())
@@ -245,7 +245,7 @@ func (c *Client) callModel(ctx context.Context, s *loopState, tools []Tool, syst
 
 // processResponse dispatches the model response to text or tool handling.
 // Returns a non-nil result when the loop should return, nil when it should continue.
-func (c *Client) processResponse(ctx context.Context, s *loopState, handler *ToolHandler, content Content, si *stepInfo) (*AnalysisResult, error) {
+func (c *Client) processResponse(ctx context.Context, s *loopState, handler ToolExecutor, content Content, si *stepInfo) (*AnalysisResult, error) {
 	calls := extractCalls(content)
 	if len(calls) == 0 {
 		return c.handleTextResponse(ctx, s, handler, content, si)
@@ -255,7 +255,7 @@ func (c *Client) processResponse(ctx context.Context, s *loopState, handler *Too
 
 // handleTextResponse processes a text-only model response, handling pending
 // traces, done-nudge logic, and result building.
-func (c *Client) handleTextResponse(ctx context.Context, s *loopState, handler *ToolHandler, content Content, si *stepInfo) (*AnalysisResult, error) {
+func (c *Client) handleTextResponse(ctx context.Context, s *loopState, handler ToolExecutor, content Content, si *stepInfo) (*AnalysisResult, error) {
 	if si.verbose {
 		emit(handler, ProgressEvent{Type: "result", Step: si.step, MaxStep: maxIterations, ModelMs: si.modelMs, Tokens: si.tokens})
 	}
@@ -299,7 +299,7 @@ func (c *Client) handleTextResponse(ctx context.Context, s *loopState, handler *
 
 // handleToolResponse executes tool calls and handles done signalling,
 // pending traces, and nudge-based early returns.
-func (c *Client) handleToolResponse(ctx context.Context, s *loopState, handler *ToolHandler, calls []FunctionCall, si *stepInfo) (*AnalysisResult, error) {
+func (c *Client) handleToolResponse(ctx context.Context, s *loopState, handler ToolExecutor, calls []FunctionCall, si *stepInfo) (*AnalysisResult, error) {
 	responseParts, done, err := c.executeCalls(ctx, handler, calls, si)
 	if err != nil {
 		return nil, err
@@ -332,7 +332,7 @@ func (c *Client) handleToolResponse(ctx context.Context, s *loopState, handler *
 
 // buildResult creates an AnalysisResult from collected text parts, applying
 // defaults when the model skipped the done tool.
-func buildResult(texts []string, handler *ToolHandler) *AnalysisResult {
+func buildResult(texts []string, handler ToolExecutor) *AnalysisResult {
 	result := &AnalysisResult{
 		Text:        strings.Join(texts, "\n"),
 		Category:    handler.DiagnosisCategory(),
@@ -355,7 +355,7 @@ func (c *Client) handleEmptyResponse(
 	s *loopState,
 	tools []Tool,
 	system *Content,
-	handler *ToolHandler,
+	handler ToolExecutor,
 	si *stepInfo,
 	candidate *Candidate,
 ) (*Candidate, error) {
@@ -384,7 +384,7 @@ func (c *Client) handleEmptyResponse(
 }
 
 // executeCalls runs each function call, emitting progress events and collecting responses.
-func (c *Client) executeCalls(ctx context.Context, handler *ToolHandler, calls []FunctionCall, si *stepInfo) ([]Part, bool, error) {
+func (c *Client) executeCalls(ctx context.Context, handler ToolExecutor, calls []FunctionCall, si *stepInfo) ([]Part, bool, error) {
 	var responseParts []Part
 	done := false
 	for ci, call := range calls {
@@ -419,7 +419,7 @@ func (c *Client) executeCalls(ctx context.Context, handler *ToolHandler, calls [
 }
 
 // emitToolResult sends a verbose progress event for a completed tool call.
-func emitToolResult(handler *ToolHandler, si *stepInfo, ci, totalCalls, toolMs int, result string) {
+func emitToolResult(handler ToolExecutor, si *stepInfo, ci, totalCalls, toolMs int, result string) {
 	if !si.verbose {
 		return
 	}
@@ -449,7 +449,7 @@ func (c *Client) generateFinal(
 	history []Content,
 	tools []Tool,
 	system *Content,
-	handler *ToolHandler,
+	handler ToolExecutor,
 	verbose bool,
 ) (*AnalysisResult, error) {
 	emit(handler, ProgressEvent{Type: "step", Step: maxIterations, MaxStep: maxIterations, Message: "Generating final analysis..."})
@@ -476,7 +476,7 @@ func (c *Client) generateFinal(
 }
 
 // forceTraces calls get_test_traces programmatically when the model skips it.
-func (c *Client) forceTraces(ctx context.Context, handler *ToolHandler, step, maxIter int, verbose bool) string {
+func (c *Client) forceTraces(ctx context.Context, handler ToolExecutor, step, maxIter int, verbose bool) string {
 	emit(handler, ProgressEvent{Type: "tool", Step: step, MaxStep: maxIter, Tool: "get_test_traces", Message: "Forcing get_test_traces (model skipped it)"})
 	t0 := time.Now()
 	result, _, _ := handler.Execute(ctx, FunctionCall{

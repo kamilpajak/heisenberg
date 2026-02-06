@@ -63,7 +63,7 @@ func Run(ctx context.Context, p Params) (*llm.AnalysisResult, error) {
 
 	initialContext := buildInitialContext(wfRun, jobs, artifacts)
 
-	handler := &llm.ToolHandler{
+	handler := &ToolHandler{
 		GitHub:       ghClient,
 		Owner:        p.Owner,
 		Repo:         p.Repo,
@@ -77,7 +77,7 @@ func Run(ctx context.Context, p Params) (*llm.AnalysisResult, error) {
 		return nil, err
 	}
 
-	return llmClient.RunAgentLoop(ctx, handler, initialContext, p.Verbose)
+	return llmClient.RunAgentLoop(ctx, handler, ToolDeclarations(), initialContext, p.Verbose)
 }
 
 func emitInfo(e llm.ProgressEmitter, msg string) {

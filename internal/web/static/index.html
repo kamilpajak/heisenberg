@@ -47,7 +47,7 @@
     white-space: nowrap;
   }
   button:hover { background: #2ea043; }
-  button:disabled { background: #21262d; color: #484f58; cursor: not-allowed; }
+  button:disabled { background: #21262d; color: #6e7681; cursor: not-allowed; }
   #progress {
     font-family: "SF Mono", SFMono-Regular, Consolas, monospace;
     font-size: 0.8rem;
@@ -199,7 +199,9 @@
       let html = '';
 
       if (a.category === 'diagnosis') {
-        const level = a.confidence >= 70 ? 'high' : (a.confidence >= 40 ? 'medium' : 'low');
+        let level = 'low';
+        if (a.confidence >= 70) level = 'high';
+        else if (a.confidence >= 40) level = 'medium';
         html += '<span class="badge ' + level + '">Confidence: ' + a.confidence + '%</span> ';
         html += '<span class="badge neutral">Sensitivity: ' + a.sensitivity + '</span>';
       } else if (a.category === 'no_failures') {

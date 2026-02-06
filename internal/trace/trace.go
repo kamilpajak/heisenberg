@@ -36,6 +36,12 @@ type Request struct {
 	Status int
 }
 
+// dirFiles groups trace-related files found in a test directory.
+type dirFiles struct {
+	traceZip     *zip.File
+	errorContext *zip.File
+}
+
 // ParseArtifact extracts trace data from a GitHub artifact ZIP (which contains
 // nested test directories, each potentially containing a trace.zip).
 func ParseArtifact(zipData []byte) ([]TestTrace, error) {
@@ -44,15 +50,26 @@ func ParseArtifact(zipData []byte) ([]TestTrace, error) {
 		return nil, fmt.Errorf("open outer zip: %w", err)
 	}
 
-	// Index files by their directory prefix.
-	// Structure: test-dir-name/trace.zip, test-dir-name/error-context.md
-	type dirFiles struct {
-		traceZip     *zip.File
-		errorContext *zip.File
+	dirs := indexDirFiles(outer.File)
+
+	var traces []TestTrace
+	for dir, files := range dirs {
+		if t, ok := buildTrace(dir, files); ok {
+			traces = append(traces, t)
+		}
 	}
+
+	if len(traces) == 0 {
+		return nil, fmt.Errorf("no test trace directories found in artifact")
+	}
+
+	return traces, nil
+}
+
+func indexDirFiles(files []*zip.File) map[string]*dirFiles {
 	dirs := make(map[string]*dirFiles)
 
-	for _, f := range outer.File {
+	for _, f := range files {
 		if f.FileInfo().IsDir() {
 			continue
 		}
@@ -74,36 +91,30 @@ func ParseArtifact(zipData []byte) ([]TestTrace, error) {
 		}
 	}
 
-	var traces []TestTrace
-	for dir, files := range dirs {
-		if files.traceZip == nil && files.errorContext == nil {
-			continue
-		}
+	return dirs
+}
 
-		t := TestTrace{TestDir: dir}
-
-		if files.errorContext != nil {
-			data, err := readZipFile(files.errorContext)
-			if err == nil {
-				t.ErrorContext = string(data)
-			}
-		}
-
-		if files.traceZip != nil {
-			if err := parseTraceZip(files.traceZip, &t); err != nil {
-				// Non-fatal: include what we have
-				continue
-			}
-		}
-
-		traces = append(traces, t)
+func buildTrace(dir string, files *dirFiles) (TestTrace, bool) {
+	if files.traceZip == nil && files.errorContext == nil {
+		return TestTrace{}, false
 	}
 
-	if len(traces) == 0 {
-		return nil, fmt.Errorf("no test trace directories found in artifact")
+	t := TestTrace{TestDir: dir}
+
+	if files.errorContext != nil {
+		data, err := readZipFile(files.errorContext)
+		if err == nil {
+			t.ErrorContext = string(data)
+		}
 	}
 
-	return traces, nil
+	if files.traceZip != nil {
+		if parseTraceZip(files.traceZip, &t) != nil {
+			return TestTrace{}, false
+		}
+	}
+
+	return t, true
 }
 
 func parseTraceZip(f *zip.File, t *TestTrace) error {
@@ -121,11 +132,11 @@ func parseTraceZip(f *zip.File, t *TestTrace) error {
 		base := path.Base(entry.Name)
 		switch {
 		case strings.HasSuffix(base, "-trace.trace") || base == "0-trace.trace":
-			if err := parseBrowserTrace(entry, t); err != nil {
+			if parseBrowserTrace(entry, t) != nil {
 				continue
 			}
 		case strings.HasSuffix(base, "-trace.network") || base == "0-trace.network":
-			if err := parseNetworkTrace(entry, t); err != nil {
+			if parseNetworkTrace(entry, t) != nil {
 				continue
 			}
 		}
@@ -158,7 +169,7 @@ func parseBrowserTrace(f *zip.File, t *TestTrace) error {
 
 	for scanner.Scan() {
 		var ev traceEvent
-		if err := json.Unmarshal(scanner.Bytes(), &ev); err != nil {
+		if json.Unmarshal(scanner.Bytes(), &ev) != nil {
 			continue
 		}
 
@@ -188,18 +199,24 @@ func parseBrowserTrace(f *zip.File, t *TestTrace) error {
 	return scanner.Err()
 }
 
+type networkRequest struct {
+	Method string `json:"method"`
+	URL    string `json:"url"`
+}
+
+type networkResponse struct {
+	Status int `json:"status"`
+}
+
+type networkSnapshot struct {
+	Request  networkRequest  `json:"request"`
+	Response networkResponse `json:"response"`
+}
+
 // networkEvent represents a single line from a .network NDJSON file.
 type networkEvent struct {
-	Type     string `json:"type"`
-	Snapshot struct {
-		Request struct {
-			Method string `json:"method"`
-			URL    string `json:"url"`
-		} `json:"request"`
-		Response struct {
-			Status int `json:"status"`
-		} `json:"response"`
-	} `json:"snapshot"`
+	Type     string          `json:"type"`
+	Snapshot networkSnapshot `json:"snapshot"`
 }
 
 func parseNetworkTrace(f *zip.File, t *TestTrace) error {
@@ -214,7 +231,7 @@ func parseNetworkTrace(f *zip.File, t *TestTrace) error {
 
 	for scanner.Scan() {
 		var ev networkEvent
-		if err := json.Unmarshal(scanner.Bytes(), &ev); err != nil {
+		if json.Unmarshal(scanner.Bytes(), &ev) != nil {
 			continue
 		}
 
@@ -263,42 +280,62 @@ func FormatSummary(traces []TestTrace) string {
 		if i > 0 {
 			b.WriteString("\n---\n\n")
 		}
-		fmt.Fprintf(&b, "## Test: %s\n\n", t.TestDir)
-
-		if len(t.Actions) > 0 {
-			b.WriteString("### Last Browser Actions\n")
-			for _, a := range t.Actions {
-				if a.Params != "" {
-					fmt.Fprintf(&b, "- %s.%s %s\n", a.Class, a.Method, a.Params)
-				} else {
-					fmt.Fprintf(&b, "- %s.%s\n", a.Class, a.Method)
-				}
-			}
-			b.WriteString("\n")
-		}
-
-		if len(t.ConsoleErrors) > 0 {
-			b.WriteString("### Console Errors\n")
-			for _, msg := range t.ConsoleErrors {
-				fmt.Fprintf(&b, "- %s\n", msg)
-			}
-			b.WriteString("\n")
-		}
-
-		if len(t.FailedRequests) > 0 {
-			b.WriteString("### Failed HTTP Requests\n")
-			for _, r := range t.FailedRequests {
-				fmt.Fprintf(&b, "- %s %s → %d\n", r.Method, r.URL, r.Status)
-			}
-			b.WriteString("\n")
-		}
-
-		if t.ErrorContext != "" {
-			b.WriteString("### Error Context (page snapshot)\n")
-			b.WriteString(t.ErrorContext)
-			b.WriteString("\n")
-		}
+		formatTrace(&b, t)
 	}
 
 	return b.String()
+}
+
+func formatTrace(b *strings.Builder, t TestTrace) {
+	fmt.Fprintf(b, "## Test: %s\n\n", t.TestDir)
+	formatActions(b, t.Actions)
+	formatConsoleErrors(b, t.ConsoleErrors)
+	formatFailedRequests(b, t.FailedRequests)
+	formatErrorContext(b, t.ErrorContext)
+}
+
+func formatActions(b *strings.Builder, actions []Action) {
+	if len(actions) == 0 {
+		return
+	}
+	b.WriteString("### Last Browser Actions\n")
+	for _, a := range actions {
+		if a.Params != "" {
+			fmt.Fprintf(b, "- %s.%s %s\n", a.Class, a.Method, a.Params)
+		} else {
+			fmt.Fprintf(b, "- %s.%s\n", a.Class, a.Method)
+		}
+	}
+	b.WriteString("\n")
+}
+
+func formatConsoleErrors(b *strings.Builder, errors []string) {
+	if len(errors) == 0 {
+		return
+	}
+	b.WriteString("### Console Errors\n")
+	for _, msg := range errors {
+		fmt.Fprintf(b, "- %s\n", msg)
+	}
+	b.WriteString("\n")
+}
+
+func formatFailedRequests(b *strings.Builder, requests []Request) {
+	if len(requests) == 0 {
+		return
+	}
+	b.WriteString("### Failed HTTP Requests\n")
+	for _, r := range requests {
+		fmt.Fprintf(b, "- %s %s → %d\n", r.Method, r.URL, r.Status)
+	}
+	b.WriteString("\n")
+}
+
+func formatErrorContext(b *strings.Builder, errorCtx string) {
+	if errorCtx == "" {
+		return
+	}
+	b.WriteString("### Error Context (page snapshot)\n")
+	b.WriteString(errorCtx)
+	b.WriteString("\n")
 }

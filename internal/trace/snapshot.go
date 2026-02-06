@@ -1,4 +1,4 @@
-package playwright
+package trace
 
 import (
 	"archive/zip"
@@ -8,10 +8,31 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/kamilpajak/heisenberg/internal/server"
 	"github.com/playwright-community/playwright-go"
 )
+
+// CommandRunner abstracts command execution for testing.
+type CommandRunner interface {
+	Run(name string, args []string, env []string) ([]byte, error)
+}
+
+// ExecRunner is the default implementation using os/exec.
+type ExecRunner struct{}
+
+// Run executes a command and returns combined output.
+func (ExecRunner) Run(name string, args []string, env []string) ([]byte, error) {
+	cmd := exec.Command(name, args...)
+	if len(env) > 0 {
+		cmd.Env = append(os.Environ(), env...)
+	}
+	return cmd.CombinedOutput()
+}
+
+// DefaultRunner is used when no runner is provided.
+var DefaultRunner CommandRunner = ExecRunner{}
 
 // Snapshot opens a URL in headless browser and captures page content
 func Snapshot(url string) ([]byte, error) {
@@ -79,6 +100,11 @@ func Snapshot(url string) ([]byte, error) {
 // MergeBlobReports merges Playwright blob report ZIPs into an HTML report.
 // Returns the path to a temp directory containing the merged HTML report.
 func MergeBlobReports(blobZips [][]byte) (string, error) {
+	return MergeBlobReportsWithRunner(blobZips, DefaultRunner)
+}
+
+// MergeBlobReportsWithRunner merges blob reports using a custom command runner.
+func MergeBlobReportsWithRunner(blobZips [][]byte, runner CommandRunner) (string, error) {
 	// Create temp dir for blob reports
 	blobDir, err := os.MkdirTemp("", "heisenberg-blobs-*")
 	if err != nil {
@@ -87,7 +113,7 @@ func MergeBlobReports(blobZips [][]byte) (string, error) {
 
 	// Extract all blob zips directly into the blob dir
 	for i, zipData := range blobZips {
-		if err := extractZip(zipData, blobDir); err != nil {
+		if err := extractSnapshotZip(zipData, blobDir); err != nil {
 			os.RemoveAll(blobDir)
 			return "", fmt.Errorf("failed to extract blob %d: %w", i, err)
 		}
@@ -101,13 +127,10 @@ func MergeBlobReports(blobZips [][]byte) (string, error) {
 	}
 
 	// Run npx playwright merge-reports
-	cmd := exec.Command("npx", "playwright", "merge-reports",
-		"--reporter", "html",
-		blobDir,
-	)
-	cmd.Env = append(os.Environ(), "PLAYWRIGHT_HTML_OPEN=never", "PLAYWRIGHT_HTML_OUTPUT_DIR="+outputDir)
+	args := []string{"playwright", "merge-reports", "--reporter", "html", blobDir}
+	env := []string{"PLAYWRIGHT_HTML_OPEN=never", "PLAYWRIGHT_HTML_OUTPUT_DIR=" + outputDir}
 
-	output, err := cmd.CombinedOutput()
+	output, err := runner.Run("npx", args, env)
 	os.RemoveAll(blobDir)
 	if err != nil {
 		os.RemoveAll(outputDir)
@@ -117,14 +140,22 @@ func MergeBlobReports(blobZips [][]byte) (string, error) {
 	return outputDir, nil
 }
 
-func extractZip(zipData []byte, destDir string) error {
+func extractSnapshotZip(zipData []byte, destDir string) error {
 	reader, err := zip.NewReader(bytes.NewReader(zipData), int64(len(zipData)))
 	if err != nil {
 		return err
 	}
 
+	// Clean destDir for consistent comparison
+	cleanDest := filepath.Clean(destDir) + string(os.PathSeparator)
+
 	for _, f := range reader.File {
 		path := filepath.Join(destDir, f.Name)
+
+		// Prevent zip slip: ensure path is within destDir
+		if !strings.HasPrefix(filepath.Clean(path)+string(os.PathSeparator), cleanDest) {
+			return fmt.Errorf("illegal file path in zip: %s", f.Name)
+		}
 
 		if f.FileInfo().IsDir() {
 			os.MkdirAll(path, 0755)
@@ -155,14 +186,14 @@ func extractZip(zipData []byte, destDir string) error {
 	return nil
 }
 
-// Install installs playwright browsers
-func Install() error {
+// InstallPlaywright installs playwright browsers
+func InstallPlaywright() error {
 	return playwright.Install()
 }
 
 // SnapshotHTML serves HTML content locally and captures page text via headless browser.
 func SnapshotHTML(htmlContent []byte) ([]byte, error) {
-	if !IsAvailable() {
+	if !IsPlaywrightAvailable() {
 		return nil, fmt.Errorf("playwright not installed. Run: go run github.com/playwright-community/playwright-go/cmd/playwright install chromium")
 	}
 
@@ -180,8 +211,8 @@ func SnapshotHTML(htmlContent []byte) ([]byte, error) {
 	return snapshot, nil
 }
 
-// IsAvailable checks if playwright browsers are installed
-func IsAvailable() bool {
+// IsPlaywrightAvailable checks if playwright browsers are installed
+func IsPlaywrightAvailable() bool {
 	pw, err := playwright.Run()
 	if err != nil {
 		return false

@@ -209,6 +209,50 @@ type noopEmitter struct{}
 
 func (noopEmitter) Emit(ProgressEvent) {}
 
+// mockToolHandler is a test double for ToolExecutor that handles the done tool.
+type mockToolHandler struct {
+	emitter     ProgressEmitter
+	category    string
+	confidence  int
+	sensitivity string
+}
+
+func (m *mockToolHandler) Execute(_ context.Context, call FunctionCall) (string, bool, error) {
+	if call.Name == "done" {
+		if cat, ok := call.Args["category"].(string); ok {
+			m.category = cat
+		} else {
+			m.category = CategoryDiagnosis
+		}
+		if conf, ok := call.Args["confidence"].(float64); ok {
+			m.confidence = int(conf)
+		} else {
+			m.confidence = 50
+		}
+		if sens, ok := call.Args["missing_information_sensitivity"].(string); ok {
+			m.sensitivity = sens
+		} else {
+			m.sensitivity = "medium"
+		}
+		return "", true, nil
+	}
+	return "unknown tool: " + call.Name, false, nil
+}
+
+func (m *mockToolHandler) HasPendingTraces() bool       { return false }
+func (m *mockToolHandler) DiagnosisCategory() string    { return m.category }
+func (m *mockToolHandler) DiagnosisConfidence() int     { return m.confidence }
+func (m *mockToolHandler) DiagnosisSensitivity() string { return m.sensitivity }
+func (m *mockToolHandler) GetEmitter() ProgressEmitter  { return m.emitter }
+
+// testToolDeclarations returns minimal tool declarations for tests.
+func testToolDeclarations() []FunctionDeclaration {
+	return []FunctionDeclaration{
+		{Name: "done", Description: "Signal done"},
+		{Name: "fake_tool", Description: "Test tool"},
+	}
+}
+
 // mockServer creates a test server that returns responses in sequence.
 func mockServer(t *testing.T, responses []GenerateResponse) *httptest.Server {
 	t.Helper()
@@ -233,9 +277,9 @@ func TestRunAgentLoop_TextOnlyResponse(t *testing.T) {
 	defer ts.Close()
 
 	c := &Client{apiKey: "test", baseURL: ts.URL, model: "m"}
-	handler := &ToolHandler{Emitter: noopEmitter{}}
+	handler := &mockToolHandler{emitter: noopEmitter{}}
 
-	result, err := c.RunAgentLoop(context.Background(), handler, "initial context", false)
+	result, err := c.RunAgentLoop(context.Background(), handler, testToolDeclarations(), "initial context", false)
 
 	require.NoError(t, err)
 	assert.Equal(t, "The test failed because...", result.Text)
@@ -253,9 +297,9 @@ func TestRunAgentLoop_TextOnlyVerbose(t *testing.T) {
 	defer ts.Close()
 
 	c := &Client{apiKey: "test", baseURL: ts.URL, model: "m"}
-	handler := &ToolHandler{Emitter: noopEmitter{}}
+	handler := &mockToolHandler{emitter: noopEmitter{}}
 
-	result, err := c.RunAgentLoop(context.Background(), handler, "context", true)
+	result, err := c.RunAgentLoop(context.Background(), handler, testToolDeclarations(), "context", true)
 
 	require.NoError(t, err)
 	assert.Equal(t, "analysis", result.Text)
@@ -282,9 +326,9 @@ func TestRunAgentLoop_DoneThenText(t *testing.T) {
 	defer ts.Close()
 
 	c := &Client{apiKey: "test", baseURL: ts.URL, model: "m"}
-	handler := &ToolHandler{Emitter: noopEmitter{}}
+	handler := &mockToolHandler{emitter: noopEmitter{}}
 
-	result, err := c.RunAgentLoop(context.Background(), handler, "context", true)
+	result, err := c.RunAgentLoop(context.Background(), handler, testToolDeclarations(), "context", true)
 
 	require.NoError(t, err)
 	assert.Equal(t, "Root cause: timeout", result.Text)
@@ -309,9 +353,9 @@ func TestRunAgentLoop_EmptyResponseRetry(t *testing.T) {
 	defer ts.Close()
 
 	c := &Client{apiKey: "test", baseURL: ts.URL, model: "m"}
-	handler := &ToolHandler{Emitter: noopEmitter{}}
+	handler := &mockToolHandler{emitter: noopEmitter{}}
 
-	result, err := c.RunAgentLoop(context.Background(), handler, "context", true)
+	result, err := c.RunAgentLoop(context.Background(), handler, testToolDeclarations(), "context", true)
 
 	require.NoError(t, err)
 	assert.Equal(t, "Recovered analysis", result.Text)
@@ -332,9 +376,9 @@ func TestRunAgentLoop_EmptyResponseRetryFails(t *testing.T) {
 	defer ts.Close()
 
 	c := &Client{apiKey: "test", baseURL: ts.URL, model: "m"}
-	handler := &ToolHandler{Emitter: noopEmitter{}}
+	handler := &mockToolHandler{emitter: noopEmitter{}}
 
-	_, err := c.RunAgentLoop(context.Background(), handler, "context", false)
+	_, err := c.RunAgentLoop(context.Background(), handler, testToolDeclarations(), "context", false)
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "empty response after retry")
@@ -347,9 +391,9 @@ func TestRunAgentLoop_NoCandidates(t *testing.T) {
 	defer ts.Close()
 
 	c := &Client{apiKey: "test", baseURL: ts.URL, model: "m"}
-	handler := &ToolHandler{Emitter: noopEmitter{}}
+	handler := &mockToolHandler{emitter: noopEmitter{}}
 
-	_, err := c.RunAgentLoop(context.Background(), handler, "context", false)
+	_, err := c.RunAgentLoop(context.Background(), handler, testToolDeclarations(), "context", false)
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "empty response from model")
@@ -396,9 +440,9 @@ func TestRunAgentLoop_ToolCallVerbose(t *testing.T) {
 	defer ts.Close()
 
 	c := &Client{apiKey: "test", baseURL: ts.URL, model: "m"}
-	handler := &ToolHandler{Emitter: noopEmitter{}}
+	handler := &mockToolHandler{emitter: noopEmitter{}}
 
-	result, err := c.RunAgentLoop(context.Background(), handler, "context", true)
+	result, err := c.RunAgentLoop(context.Background(), handler, testToolDeclarations(), "context", true)
 
 	require.NoError(t, err)
 	assert.Equal(t, "diagnosis text", result.Text)
@@ -443,9 +487,9 @@ func TestRunAgentLoop_DoneNudgeFallback(t *testing.T) {
 	defer ts.Close()
 
 	c := &Client{apiKey: "test", baseURL: ts.URL, model: "m"}
-	handler := &ToolHandler{Emitter: noopEmitter{}}
+	handler := &mockToolHandler{emitter: noopEmitter{}}
 
-	result, err := c.RunAgentLoop(context.Background(), handler, "context", false)
+	result, err := c.RunAgentLoop(context.Background(), handler, testToolDeclarations(), "context", false)
 
 	require.NoError(t, err)
 	assert.Equal(t, "my analysis", result.Text, "should return the original saved text")
@@ -480,9 +524,9 @@ func TestRunAgentLoop_GenerateErrorMidLoop(t *testing.T) {
 	defer ts.Close()
 
 	c := &Client{apiKey: "test", baseURL: ts.URL, model: "m"}
-	handler := &ToolHandler{Emitter: noopEmitter{}}
+	handler := &mockToolHandler{emitter: noopEmitter{}}
 
-	_, err := c.RunAgentLoop(context.Background(), handler, "context", false)
+	_, err := c.RunAgentLoop(context.Background(), handler, testToolDeclarations(), "context", false)
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "gemini API error")
@@ -494,7 +538,7 @@ func TestEmit_NilHandler(t *testing.T) {
 }
 
 func TestEmit_NilEmitter(t *testing.T) {
-	h := &ToolHandler{}
+	h := &mockToolHandler{}
 	// Should not panic
 	emit(h, ProgressEvent{Type: "info", Message: "test"})
 }
@@ -502,4 +546,173 @@ func TestEmit_NilEmitter(t *testing.T) {
 // repeat creates a string of n copies of s.
 func repeat(s string, n int) string {
 	return strings.Repeat(s, n)
+}
+
+// mockToolHandlerWithTraces is a mock that returns pending traces.
+type mockToolHandlerWithTraces struct {
+	mockToolHandler
+	pendingTraces bool
+	tracesResult  string
+}
+
+func (m *mockToolHandlerWithTraces) HasPendingTraces() bool { return m.pendingTraces }
+func (m *mockToolHandlerWithTraces) Execute(_ context.Context, call FunctionCall) (string, bool, error) {
+	if call.Name == "get_test_traces" {
+		m.pendingTraces = false // Mark traces as fetched
+		return m.tracesResult, false, nil
+	}
+	return m.mockToolHandler.Execute(context.Background(), call)
+}
+
+func TestRunAgentLoop_ForceTraces(t *testing.T) {
+	call := 0
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		var resp GenerateResponse
+		switch call {
+		case 0:
+			// Model returns text response - triggers forceTraces because handler has pending traces
+			resp = GenerateResponse{
+				Candidates:    []Candidate{{Content: Content{Parts: []Part{{Text: "initial analysis"}}}}},
+				UsageMetadata: &UsageMetadata{PromptTokenCount: 500},
+			}
+		default:
+			// After forceTraces, model returns final analysis
+			resp = GenerateResponse{
+				Candidates:    []Candidate{{Content: Content{Parts: []Part{{Text: "final analysis with traces"}}}}},
+				UsageMetadata: &UsageMetadata{PromptTokenCount: 700},
+			}
+		}
+		_ = json.NewEncoder(w).Encode(resp)
+		call++
+	}))
+	defer ts.Close()
+
+	c := &Client{apiKey: "test", baseURL: ts.URL, model: "m"}
+	handler := &mockToolHandlerWithTraces{
+		mockToolHandler: mockToolHandler{emitter: noopEmitter{}},
+		pendingTraces:   true,
+		tracesResult:    "trace data here",
+	}
+
+	result, err := c.RunAgentLoop(context.Background(), handler, testToolDeclarations(), "context", true)
+
+	require.NoError(t, err)
+	assert.Equal(t, "final analysis with traces", result.Text)
+}
+
+func TestRunAgentLoop_DoneWithPendingTraces(t *testing.T) {
+	call := 0
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		var resp GenerateResponse
+		switch call {
+		case 0:
+			// Model calls done but there are pending traces
+			resp = GenerateResponse{
+				Candidates: []Candidate{{Content: Content{Parts: []Part{{
+					FunctionCall: &FunctionCall{
+						Name: "done",
+						Args: map[string]any{"category": "diagnosis", "confidence": float64(85), "missing_information_sensitivity": "low"},
+					},
+				}}}}},
+				UsageMetadata: &UsageMetadata{PromptTokenCount: 500},
+			}
+		default:
+			// After forceTraces, model returns final text
+			resp = GenerateResponse{
+				Candidates:    []Candidate{{Content: Content{Parts: []Part{{Text: "analysis with forced traces"}}}}},
+				UsageMetadata: &UsageMetadata{PromptTokenCount: 800},
+			}
+		}
+		_ = json.NewEncoder(w).Encode(resp)
+		call++
+	}))
+	defer ts.Close()
+
+	c := &Client{apiKey: "test", baseURL: ts.URL, model: "m"}
+	handler := &mockToolHandlerWithTraces{
+		mockToolHandler: mockToolHandler{emitter: noopEmitter{}},
+		pendingTraces:   true,
+		tracesResult:    "trace data",
+	}
+
+	result, err := c.RunAgentLoop(context.Background(), handler, testToolDeclarations(), "context", true)
+
+	require.NoError(t, err)
+	assert.Equal(t, "analysis with forced traces", result.Text)
+	assert.Equal(t, 85, result.Confidence)
+}
+
+func TestRunAgentLoop_GenerateFinalEmptyResponse(t *testing.T) {
+	call := 0
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		var resp GenerateResponse
+		switch call {
+		case 0:
+			// Step 1: model calls done
+			resp = GenerateResponse{
+				Candidates: []Candidate{{Content: Content{Parts: []Part{{
+					FunctionCall: &FunctionCall{
+						Name: "done",
+						Args: map[string]any{"category": "diagnosis", "confidence": float64(80), "missing_information_sensitivity": "low"},
+					},
+				}}}}},
+				UsageMetadata: &UsageMetadata{PromptTokenCount: 500},
+			}
+		case 1:
+			// Step 2: final response has no text (triggers retry in handleEmptyResponse)
+			resp = GenerateResponse{
+				Candidates:    []Candidate{{Content: Content{Parts: []Part{{}}}, FinishReason: "STOP"}},
+				UsageMetadata: &UsageMetadata{PromptTokenCount: 600},
+			}
+		default:
+			// Retry also returns empty
+			resp = GenerateResponse{
+				Candidates:    []Candidate{{Content: Content{Parts: []Part{{}}}, FinishReason: "STOP"}},
+				UsageMetadata: &UsageMetadata{PromptTokenCount: 600},
+			}
+		}
+		_ = json.NewEncoder(w).Encode(resp)
+		call++
+	}))
+	defer ts.Close()
+
+	c := &Client{apiKey: "test", baseURL: ts.URL, model: "m"}
+	handler := &mockToolHandler{emitter: noopEmitter{}}
+
+	_, err := c.RunAgentLoop(context.Background(), handler, testToolDeclarations(), "context", false)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "empty response")
+}
+
+func TestRunAgentLoop_GenerateFinalNoCandidates(t *testing.T) {
+	ts := mockServer(t, []GenerateResponse{
+		// Step 1: model calls done
+		{
+			Candidates: []Candidate{{Content: Content{Parts: []Part{{
+				FunctionCall: &FunctionCall{
+					Name: "done",
+					Args: map[string]any{"category": "diagnosis", "confidence": float64(80), "missing_information_sensitivity": "low"},
+				},
+			}}}}},
+			UsageMetadata: &UsageMetadata{PromptTokenCount: 500},
+		},
+		// Step 2: final response has no candidates
+		{
+			Candidates:    []Candidate{},
+			UsageMetadata: &UsageMetadata{PromptTokenCount: 600},
+		},
+	})
+	defer ts.Close()
+
+	c := &Client{apiKey: "test", baseURL: ts.URL, model: "m"}
+	handler := &mockToolHandler{emitter: noopEmitter{}}
+
+	_, err := c.RunAgentLoop(context.Background(), handler, testToolDeclarations(), "context", false)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "empty response")
 }

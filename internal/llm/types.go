@@ -1,5 +1,7 @@
 package llm
 
+import "context"
+
 // GenerateRequest is the request body for Gemini generateContent.
 type GenerateRequest struct {
 	Contents          []Content         `json:"contents"`
@@ -90,6 +92,17 @@ const (
 	CategoryNoFailures   = "no_failures"
 	CategoryNotSupported = "not_supported"
 )
+
+// ToolExecutor executes tool calls on behalf of the agent loop.
+// Implementations handle domain-specific tool logic (GitHub, traces, etc).
+type ToolExecutor interface {
+	Execute(ctx context.Context, call FunctionCall) (string, bool, error)
+	HasPendingTraces() bool
+	DiagnosisCategory() string
+	DiagnosisConfidence() int
+	DiagnosisSensitivity() string
+	GetEmitter() ProgressEmitter
+}
 
 // AnalysisResult holds the final output from the agent loop.
 type AnalysisResult struct {
