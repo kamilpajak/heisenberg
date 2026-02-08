@@ -75,6 +75,7 @@ brews:
       owner: kamilpajak
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    directory: Formula
     homepage: https://github.com/kamilpajak/heisenberg
     description: AI-powered test failure analysis for GitHub repositories
     license: Apache-2.0
