@@ -20,7 +20,8 @@ func emit(h ToolExecutor, ev ProgressEvent) {
 	}
 }
 
-const maxIterations = 10
+const maxIterations = 20
+const softLimitIteration = 15
 
 var ansiRe = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
 
@@ -171,6 +172,8 @@ type loopState struct {
 	hasCalledTools bool
 	doneNudged     bool
 	savedText      string
+	calledTools    map[string]bool // tracks tool+args hashes to detect duplicates
+	softWarned     bool            // true after soft limit warning injected
 }
 
 // RunAgentLoop runs the agentic conversation loop. The model can call tools
@@ -183,10 +186,22 @@ func (c *Client) RunAgentLoop(ctx context.Context, handler ToolExecutor, toolDec
 		history: []Content{
 			{Role: "user", Parts: []Part{{Text: initialContext}}},
 		},
+		calledTools: make(map[string]bool),
 	}
 
 	for i := range maxIterations {
 		si := &stepInfo{step: i + 1, iteration: i, verbose: verbose}
+
+		// Inject soft limit warning at iteration 15
+		if i == softLimitIteration && !s.softWarned {
+			s.softWarned = true
+			remaining := maxIterations - i
+			s.history = append(s.history, Content{
+				Role:  "user",
+				Parts: []Part{{Text: fmt.Sprintf("Note: You have %d iterations remaining. Please consolidate your findings and move toward a final diagnosis soon.", remaining)}},
+			})
+		}
+
 		stepMsg := "Calling model..."
 		if s.pendingDone {
 			stepMsg = "Generating final analysis..."
@@ -304,7 +319,7 @@ func (c *Client) handleTextResponse(ctx context.Context, s *loopState, handler T
 // handleToolResponse executes tool calls and handles done signalling,
 // pending traces, and nudge-based early returns.
 func (c *Client) handleToolResponse(ctx context.Context, s *loopState, handler ToolExecutor, calls []FunctionCall, si *stepInfo) (*AnalysisResult, error) {
-	responseParts, done, err := c.executeCalls(ctx, handler, calls, si)
+	responseParts, done, err := c.executeCalls(ctx, s, handler, calls, si)
 	if err != nil {
 		return nil, err
 	}
@@ -387,8 +402,15 @@ func (c *Client) handleEmptyResponse(
 	return &resp.Candidates[0], nil
 }
 
+// callKey creates a unique key for a tool call based on name and arguments.
+func callKey(call FunctionCall) string {
+	argsJSON, _ := json.Marshal(call.Args)
+	return call.Name + ":" + string(argsJSON)
+}
+
 // executeCalls runs each function call, emitting progress events and collecting responses.
-func (c *Client) executeCalls(ctx context.Context, handler ToolExecutor, calls []FunctionCall, si *stepInfo) ([]Part, bool, error) {
+// It detects duplicate calls (same tool + args) and returns an error to the model instead of re-executing.
+func (c *Client) executeCalls(ctx context.Context, s *loopState, handler ToolExecutor, calls []FunctionCall, si *stepInfo) ([]Part, bool, error) {
 	var responseParts []Part
 	done := false
 	for ci, call := range calls {
@@ -398,6 +420,22 @@ func (c *Client) executeCalls(ctx context.Context, handler ToolExecutor, calls [
 			toolEvent.Args = string(argsJSON)
 		}
 		emit(handler, toolEvent)
+
+		// Check for duplicate calls (same tool + args)
+		key := callKey(call)
+		if call.Name != "done" && s.calledTools[key] {
+			// Return error to model instead of re-executing
+			result := `{"error": "You already called this tool with these exact arguments. Analyze the data you have or try different arguments."}`
+			emitToolResult(handler, si, ci, len(calls), 0, result)
+			responseParts = append(responseParts, Part{
+				FunctionResponse: &FunctionResponse{
+					Name:     call.Name,
+					Response: map[string]any{"result": result},
+				},
+			})
+			continue
+		}
+		s.calledTools[key] = true
 
 		t1 := time.Now()
 		result, isDone, err := handler.Execute(ctx, call)
