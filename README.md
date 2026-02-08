@@ -1,7 +1,7 @@
 # Heisenberg
 
 [![CI](https://github.com/kamilpajak/heisenberg/actions/workflows/ci.yml/badge.svg)](https://github.com/kamilpajak/heisenberg/actions/workflows/ci.yml)
-[![Go Report Card](https://goreportcard.com/badge/github.com/kamilpajak/heisenberg)](https://goreportcard.com/report/github.com/kamilpajak/heisenberg)
+[![Go Report Card](https://goreportcard.com/badge/github.com/kamilpajak/heisenberg?style=flat-square)](https://goreportcard.com/report/github.com/kamilpajak/heisenberg)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
 AI-powered test failure analysis for GitHub repositories.
