@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/kamilpajak/heisenberg/internal/server"
@@ -127,10 +128,14 @@ func MergeBlobReportsWithRunner(blobZips [][]byte, runner CommandRunner) (string
 	}
 
 	// Run npx playwright merge-reports
+	npx := "npx"
+	if runtime.GOOS == "windows" {
+		npx = "npx.cmd"
+	}
 	args := []string{"playwright", "merge-reports", "--reporter", "html", blobDir}
 	env := []string{"PLAYWRIGHT_HTML_OPEN=never", "PLAYWRIGHT_HTML_OUTPUT_DIR=" + outputDir}
 
-	output, err := runner.Run("npx", args, env)
+	output, err := runner.Run(npx, args, env)
 	os.RemoveAll(blobDir)
 	if err != nil {
 		os.RemoveAll(outputDir)

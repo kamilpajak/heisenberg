@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/signal"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/fatih/color"
@@ -148,9 +147,9 @@ func serve(cmd *cobra.Command, args []string) error {
 		Handler: web.NewHandler(),
 	}
 
-	// Graceful shutdown on SIGINT/SIGTERM
+	// Graceful shutdown on interrupt (Ctrl+C)
 	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
+	signal.Notify(quit, os.Interrupt)
 
 	go func() {
 		<-quit
