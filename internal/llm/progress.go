@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -38,21 +39,21 @@ const alignWidth = 56
 
 // TextEmitter formats progress events as colored terminal output with spinners.
 type TextEmitter struct {
-	w   io.Writer
-	sp  *spinner.Spinner
-	tty bool
+	w       io.Writer
+	sp      *spinner.Spinner
+	tty     bool
+	noColor bool
 }
 
 // NewTextEmitter creates a TextEmitter that writes to w.
-// It detects TTY capability for color and spinner support,
-// and configures the global color.NoColor based on w.
+// It detects TTY capability for color and spinner support.
 func NewTextEmitter(w io.Writer) *TextEmitter {
 	tty := false
 	if f, ok := w.(*os.File); ok {
 		tty = isatty.IsTerminal(f.Fd()) || isatty.IsCygwinTerminal(f.Fd())
 	}
-	color.NoColor = !tty || os.Getenv("NO_COLOR") != "" || os.Getenv("TERM") == "dumb"
-	return &TextEmitter{w: w, tty: tty}
+	noColor := !tty || os.Getenv("NO_COLOR") != "" || os.Getenv("TERM") == "dumb"
+	return &TextEmitter{w: w, tty: tty, noColor: noColor}
 }
 
 // Close stops any running spinner. Call before printing final results.
@@ -84,6 +85,12 @@ func (e *TextEmitter) Emit(ev ProgressEvent) {
 	dim := color.New(color.FgHiBlack)
 	green := color.New(color.FgGreen)
 	cyan := color.New(color.FgCyan)
+
+	if e.noColor {
+		dim.DisableColor()
+		green.DisableColor()
+		cyan.DisableColor()
+	}
 
 	switch ev.Type {
 	case "step":
@@ -129,6 +136,7 @@ func (e *TextEmitter) Emit(ev ProgressEvent) {
 }
 
 // humanizeArgs converts JSON args to a readable format like "(key: value, key2: value2)".
+// Keys are sorted for deterministic output.
 func humanizeArgs(argsJSON string) string {
 	var args map[string]any
 	if json.Unmarshal([]byte(argsJSON), &args) != nil {
@@ -143,8 +151,16 @@ func humanizeArgs(argsJSON string) string {
 		"missing_information_sensitivity": "sensitivity",
 	}
 
+	// Sort keys for deterministic output
+	keys := make([]string, 0, len(args))
+	for k := range args {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
 	var parts []string
-	for k, v := range args {
+	for _, k := range keys {
+		v := args[k]
 		display := k
 		if short, ok := shortKeys[k]; ok {
 			display = short

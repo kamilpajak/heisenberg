@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/fatih/color"
 	"github.com/kamilpajak/heisenberg/internal/analysis"
@@ -148,16 +149,20 @@ func serve(cmd *cobra.Command, args []string) error {
 	}
 
 	// Graceful shutdown on SIGINT/SIGTERM
-	done := make(chan os.Signal, 1)
-	signal.Notify(done, os.Interrupt, syscall.SIGTERM)
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
 
 	go func() {
-		<-done
+		<-quit
 		fmt.Fprintln(os.Stderr, "\nShutting down...")
-		srv.Close()
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := srv.Shutdown(ctx); err != nil {
+			fmt.Fprintf(os.Stderr, "Shutdown error: %v\n", err)
+		}
 	}()
 
-	fmt.Fprintf(os.Stderr, "Dashboard: http://localhost%s\n", addr)
+	fmt.Fprintf(os.Stderr, "Dashboard: http://localhost:%d\n", port)
 	if err := srv.ListenAndServe(); err != http.ErrServerClosed {
 		return err
 	}
