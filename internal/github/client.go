@@ -68,6 +68,30 @@ type Artifact struct {
 	Expired   bool   `json:"expired"`
 }
 
+// ArtifactStatus describes the availability of artifacts for a run.
+type ArtifactStatus struct {
+	Total      int
+	Expired    int
+	Available  int
+	HasUsable  bool
+	AllExpired bool
+}
+
+// CheckArtifacts analyzes artifact availability.
+func CheckArtifacts(artifacts []Artifact) ArtifactStatus {
+	status := ArtifactStatus{Total: len(artifacts)}
+	for _, a := range artifacts {
+		if a.Expired {
+			status.Expired++
+		} else {
+			status.Available++
+		}
+	}
+	status.HasUsable = status.Available > 0
+	status.AllExpired = status.Total > 0 && status.Expired == status.Total
+	return status
+}
+
 // WorkflowRun represents a GitHub Actions workflow run
 type WorkflowRun struct {
 	ID           int64  `json:"id"`
@@ -78,6 +102,7 @@ type WorkflowRun struct {
 	Event        string `json:"event"`
 	Path         string `json:"path"`
 	DisplayTitle string `json:"display_title"`
+	CreatedAt    string `json:"created_at"`
 }
 
 // Job represents a GitHub Actions job within a workflow run

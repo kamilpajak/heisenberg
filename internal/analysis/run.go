@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	gh "github.com/kamilpajak/heisenberg/internal/github"
 	"github.com/kamilpajak/heisenberg/internal/llm"
@@ -59,6 +60,13 @@ func Run(ctx context.Context, p Params) (*llm.AnalysisResult, error) {
 	artifacts, err := ghClient.ListArtifacts(ctx, p.Owner, p.Repo, resolvedRunID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list artifacts: %w", err)
+	}
+
+	// Check artifact availability early
+	artifactStatus := gh.CheckArtifacts(artifacts)
+	if artifactStatus.AllExpired {
+		runDate := formatRunDate(wfRun.CreatedAt)
+		return nil, fmt.Errorf("all artifacts have expired for run %d (created %s)\n\nArtifacts expire after 90 days. Try analyzing a more recent run, or omit --run-id to use the latest failed run", resolvedRunID, runDate)
 	}
 
 	initialContext := buildInitialContext(wfRun, jobs, artifacts)
@@ -124,4 +132,16 @@ func buildInitialContext(run *gh.WorkflowRun, jobs []gh.Job, artifacts []gh.Arti
 	b.WriteString("When you have enough information, you MUST call the 'done' tool first, then provide your final root cause analysis.\n")
 
 	return b.String()
+}
+
+// formatRunDate parses a GitHub timestamp and returns a human-readable date.
+func formatRunDate(timestamp string) string {
+	if timestamp == "" {
+		return "unknown date"
+	}
+	t, err := time.Parse(time.RFC3339, timestamp)
+	if err != nil {
+		return timestamp
+	}
+	return t.Format("2006-01-02")
 }
