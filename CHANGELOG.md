@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-02-08
+
+### Added
+
+- Early detection of expired artifacts with clear error message
+- Soft limit warning at iteration 15 to improve analysis completion
+- Duplicate tool call detection to prevent spinning
+
+### Changed
+
+- Increased agent loop limit from 10 to 20 iterations for thorough analysis
+
 ## [0.1.1] - 2026-02-08
 
 ### Added
@@ -39,6 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automatic artifact format detection (HTML, blob, JSON)
 - HTML report rendering via headless Playwright
 
-[Unreleased]: https://github.com/kamilpajak/heisenberg/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/kamilpajak/heisenberg/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/kamilpajak/heisenberg/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/kamilpajak/heisenberg/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/kamilpajak/heisenberg/releases/tag/v0.1.0
