@@ -7,7 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.1.0] - 2024-02-08
+## [0.1.1] - 2026-02-08
+
+### Added
+
+- Homebrew tap support (`brew install kamilpajak/tap/heisenberg`)
+
+### Fixed
+
+- Windows compatibility: proper signal handling and npx.cmd detection
+- UTF-8 safe string truncation in progress output
+- Deterministic output ordering in tool argument display
+
+## [0.1.0] - 2026-02-08
 
 ### Added
 
@@ -27,5 +39,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automatic artifact format detection (HTML, blob, JSON)
 - HTML report rendering via headless Playwright
 
-[Unreleased]: https://github.com/kamilpajak/heisenberg/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/kamilpajak/heisenberg/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/kamilpajak/heisenberg/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/kamilpajak/heisenberg/releases/tag/v0.1.0
