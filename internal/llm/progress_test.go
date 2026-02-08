@@ -224,3 +224,22 @@ func TestHumanizeArgs(t *testing.T) {
 		assert.Equal(t, tt.want, humanizeArgs(tt.json), tt.name)
 	}
 }
+
+func TestHumanizeArgs_DeterministicOrder(t *testing.T) {
+	// Multiple keys should always produce the same output (sorted alphabetically)
+	json := `{"zebra":"last","alpha":"first","middle":"center"}`
+	expected := "(alpha: first, middle: center, zebra: last)"
+
+	// Run multiple times to verify deterministic ordering
+	for i := 0; i < 10; i++ {
+		result := humanizeArgs(json)
+		assert.Equal(t, expected, result, "iteration %d should produce same result", i)
+	}
+}
+
+func TestNewTextEmitter_NoColor(t *testing.T) {
+	var buf bytes.Buffer
+	e := NewTextEmitter(&buf)
+	// Non-TTY writer should have noColor=true
+	assert.True(t, e.noColor, "non-TTY should have noColor=true")
+}

@@ -26,9 +26,11 @@ var ansiRe = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
 
 // previewExcerpt returns a short excerpt of s, preferring content around error
 // keywords. Strips ANSI codes. Falls back to the tail if no keywords found.
+// Uses rune-based slicing to avoid splitting multi-byte UTF-8 characters.
 func previewExcerpt(s string, maxLen int) string {
 	clean := ansiRe.ReplaceAllString(s, "")
-	if len(clean) <= maxLen {
+	runes := []rune(clean)
+	if len(runes) <= maxLen {
 		return clean
 	}
 	lower := strings.ToLower(clean)
@@ -36,12 +38,14 @@ func previewExcerpt(s string, maxLen int) string {
 	for _, kw := range []string{"FAIL", "Error:", "timeout", "panic", "error"} {
 		target := strings.ToLower(kw)
 		if idx := strings.LastIndex(lower, target); idx != -1 {
-			start := max(0, idx-maxLen/4)
-			end := min(len(clean), start+maxLen)
-			return "..." + clean[start:end] + "..."
+			// Convert byte index to rune index
+			runeIdx := len([]rune(clean[:idx]))
+			start := max(0, runeIdx-maxLen/4)
+			end := min(len(runes), start+maxLen)
+			return "..." + string(runes[start:end]) + "..."
 		}
 	}
-	return "..." + clean[len(clean)-maxLen:]
+	return "..." + string(runes[len(runes)-maxLen:])
 }
 
 // Client handles Gemini API calls with function calling support.

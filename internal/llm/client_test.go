@@ -49,6 +49,25 @@ func TestPreviewExcerpt_KeywordPriority(t *testing.T) {
 	assert.Contains(t, result, "FAIL test.spec.ts")
 }
 
+func TestPreviewExcerpt_UTF8Safe(t *testing.T) {
+	// Test with multi-byte UTF-8 characters (Polish, emoji)
+	long := repeat("ą", 50) + "Error: błąd połączenia 🔥" + repeat("ę", 50)
+	result := previewExcerpt(long, 40)
+	// Should not panic and should contain the error message
+	assert.Contains(t, result, "Error:")
+	// Result should be valid UTF-8 (no broken characters)
+	assert.True(t, isValidUTF8(result), "result should be valid UTF-8")
+}
+
+func isValidUTF8(s string) bool {
+	for _, r := range s {
+		if r == '\uFFFD' {
+			return false // replacement character indicates invalid UTF-8
+		}
+	}
+	return true
+}
+
 func TestIsEmptyResponse_Nil(t *testing.T) {
 	assert.True(t, isEmptyResponse(nil))
 }
