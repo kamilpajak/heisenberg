@@ -567,6 +567,143 @@ func repeat(s string, n int) string {
 	return strings.Repeat(s, n)
 }
 
+func TestCallKey_BasicTool(t *testing.T) {
+	call := FunctionCall{Name: "get_job_logs", Args: map[string]any{"job_id": float64(123)}}
+	key := callKey(call)
+	assert.Equal(t, `get_job_logs:{"job_id":123}`, key)
+}
+
+func TestCallKey_NoArgs(t *testing.T) {
+	call := FunctionCall{Name: "list_jobs", Args: nil}
+	key := callKey(call)
+	assert.Equal(t, "list_jobs:null", key)
+}
+
+func TestCallKey_EmptyArgs(t *testing.T) {
+	call := FunctionCall{Name: "list_jobs", Args: map[string]any{}}
+	key := callKey(call)
+	assert.Equal(t, "list_jobs:{}", key)
+}
+
+func TestCallKey_DifferentArgsSameToolDifferentKeys(t *testing.T) {
+	call1 := FunctionCall{Name: "get_job_logs", Args: map[string]any{"job_id": float64(123)}}
+	call2 := FunctionCall{Name: "get_job_logs", Args: map[string]any{"job_id": float64(456)}}
+
+	key1 := callKey(call1)
+	key2 := callKey(call2)
+
+	assert.NotEqual(t, key1, key2)
+}
+
+func TestCallKey_SameArgsSameKey(t *testing.T) {
+	call1 := FunctionCall{Name: "get_artifact", Args: map[string]any{"name": "html-report"}}
+	call2 := FunctionCall{Name: "get_artifact", Args: map[string]any{"name": "html-report"}}
+
+	key1 := callKey(call1)
+	key2 := callKey(call2)
+
+	assert.Equal(t, key1, key2)
+}
+
+func TestRunAgentLoop_DuplicateCallDetection(t *testing.T) {
+	call := 0
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		var resp GenerateResponse
+		switch call {
+		case 0:
+			// Model calls fake_tool with args
+			resp = GenerateResponse{
+				Candidates: []Candidate{{Content: Content{Parts: []Part{{
+					FunctionCall: &FunctionCall{
+						Name: "fake_tool",
+						Args: map[string]any{"key": "value"},
+					},
+				}}}}},
+				UsageMetadata: &UsageMetadata{PromptTokenCount: 500},
+			}
+		case 1:
+			// Model calls same tool with same args again (should be blocked)
+			resp = GenerateResponse{
+				Candidates: []Candidate{{Content: Content{Parts: []Part{{
+					FunctionCall: &FunctionCall{
+						Name: "fake_tool",
+						Args: map[string]any{"key": "value"},
+					},
+				}}}}},
+				UsageMetadata: &UsageMetadata{PromptTokenCount: 600},
+			}
+		default:
+			// Model returns final text
+			resp = GenerateResponse{
+				Candidates:    []Candidate{{Content: Content{Parts: []Part{{Text: "final analysis"}}}}},
+				UsageMetadata: &UsageMetadata{PromptTokenCount: 700},
+			}
+		}
+		_ = json.NewEncoder(w).Encode(resp)
+		call++
+	}))
+	defer ts.Close()
+
+	c := &Client{apiKey: "test", baseURL: ts.URL, model: "m"}
+	handler := &mockToolHandler{emitter: noopEmitter{}}
+
+	result, err := c.RunAgentLoop(context.Background(), handler, testToolDeclarations(), "context", false)
+
+	require.NoError(t, err)
+	assert.Equal(t, "final analysis", result.Text)
+	// Test passed if no infinite loop occurred - duplicate was detected
+}
+
+func TestRunAgentLoop_DuplicateCallAllowsDifferentArgs(t *testing.T) {
+	call := 0
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		var resp GenerateResponse
+		switch call {
+		case 0:
+			// Model calls fake_tool with args
+			resp = GenerateResponse{
+				Candidates: []Candidate{{Content: Content{Parts: []Part{{
+					FunctionCall: &FunctionCall{
+						Name: "fake_tool",
+						Args: map[string]any{"key": "value1"},
+					},
+				}}}}},
+				UsageMetadata: &UsageMetadata{PromptTokenCount: 500},
+			}
+		case 1:
+			// Model calls same tool with DIFFERENT args (should be allowed)
+			resp = GenerateResponse{
+				Candidates: []Candidate{{Content: Content{Parts: []Part{{
+					FunctionCall: &FunctionCall{
+						Name: "fake_tool",
+						Args: map[string]any{"key": "value2"},
+					},
+				}}}}},
+				UsageMetadata: &UsageMetadata{PromptTokenCount: 600},
+			}
+		default:
+			// Model returns final text
+			resp = GenerateResponse{
+				Candidates:    []Candidate{{Content: Content{Parts: []Part{{Text: "analysis complete"}}}}},
+				UsageMetadata: &UsageMetadata{PromptTokenCount: 700},
+			}
+		}
+		_ = json.NewEncoder(w).Encode(resp)
+		call++
+	}))
+	defer ts.Close()
+
+	c := &Client{apiKey: "test", baseURL: ts.URL, model: "m"}
+	handler := &mockToolHandler{emitter: noopEmitter{}}
+
+	result, err := c.RunAgentLoop(context.Background(), handler, testToolDeclarations(), "context", false)
+
+	require.NoError(t, err)
+	assert.Equal(t, "analysis complete", result.Text)
+}
+
 // mockToolHandlerWithTraces is a mock that returns pending traces.
 type mockToolHandlerWithTraces struct {
 	mockToolHandler

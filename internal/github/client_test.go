@@ -246,6 +246,61 @@ func TestFetchBlobsAllFail(t *testing.T) {
 	assert.Nil(t, result)
 }
 
+func TestCheckArtifacts_AllExpired(t *testing.T) {
+	artifacts := []Artifact{
+		{ID: 1, Name: "html-report", Expired: true},
+		{ID: 2, Name: "blob-report", Expired: true},
+	}
+
+	status := CheckArtifacts(artifacts)
+
+	assert.Equal(t, 2, status.Total)
+	assert.Equal(t, 2, status.Expired)
+	assert.Equal(t, 0, status.Available)
+	assert.False(t, status.HasUsable)
+	assert.True(t, status.AllExpired)
+}
+
+func TestCheckArtifacts_SomeExpired(t *testing.T) {
+	artifacts := []Artifact{
+		{ID: 1, Name: "html-report", Expired: true},
+		{ID: 2, Name: "blob-report", Expired: false},
+	}
+
+	status := CheckArtifacts(artifacts)
+
+	assert.Equal(t, 2, status.Total)
+	assert.Equal(t, 1, status.Expired)
+	assert.Equal(t, 1, status.Available)
+	assert.True(t, status.HasUsable)
+	assert.False(t, status.AllExpired)
+}
+
+func TestCheckArtifacts_NoneExpired(t *testing.T) {
+	artifacts := []Artifact{
+		{ID: 1, Name: "html-report", Expired: false},
+		{ID: 2, Name: "blob-report", Expired: false},
+	}
+
+	status := CheckArtifacts(artifacts)
+
+	assert.Equal(t, 2, status.Total)
+	assert.Equal(t, 0, status.Expired)
+	assert.Equal(t, 2, status.Available)
+	assert.True(t, status.HasUsable)
+	assert.False(t, status.AllExpired)
+}
+
+func TestCheckArtifacts_Empty(t *testing.T) {
+	status := CheckArtifacts(nil)
+
+	assert.Equal(t, 0, status.Total)
+	assert.Equal(t, 0, status.Expired)
+	assert.Equal(t, 0, status.Available)
+	assert.False(t, status.HasUsable)
+	assert.False(t, status.AllExpired)
+}
+
 func TestSelectAndFetch(t *testing.T) {
 	zipData := buildZip(t, map[string][]byte{
 		"report.html": []byte("<html>test</html>"),
