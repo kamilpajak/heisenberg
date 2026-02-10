@@ -1,0 +1,32 @@
+name: 'Heisenberg'
+description: 'AI-powered test failure analysis for GitHub repositories'
+author: 'kamilpajak'
+branding:
+  icon: 'alert-triangle'
+  color: 'yellow'
+
+inputs:
+  google-api-key:
+    description: 'Google AI API key for Gemini'
+    required: true
+  repository:
+    description: 'Repository to analyze (owner/repo)'
+    default: ${{ github.repository }}
+  run-id:
+    description: 'Workflow run ID to analyze'
+    required: false
+
+outputs:
+  diagnosis:
+    description: 'Analysis text'
+  confidence:
+    description: 'Confidence score (0-100)'
+  category:
+    description: 'Result category (diagnosis, no_failures, not_supported)'
+
+runs:
+  using: 'docker'
+  image: 'Dockerfile.action'
+  env:
+    GITHUB_TOKEN: ${{ github.token }}
+    GOOGLE_API_KEY: ${{ inputs.google-api-key }}
