@@ -84,6 +84,7 @@ type Schema struct {
 	Properties  map[string]Schema `json:"properties,omitempty"`
 	Required    []string          `json:"required,omitempty"`
 	Enum        []string          `json:"enum,omitempty"`
+	Items       *Schema           `json:"items,omitempty"` // For array types
 }
 
 // Outcome categories for the done tool.
@@ -101,15 +102,17 @@ type ToolExecutor interface {
 	DiagnosisCategory() string
 	DiagnosisConfidence() int
 	DiagnosisSensitivity() string
+	DiagnosisRCA() *RootCauseAnalysis
 	GetEmitter() ProgressEmitter
 }
 
 // AnalysisResult holds the final output from the agent loop.
 type AnalysisResult struct {
-	Text        string `json:"text"`
-	Category    string `json:"category"`    // "diagnosis", "no_failures", "not_supported", or "" (model skipped done)
-	Confidence  int    `json:"confidence"`  // 0-100, meaningful only for "diagnosis"
-	Sensitivity string `json:"sensitivity"` // "high", "medium", "low", meaningful only for "diagnosis"
+	Text        string             `json:"text"`
+	Category    string             `json:"category"`      // "diagnosis", "no_failures", "not_supported", or "" (model skipped done)
+	Confidence  int                `json:"confidence"`    // 0-100, meaningful only for "diagnosis"
+	Sensitivity string             `json:"sensitivity"`   // "high", "medium", "low", meaningful only for "diagnosis"
+	RCA         *RootCauseAnalysis `json:"rca,omitempty"` // Structured diagnosis, only for "diagnosis"
 }
 
 // GenerationConfig controls response generation.

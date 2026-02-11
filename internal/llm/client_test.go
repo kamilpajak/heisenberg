@@ -258,11 +258,12 @@ func (m *mockToolHandler) Execute(_ context.Context, call FunctionCall) (string,
 	return "unknown tool: " + call.Name, false, nil
 }
 
-func (m *mockToolHandler) HasPendingTraces() bool       { return false }
-func (m *mockToolHandler) DiagnosisCategory() string    { return m.category }
-func (m *mockToolHandler) DiagnosisConfidence() int     { return m.confidence }
-func (m *mockToolHandler) DiagnosisSensitivity() string { return m.sensitivity }
-func (m *mockToolHandler) GetEmitter() ProgressEmitter  { return m.emitter }
+func (m *mockToolHandler) HasPendingTraces() bool           { return false }
+func (m *mockToolHandler) DiagnosisCategory() string        { return m.category }
+func (m *mockToolHandler) DiagnosisConfidence() int         { return m.confidence }
+func (m *mockToolHandler) DiagnosisSensitivity() string     { return m.sensitivity }
+func (m *mockToolHandler) DiagnosisRCA() *RootCauseAnalysis { return nil }
+func (m *mockToolHandler) GetEmitter() ProgressEmitter      { return m.emitter }
 
 // testToolDeclarations returns minimal tool declarations for tests.
 func testToolDeclarations() []FunctionDeclaration {

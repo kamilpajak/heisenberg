@@ -20,7 +20,7 @@ func emit(h ToolExecutor, ev ProgressEvent) {
 	}
 }
 
-const maxIterations = 20
+const maxIterations = 30
 const softLimitIteration = 15
 
 var ansiRe = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
@@ -112,20 +112,31 @@ Strategy:
 3. Focus on FAILED jobs and their logs
 4. For Playwright test failures, fetch the HTML report artifact first
 5. Use get_test_traces on test-results artifacts to get browser actions, console errors, and failed HTTP requests from Playwright trace recordings
-6. When you have enough information, you MUST call the "done" tool first, then provide your analysis text. Never skip the done tool.
+6. When you have enough information, you MUST call the "done" tool with structured RCA data, then provide your analysis text.
 
 When calling the "done" tool, classify your conclusion:
-- category "diagnosis": you identified a specific failure root cause. Include confidence (0-100) and missing_information_sensitivity.
+- category "diagnosis": you identified a specific failure root cause. Include ALL structured RCA fields.
 - category "no_failures": all tests are passing, nothing to diagnose.
 - category "not_supported": the test framework or artifact format cannot be analyzed.
 
-For "diagnosis" category:
-  Confidence scoring (0-100):
+For "diagnosis" category, provide structured Root Cause Analysis:
+  - title: Short summary (e.g., "Timeout waiting for Submit Button")
+  - failure_type: One of: timeout, assertion, network, infra, flake
+  - file_path: Test file where failure occurred (e.g., "tests/checkout.spec.ts")
+  - line_number: Line number in the test file (if known)
+  - symptom: What failed (the observable error)
+  - root_cause: Why it failed (the underlying issue)
+  - evidence: Array of supporting data points, each with type (screenshot/trace/log/network/code) and content
+  - remediation: How to fix it (actionable guidance)
+  - confidence: 0-100 score
+  - missing_information_sensitivity: high/medium/low
+
+Confidence scoring (0-100):
   - 80-100: Clear root cause identified with strong evidence
   - 40-79: Likely cause identified but some ambiguity remains
   - 0-39: Uncertain, multiple possible causes or insufficient evidence
 
-  Missing information sensitivity:
+Missing information sensitivity:
   - high: Backend logs, Docker state, or CI environment data would likely reveal the root cause
   - medium: Additional data might help but current evidence is reasonable
   - low: Diagnosis is well-supported by frontend/test evidence alone
@@ -357,6 +368,7 @@ func buildResult(texts []string, handler ToolExecutor) *AnalysisResult {
 		Category:    handler.DiagnosisCategory(),
 		Confidence:  handler.DiagnosisConfidence(),
 		Sensitivity: handler.DiagnosisSensitivity(),
+		RCA:         handler.DiagnosisRCA(),
 	}
 	if result.Category == "" {
 		result.Category = CategoryDiagnosis
