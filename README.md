@@ -204,4 +204,15 @@ Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for gui
 
 ## License
 
-Apache 2.0 - see [LICENSE](LICENSE) for details.
+This project uses a dual-license model:
+
+| Component | License | Path |
+|-----------|---------|------|
+| CLI, analysis engine, integrations | [Apache 2.0](LICENSE) | `cmd/cli`, `pkg/*`, `internal/*` (most) |
+| SaaS components (auth, billing, database) | [BSL 1.1](LICENSE_ENTERPRISE) | `internal/auth`, `internal/billing`, `internal/database`, `cmd/server` |
+
+**Open Source (Apache 2.0):** You can freely use, modify, and distribute the CLI and analysis engine. This includes running `heisenberg` locally and in your CI pipelines.
+
+**SaaS Components (BSL 1.1):** The authentication, billing, and multi-tenant database code cannot be used to operate a competing commercial service. After 4 years, these components convert to Apache 2.0.
+
+For most users, only the Apache 2.0 license applies.
