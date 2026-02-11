@@ -34,3 +34,8 @@ Thumbs.db
 .env
 .env.local
 .envrc
+
+# Web frontend (SvelteKit)
+web/node_modules/
+web/.svelte-kit/
+web/build/
