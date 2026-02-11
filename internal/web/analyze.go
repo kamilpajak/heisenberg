@@ -5,9 +5,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/kamilpajak/heisenberg/internal/analysis"
-	"github.com/kamilpajak/heisenberg/internal/llm"
-	"github.com/kamilpajak/heisenberg/internal/trace"
+	"github.com/kamilpajak/heisenberg/pkg/analysis"
+	"github.com/kamilpajak/heisenberg/pkg/llm"
+	"github.com/kamilpajak/heisenberg/pkg/trace"
 )
 
 func (h *Handler) handleAnalyze(w http.ResponseWriter, r *http.Request) {

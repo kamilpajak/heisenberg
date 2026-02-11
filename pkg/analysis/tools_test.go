@@ -9,8 +9,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	gh "github.com/kamilpajak/heisenberg/internal/github"
-	"github.com/kamilpajak/heisenberg/internal/llm"
+	gh "github.com/kamilpajak/heisenberg/pkg/github"
+	"github.com/kamilpajak/heisenberg/pkg/llm"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

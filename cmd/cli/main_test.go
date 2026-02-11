@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/fatih/color"
-	"github.com/kamilpajak/heisenberg/internal/llm"
+	"github.com/kamilpajak/heisenberg/pkg/llm"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

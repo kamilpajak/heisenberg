@@ -12,10 +12,10 @@ import (
 	"time"
 
 	"github.com/fatih/color"
-	"github.com/kamilpajak/heisenberg/internal/analysis"
-	"github.com/kamilpajak/heisenberg/internal/llm"
-	"github.com/kamilpajak/heisenberg/internal/trace"
 	"github.com/kamilpajak/heisenberg/internal/web"
+	"github.com/kamilpajak/heisenberg/pkg/analysis"
+	"github.com/kamilpajak/heisenberg/pkg/llm"
+	"github.com/kamilpajak/heisenberg/pkg/trace"
 	"github.com/spf13/cobra"
 )
 

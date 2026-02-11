@@ -3,7 +3,7 @@ package analysis
 import (
 	"testing"
 
-	gh "github.com/kamilpajak/heisenberg/internal/github"
+	gh "github.com/kamilpajak/heisenberg/pkg/github"
 	"github.com/stretchr/testify/assert"
 )
 

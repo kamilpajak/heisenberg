@@ -1,0 +1,15 @@
+Business Source License 1.1
+
+Licensor: Kamil Pajak
+Licensed Work: Heisenberg SaaS Components (internal/auth, internal/billing, internal/database, cmd/server)
+Change Date: Four years from release date
+Change License: Apache License 2.0
+
+The Licensed Work is provided under the terms of the Business Source License 1.1.
+See https://mariadb.com/bsl11/ for the full license text.
+
+Additional Use Grant: You may use the Licensed Work for any purpose except operating
+a commercial test failure analysis service that competes with Heisenberg SaaS.
+
+The open source components (CLI, pkg/*, internal/analysis, internal/github, internal/llm,
+internal/trace, internal/web, internal/server) remain under Apache License 2.0.
