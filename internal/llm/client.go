@@ -20,7 +20,7 @@ func emit(h ToolExecutor, ev ProgressEvent) {
 	}
 }
 
-const maxIterations = 20
+const maxIterations = 30
 const softLimitIteration = 15
 
 var ansiRe = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
