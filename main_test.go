@@ -2,11 +2,13 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"testing"
 
 	"github.com/fatih/color"
 	"github.com/kamilpajak/heisenberg/internal/llm"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func init() {
@@ -91,4 +93,26 @@ func TestPrintConfidenceBar_OverflowClamped(t *testing.T) {
 	printConfidenceBar(&buf, 150, "low")
 
 	assert.Contains(t, buf.String(), "Confidence: 150%")
+}
+
+func TestJSONOutput(t *testing.T) {
+	r := &llm.AnalysisResult{
+		Text:        "Root cause: timeout in login",
+		Category:    llm.CategoryDiagnosis,
+		Confidence:  85,
+		Sensitivity: "low",
+	}
+
+	var buf bytes.Buffer
+	err := json.NewEncoder(&buf).Encode(r)
+	require.NoError(t, err)
+
+	var decoded llm.AnalysisResult
+	err = json.Unmarshal(buf.Bytes(), &decoded)
+	require.NoError(t, err)
+
+	assert.Equal(t, r.Text, decoded.Text)
+	assert.Equal(t, r.Category, decoded.Category)
+	assert.Equal(t, r.Confidence, decoded.Confidence)
+	assert.Equal(t, r.Sensitivity, decoded.Sensitivity)
 }

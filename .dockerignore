@@ -18,7 +18,6 @@ dist/
 
 # Documentation
 *.md
-!go.mod
 LICENSE
 CONTRIBUTING.md
 
