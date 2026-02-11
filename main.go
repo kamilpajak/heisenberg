@@ -114,12 +114,77 @@ func printResult(stderr, stdout io.Writer, r *llm.AnalysisResult) {
 	}
 
 	fmt.Fprintln(stderr)
-	fmt.Fprintln(stdout, r.Text)
+
+	// Use structured RCA if available, otherwise fall back to legacy text
+	if r.RCA != nil && r.RCA.Title != "" {
+		printStructuredRCA(stdout, r.RCA)
+	} else {
+		fmt.Fprintln(stdout, r.Text)
+	}
 
 	if r.Category == llm.CategoryDiagnosis && r.Confidence < 70 && r.Sensitivity == "high" {
 		fmt.Fprintln(stderr)
 		yellow := color.New(color.FgYellow)
 		_, _ = yellow.Fprintln(stderr, "  Tip: Additional data sources (backend logs, Docker state) may improve this diagnosis.")
+	}
+}
+
+func printStructuredRCA(w io.Writer, rca *llm.RootCauseAnalysis) {
+	bold := color.New(color.Bold)
+	dim := color.New(color.FgHiBlack)
+
+	// Header with failure type and location
+	failureType := strings.ToUpper(rca.FailureType)
+	if failureType == "" {
+		failureType = "ERROR"
+	}
+
+	header := failureType
+	if rca.Location != nil && rca.Location.FilePath != "" {
+		loc := rca.Location.FilePath
+		if rca.Location.LineNumber > 0 {
+			loc = fmt.Sprintf("%s:%d", rca.Location.FilePath, rca.Location.LineNumber)
+		}
+		header = fmt.Sprintf("%s in %s", header, loc)
+	}
+	_, _ = bold.Fprintln(w, header)
+	fmt.Fprintln(w)
+
+	// Root cause
+	_, _ = bold.Fprintln(w, "ROOT CAUSE")
+	fmt.Fprintln(w, rca.RootCause)
+	fmt.Fprintln(w)
+
+	// Evidence (if any)
+	if len(rca.Evidence) > 0 {
+		_, _ = bold.Fprintln(w, "EVIDENCE")
+		for _, ev := range rca.Evidence {
+			icon := evidenceIcon(ev.Type)
+			_, _ = dim.Fprintf(w, "%s ", icon)
+			fmt.Fprintln(w, ev.Content)
+		}
+		fmt.Fprintln(w)
+	}
+
+	// Remediation
+	_, _ = bold.Fprintln(w, "FIX")
+	fmt.Fprintln(w, rca.Remediation)
+}
+
+func evidenceIcon(t string) string {
+	switch t {
+	case llm.EvidenceScreenshot:
+		return "[Screenshot]"
+	case llm.EvidenceTrace:
+		return "[Trace]"
+	case llm.EvidenceLog:
+		return "[Log]"
+	case llm.EvidenceNetwork:
+		return "[Network]"
+	case llm.EvidenceCode:
+		return "[Code]"
+	default:
+		return "[Evidence]"
 	}
 }
 

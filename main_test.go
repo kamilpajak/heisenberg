@@ -116,3 +116,153 @@ func TestJSONOutput(t *testing.T) {
 	assert.Equal(t, r.Confidence, decoded.Confidence)
 	assert.Equal(t, r.Sensitivity, decoded.Sensitivity)
 }
+
+func TestPrintResult_WithStructuredRCA(t *testing.T) {
+	var stderr, stdout bytes.Buffer
+	r := &llm.AnalysisResult{
+		Category:    llm.CategoryDiagnosis,
+		Confidence:  90,
+		Sensitivity: "low",
+		RCA: &llm.RootCauseAnalysis{
+			Title:       "Timeout waiting for Submit Button",
+			FailureType: llm.FailureTypeTimeout,
+			Location: &llm.CodeLocation{
+				FilePath:   "tests/checkout.spec.ts",
+				LineNumber: 45,
+			},
+			Symptom:   "Test timed out after 30000ms",
+			RootCause: "Cookie banner overlays submit button",
+			Evidence: []llm.Evidence{
+				{Type: llm.EvidenceScreenshot, Content: "Overlay visible at z=999"},
+				{Type: llm.EvidenceTrace, Content: "Click blocked at 12:34:56"},
+			},
+			Remediation: "Dismiss cookie banner before form submission",
+		},
+	}
+
+	printResult(&stderr, &stdout, r)
+
+	out := stdout.String()
+	assert.Contains(t, out, "TIMEOUT")
+	assert.Contains(t, out, "tests/checkout.spec.ts:45")
+	assert.Contains(t, out, "ROOT CAUSE")
+	assert.Contains(t, out, "Cookie banner overlays submit button")
+	assert.Contains(t, out, "EVIDENCE")
+	assert.Contains(t, out, "[Screenshot]")
+	assert.Contains(t, out, "Overlay visible")
+	assert.Contains(t, out, "FIX")
+	assert.Contains(t, out, "Dismiss cookie banner")
+}
+
+func TestPrintResult_FallbackToText(t *testing.T) {
+	var stderr, stdout bytes.Buffer
+	r := &llm.AnalysisResult{
+		Text:        "Legacy text analysis",
+		Category:    llm.CategoryDiagnosis,
+		Confidence:  75,
+		Sensitivity: "medium",
+		RCA:         nil, // No structured RCA
+	}
+
+	printResult(&stderr, &stdout, r)
+
+	out := stdout.String()
+	assert.Contains(t, out, "Legacy text analysis")
+	assert.NotContains(t, out, "ROOT CAUSE")
+}
+
+func TestPrintResult_EmptyRCATitle(t *testing.T) {
+	var stderr, stdout bytes.Buffer
+	r := &llm.AnalysisResult{
+		Text:        "Fallback text",
+		Category:    llm.CategoryDiagnosis,
+		Confidence:  60,
+		Sensitivity: "medium",
+		RCA:         &llm.RootCauseAnalysis{Title: ""}, // Empty title = fallback
+	}
+
+	printResult(&stderr, &stdout, r)
+
+	out := stdout.String()
+	assert.Contains(t, out, "Fallback text")
+}
+
+func TestPrintStructuredRCA_NoLocation(t *testing.T) {
+	var buf bytes.Buffer
+	rca := &llm.RootCauseAnalysis{
+		Title:       "Network Error",
+		FailureType: llm.FailureTypeNetwork,
+		Symptom:     "HTTP 500",
+		RootCause:   "Backend service down",
+		Evidence:    []llm.Evidence{},
+		Remediation: "Check backend logs",
+	}
+
+	printStructuredRCA(&buf, rca)
+
+	out := buf.String()
+	assert.Contains(t, out, "NETWORK")
+	assert.NotContains(t, out, ":0") // No line number shown
+	assert.Contains(t, out, "Backend service down")
+}
+
+func TestPrintStructuredRCA_AllEvidenceTypes(t *testing.T) {
+	var buf bytes.Buffer
+	rca := &llm.RootCauseAnalysis{
+		Title:       "Test Error",
+		FailureType: llm.FailureTypeAssertion,
+		RootCause:   "Assertion failed",
+		Evidence: []llm.Evidence{
+			{Type: llm.EvidenceScreenshot, Content: "Screenshot data"},
+			{Type: llm.EvidenceTrace, Content: "Trace data"},
+			{Type: llm.EvidenceLog, Content: "Log data"},
+			{Type: llm.EvidenceNetwork, Content: "Network data"},
+			{Type: llm.EvidenceCode, Content: "Code data"},
+		},
+		Remediation: "Fix assertion",
+	}
+
+	printStructuredRCA(&buf, rca)
+
+	out := buf.String()
+	assert.Contains(t, out, "[Screenshot]")
+	assert.Contains(t, out, "[Trace]")
+	assert.Contains(t, out, "[Log]")
+	assert.Contains(t, out, "[Network]")
+	assert.Contains(t, out, "[Code]")
+}
+
+func TestJSONOutput_WithRCA(t *testing.T) {
+	r := &llm.AnalysisResult{
+		Category:    llm.CategoryDiagnosis,
+		Confidence:  85,
+		Sensitivity: "low",
+		RCA: &llm.RootCauseAnalysis{
+			Title:       "Timeout Error",
+			FailureType: llm.FailureTypeTimeout,
+			Location: &llm.CodeLocation{
+				FilePath:   "tests/login.spec.ts",
+				LineNumber: 42,
+			},
+			Symptom:     "Timed out",
+			RootCause:   "Slow network",
+			Evidence:    []llm.Evidence{{Type: llm.EvidenceTrace, Content: "Delay"}},
+			Remediation: "Add retry",
+		},
+	}
+
+	var buf bytes.Buffer
+	err := json.NewEncoder(&buf).Encode(r)
+	require.NoError(t, err)
+
+	var decoded llm.AnalysisResult
+	err = json.Unmarshal(buf.Bytes(), &decoded)
+	require.NoError(t, err)
+
+	require.NotNil(t, decoded.RCA)
+	assert.Equal(t, "Timeout Error", decoded.RCA.Title)
+	assert.Equal(t, llm.FailureTypeTimeout, decoded.RCA.FailureType)
+	assert.Equal(t, "tests/login.spec.ts", decoded.RCA.Location.FilePath)
+	assert.Equal(t, 42, decoded.RCA.Location.LineNumber)
+	assert.Len(t, decoded.RCA.Evidence, 1)
+}
