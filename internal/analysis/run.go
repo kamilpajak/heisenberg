@@ -28,17 +28,22 @@ func Run(ctx context.Context, p Params) (*llm.AnalysisResult, error) {
 	// Resolve run ID
 	resolvedRunID := p.RunID
 	if resolvedRunID == 0 {
-		emitInfo(p.Emitter, fmt.Sprintf("Finding latest failed run for %s/%s...", p.Owner, p.Repo))
+		emitInfo(p.Emitter, fmt.Sprintf("Finding run to analyze for %s/%s...", p.Owner, p.Repo))
 		runs, err := ghClient.ListWorkflowRuns(ctx, p.Owner, p.Repo)
 		if err != nil {
 			return nil, fmt.Errorf("failed to list runs: %w", err)
 		}
-		for _, r := range runs {
-			if r.Conclusion == "failure" {
-				resolvedRunID = r.ID
-				break
-			}
+
+		var shouldSkip bool
+		resolvedRunID, shouldSkip = findRunToAnalyze(runs)
+
+		if shouldSkip {
+			return &llm.AnalysisResult{
+				Text:     "Latest workflow run passed. No failures to analyze.",
+				Category: llm.CategoryNoFailures,
+			}, nil
 		}
+
 		if resolvedRunID == 0 {
 			return nil, fmt.Errorf("no failed workflow runs found for %s/%s", p.Owner, p.Repo)
 		}
@@ -132,6 +137,30 @@ func buildInitialContext(run *gh.WorkflowRun, jobs []gh.Job, artifacts []gh.Arti
 	b.WriteString("When you have enough information, you MUST call the 'done' tool first, then provide your final root cause analysis.\n")
 
 	return b.String()
+}
+
+// findRunToAnalyze determines which run to analyze based on smart selection logic.
+// Returns (runID, shouldSkip). If shouldSkip is true, the latest run passed and
+// there's nothing to analyze. If runID is 0 and shouldSkip is false, no failed runs exist.
+func findRunToAnalyze(runs []gh.WorkflowRun) (runID int64, shouldSkip bool) {
+	if len(runs) == 0 {
+		return 0, false
+	}
+
+	// Check if the latest completed run is a success
+	latest := runs[0]
+	if latest.Conclusion == "success" {
+		return 0, true
+	}
+
+	// Find the first failure
+	for _, r := range runs {
+		if r.Conclusion == "failure" {
+			return r.ID, false
+		}
+	}
+
+	return 0, false
 }
 
 // formatRunDate parses a GitHub timestamp and returns a human-readable date.
