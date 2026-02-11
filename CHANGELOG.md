@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-02-11
+
+### Added
+
+- GitHub Action for automated test failure analysis
+- JSON output format via `--json` flag for CI integration
+- Action outputs: `diagnosis`, `confidence`, `category`
+- Job Summary with analysis results
+
+### Usage
+
+```yaml
+- uses: kamilpajak/heisenberg@v0.2.0
+  with:
+    google-api-key: ${{ secrets.GOOGLE_API_KEY }}
+```
+
 ## [0.1.2] - 2026-02-08
 
 ### Added
@@ -51,7 +68,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automatic artifact format detection (HTML, blob, JSON)
 - HTML report rendering via headless Playwright
 
-[Unreleased]: https://github.com/kamilpajak/heisenberg/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/kamilpajak/heisenberg/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/kamilpajak/heisenberg/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/kamilpajak/heisenberg/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/kamilpajak/heisenberg/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/kamilpajak/heisenberg/releases/tag/v0.1.0
