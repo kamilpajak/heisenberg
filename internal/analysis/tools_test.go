@@ -1081,6 +1081,30 @@ func TestToolDeclarations(t *testing.T) {
 	assert.Len(t, decls, 7)
 }
 
+func TestToolDeclarations_DoneEvidenceArrayHasItems(t *testing.T) {
+	decls := ToolDeclarations()
+
+	// Find the done tool
+	var doneDecl *llm.FunctionDeclaration
+	for i := range decls {
+		if decls[i].Name == "done" {
+			doneDecl = &decls[i]
+			break
+		}
+	}
+	require.NotNil(t, doneDecl, "done tool should exist")
+	require.NotNil(t, doneDecl.Parameters, "done tool should have parameters")
+
+	// Check evidence field exists and has Items schema (required by Gemini API for arrays)
+	evidenceSchema, ok := doneDecl.Parameters.Properties["evidence"]
+	require.True(t, ok, "done tool should have evidence property")
+	assert.Equal(t, "array", evidenceSchema.Type, "evidence should be array type")
+	require.NotNil(t, evidenceSchema.Items, "evidence array MUST have Items schema for Gemini API")
+	assert.Equal(t, "object", evidenceSchema.Items.Type, "evidence items should be objects")
+	assert.Contains(t, evidenceSchema.Items.Properties, "type", "evidence items should have type property")
+	assert.Contains(t, evidenceSchema.Items.Properties, "content", "evidence items should have content property")
+}
+
 type mockEmitter struct{}
 
 func (m *mockEmitter) Emit(llm.ProgressEvent) {}

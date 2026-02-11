@@ -439,6 +439,13 @@ func ToolDeclarations() []llm.FunctionDeclaration {
 					"evidence": {
 						Type:        "array",
 						Description: "Supporting data points. Each item has 'type' (screenshot/trace/log/network/code) and 'content' (description).",
+						Items: &llm.Schema{
+							Type: "object",
+							Properties: map[string]llm.Schema{
+								"type":    {Type: "string", Description: "Evidence type: screenshot, trace, log, network, or code"},
+								"content": {Type: "string", Description: "Description of the evidence"},
+							},
+						},
 					},
 					"remediation": {
 						Type:        "string",
