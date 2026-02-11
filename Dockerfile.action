@@ -1,0 +1,17 @@
+# Stage 1: Build from source
+FROM golang:1.24-alpine AS builder
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+# .dockerignore excludes sensitive files (.env, .git, etc.)
+COPY . .  # NOSONAR
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /heisenberg .
+
+# Stage 2: Runtime with Playwright
+# Playwright requires root for browser installation; acceptable for GitHub Action containers
+FROM mcr.microsoft.com/playwright:v1.52.0-noble  # NOSONAR
+RUN apt-get update && apt-get install -y --no-install-recommends jq && rm -rf /var/lib/apt/lists/*
+COPY --from=builder /heisenberg /usr/local/bin/
+COPY scripts/action-entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+ENTRYPOINT ["/entrypoint.sh"]

@@ -10,12 +10,20 @@ Heisenberg fetches Playwright test artifacts from GitHub Actions and uses Google
 
 ## Features
 
-- **Playwright trace analysis** - Parses HTML reports and trace files
+- **Agentic analysis** - Iterative tool-calling loop (typically 4-7 rounds, max 20) gathers context automatically
+- **Full CI access** - Fetches job logs, workflow files, test source code, and Playwright artifacts
+- **Playwright support** - HTML reports (rendered via headless browser), blob reports, trace files
 - **Root cause diagnosis** - AI-powered analysis with confidence scoring
 - **Local dashboard** - Web UI for interactive analysis (`heisenberg serve`)
 - **Progressive disclosure** - Suggests additional data sources when confidence is low
 
 ## Installation
+
+### Homebrew (macOS/Linux)
+
+```bash
+brew install kamilpajak/tap/heisenberg
+```
 
 ### Using Go
 
@@ -58,6 +66,9 @@ heisenberg owner/repo --verbose
 # Analyze a specific workflow run
 heisenberg owner/repo --run-id 12345678
 
+# Output result as JSON
+heisenberg owner/repo --json
+
 # Start the local web dashboard
 heisenberg serve
 
@@ -75,6 +86,47 @@ The test failure in `auth.setup.ts` is caused by a timeout during
 authentication setup. The login endpoint is returning HTTP 503,
 indicating the backend service is unavailable during the test run.
 ```
+
+## GitHub Action
+
+Analyze test failures automatically when your CI fails:
+
+```yaml
+# .github/workflows/heisenberg.yml
+name: Analyze Failures
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+
+jobs:
+  analyze:
+    if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: kamilpajak/heisenberg@v1
+        with:
+          google-api-key: ${{ secrets.GOOGLE_API_KEY }}
+```
+
+### Inputs
+
+| Input | Required | Default | Description |
+|-------|----------|---------|-------------|
+| `google-api-key` | Yes | - | Google AI API key for Gemini |
+| `repository` | No | Current repo | Repository to analyze (owner/repo) |
+| `run-id` | No | Latest failed | Specific workflow run ID |
+
+### Outputs
+
+| Output | Description |
+|--------|-------------|
+| `diagnosis` | Analysis text |
+| `confidence` | Confidence score (0-100) |
+| `category` | Result category (diagnosis, no_failures, not_supported) |
+
+The action writes a summary to the Job Summary page with the diagnosis and confidence score.
 
 ## Configuration
 
@@ -100,28 +152,35 @@ heisenberg owner/repo
        │
        ▼
 ┌─────────────────────────────┐
-│  Fetch artifacts from       │
+│  Fetch workflow run from    │
 │  GitHub Actions             │
 └─────────────┬───────────────┘
               │
               ▼
 ┌─────────────────────────────┐
-│  Detect format:             │
-│  • HTML report → Playwright │
-│  • blob-report → Merge      │
-│  • JSON → Parse directly    │
-└─────────────┬───────────────┘
-              │
-              ▼
-┌─────────────────────────────┐
-│  LLM Analysis (Gemini)      │
-│  with tool calling          │
-└─────────────┬───────────────┘
-              │
+│  Gemini analysis loop       │◄──────────┐
+│  (typically 4-7 iterations) │           │
+└─────────────┬───────────────┘           │
+              │                           │
+              ▼                           │
+┌─────────────────────────────┐           │
+│  Tool calls:                │           │
+│  • get_job_logs             │           │
+│  • get_artifact (HTML/blob) │           │
+│  • get_test_traces          │   Need    │
+│  • get_repo_file            │   more    │
+│  • get_workflow_file        │  context  │
+└─────────────┬───────────────┘           │
+              │                           │
+              ▼                           │
+         ┌────────┐   No                  │
+         │ Done?  │───────────────────────┘
+         └────┬───┘
+              │ Yes
               ▼
 ┌─────────────────────────────┐
 │  Diagnosis with confidence  │
-│  score and sensitivity      │
+│  score (0-100%)             │
 └─────────────────────────────┘
 ```
 
@@ -132,6 +191,12 @@ Currently optimized for:
 - **Playwright** - HTML reports, blob reports, trace files
 
 Other frameworks may work but are not fully supported yet.
+
+## Privacy
+
+Heisenberg sends test artifacts and job logs to Google's Gemini API for analysis. You provide your own API key. No data is stored or logged by this tool.
+
+If your CI logs contain sensitive information, review Google's [Gemini API data usage policy](https://ai.google.dev/gemini-api/terms).
 
 ## Contributing
 

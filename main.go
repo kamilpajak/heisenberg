@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -25,9 +26,10 @@ var (
 )
 
 var (
-	verbose bool
-	runID   int64
-	port    int
+	verbose    bool
+	jsonOutput bool
+	runID      int64
+	port       int
 )
 
 var rootCmd = &cobra.Command{
@@ -56,6 +58,7 @@ var versionCmd = &cobra.Command{
 
 func init() {
 	rootCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Show detailed tool call info")
+	rootCmd.Flags().BoolVar(&jsonOutput, "json", false, "Output result as JSON")
 	rootCmd.Flags().Int64Var(&runID, "run-id", 0, "Specific workflow run ID to analyze")
 
 	serveCmd.Flags().IntVarP(&port, "port", "p", 8080, "Port to listen on")
@@ -93,6 +96,11 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	emitter.Close()
+
+	if jsonOutput {
+		return json.NewEncoder(os.Stdout).Encode(result)
+	}
+
 	printResult(os.Stderr, os.Stdout, result)
 	return nil
 }

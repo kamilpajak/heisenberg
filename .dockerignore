@@ -1,0 +1,26 @@
+# Git
+.git
+.gitignore
+
+# IDE
+.idea
+.vscode
+*.swp
+
+# Build artifacts
+heisenberg
+*.exe
+dist/
+
+# Environment
+.env
+.envrc
+
+# Documentation
+*.md
+LICENSE
+CONTRIBUTING.md
+
+# Test artifacts
+coverage.out
+*.test
