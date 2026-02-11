@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Structured Root Cause Analysis (RCA) output for diagnoses
+  - Title, failure type, code location, symptom, root cause, evidence, remediation
+  - Evidence types: screenshot, trace, log, network, code
+  - CLI renders formatted diagnosis with `[Log]`, `[Code]` prefixes
+  - JSON output includes full RCA structure in `.rca` field
+
+### Changed
+
+- Increased agent loop limit from 20 to 30 iterations for complex repositories
+
 ## [0.2.1] - 2026-02-11
 
 ### Added
