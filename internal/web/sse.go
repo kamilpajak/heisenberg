@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/kamilpajak/heisenberg/internal/llm"
+	"github.com/kamilpajak/heisenberg/pkg/llm"
 )
 
 // SSEEmitter implements llm.ProgressEmitter by writing Server-Sent Events.

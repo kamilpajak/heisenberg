@@ -7,7 +7,7 @@ before:
 
 builds:
   - id: heisenberg
-    main: .
+    main: ./cmd/cli
     binary: heisenberg
     env:
       - CGO_ENABLED=0

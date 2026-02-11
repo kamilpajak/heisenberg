@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	gh "github.com/kamilpajak/heisenberg/internal/github"
-	"github.com/kamilpajak/heisenberg/internal/llm"
+	gh "github.com/kamilpajak/heisenberg/pkg/github"
+	"github.com/kamilpajak/heisenberg/pkg/llm"
 )
 
 // Params configures an analysis run.

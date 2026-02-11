@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"strings"
 
-	gh "github.com/kamilpajak/heisenberg/internal/github"
-	"github.com/kamilpajak/heisenberg/internal/llm"
-	"github.com/kamilpajak/heisenberg/internal/trace"
+	gh "github.com/kamilpajak/heisenberg/pkg/github"
+	"github.com/kamilpajak/heisenberg/pkg/llm"
+	"github.com/kamilpajak/heisenberg/pkg/trace"
 )
 
 // ToolHandler executes tool calls on behalf of the agent loop.
