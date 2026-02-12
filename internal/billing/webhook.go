@@ -10,6 +10,19 @@ import (
 	"github.com/stripe/stripe-go/v76/webhook"
 )
 
+// WebhookVerifier defines the interface for verifying webhook signatures.
+type WebhookVerifier interface {
+	ConstructEvent(payload []byte, header string, secret string) (stripe.Event, error)
+}
+
+// DefaultWebhookVerifier uses the real Stripe webhook package.
+type DefaultWebhookVerifier struct{}
+
+// ConstructEvent verifies and constructs a Stripe event from webhook payload.
+func (v *DefaultWebhookVerifier) ConstructEvent(payload []byte, header string, secret string) (stripe.Event, error) {
+	return webhook.ConstructEvent(payload, header, secret)
+}
+
 // WebhookEvent represents a parsed Stripe webhook event.
 type WebhookEvent struct {
 	Type               string
@@ -22,15 +35,26 @@ type WebhookEvent struct {
 
 // WebhookHandler handles Stripe webhook requests.
 type WebhookHandler struct {
-	client  *Client
-	onEvent func(event WebhookEvent) error
+	client   *Client
+	verifier WebhookVerifier
+	onEvent  func(event WebhookEvent) error
 }
 
 // NewWebhookHandler creates a new webhook handler.
 func NewWebhookHandler(client *Client, onEvent func(WebhookEvent) error) *WebhookHandler {
 	return &WebhookHandler{
-		client:  client,
-		onEvent: onEvent,
+		client:   client,
+		verifier: &DefaultWebhookVerifier{},
+		onEvent:  onEvent,
+	}
+}
+
+// NewWebhookHandlerWithVerifier creates a webhook handler with a custom verifier (for testing).
+func NewWebhookHandlerWithVerifier(client *Client, verifier WebhookVerifier, onEvent func(WebhookEvent) error) *WebhookHandler {
+	return &WebhookHandler{
+		client:   client,
+		verifier: verifier,
+		onEvent:  onEvent,
 	}
 }
 
@@ -43,7 +67,7 @@ func (h *WebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	signature := r.Header.Get("Stripe-Signature")
-	event, err := webhook.ConstructEvent(body, signature, h.client.config.WebhookSecret)
+	event, err := h.verifier.ConstructEvent(body, signature, h.client.config.WebhookSecret)
 	if err != nil {
 		http.Error(w, "invalid signature", http.StatusBadRequest)
 		return

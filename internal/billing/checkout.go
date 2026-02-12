@@ -4,9 +4,6 @@ import (
 	"fmt"
 
 	"github.com/stripe/stripe-go/v76"
-	portalsession "github.com/stripe/stripe-go/v76/billingportal/session"
-	"github.com/stripe/stripe-go/v76/checkout/session"
-	"github.com/stripe/stripe-go/v76/customer"
 )
 
 // CreateCheckoutParams contains parameters for creating a checkout session.
@@ -47,7 +44,7 @@ func (c *Client) CreateCheckoutSession(params CreateCheckoutParams) (*stripe.Che
 		sessionParams.CustomerEmail = stripe.String(params.Email)
 	}
 
-	return session.New(sessionParams)
+	return c.provider.CreateCheckoutSession(sessionParams)
 }
 
 // CreateCustomer creates a new Stripe customer.
@@ -59,12 +56,12 @@ func (c *Client) CreateCustomer(email, name, orgID string) (*stripe.Customer, er
 			"org_id": orgID,
 		},
 	}
-	return customer.New(params)
+	return c.provider.CreateCustomer(params)
 }
 
 // GetCustomer retrieves a Stripe customer by ID.
 func (c *Client) GetCustomer(customerID string) (*stripe.Customer, error) {
-	return customer.Get(customerID, nil)
+	return c.provider.GetCustomer(customerID)
 }
 
 // CreatePortalSession creates a Stripe billing portal session.
@@ -73,5 +70,5 @@ func (c *Client) CreatePortalSession(customerID, returnURL string) (*stripe.Bill
 		Customer:  stripe.String(customerID),
 		ReturnURL: stripe.String(returnURL),
 	}
-	return portalsession.New(params)
+	return c.provider.CreatePortalSession(params)
 }
