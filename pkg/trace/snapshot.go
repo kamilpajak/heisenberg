@@ -11,7 +11,7 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/kamilpajak/heisenberg/internal/server"
+	"github.com/kamilpajak/heisenberg/internal/artifactserver"
 	"github.com/playwright-community/playwright-go"
 )
 
@@ -202,7 +202,7 @@ func SnapshotHTML(htmlContent []byte) ([]byte, error) {
 		return nil, fmt.Errorf("playwright not installed. Run: go run github.com/playwright-community/playwright-go/cmd/playwright install chromium")
 	}
 
-	srv, err := server.Start(htmlContent, "index.html")
+	srv, err := artifactserver.Start(htmlContent, "index.html")
 	if err != nil {
 		return nil, fmt.Errorf("failed to start server: %w", err)
 	}

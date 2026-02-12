@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/fatih/color"
-	"github.com/kamilpajak/heisenberg/internal/web"
+	"github.com/kamilpajak/heisenberg/internal/dashboard"
 	"github.com/kamilpajak/heisenberg/pkg/analysis"
 	"github.com/kamilpajak/heisenberg/pkg/llm"
 	"github.com/kamilpajak/heisenberg/pkg/trace"
@@ -217,7 +217,7 @@ func serve(cmd *cobra.Command, args []string) error {
 	addr := fmt.Sprintf("127.0.0.1:%d", port)
 	srv := &http.Server{
 		Addr:    addr,
-		Handler: web.NewHandler(),
+		Handler: dashboard.NewHandler(),
 	}
 
 	// Graceful shutdown on interrupt (Ctrl+C)

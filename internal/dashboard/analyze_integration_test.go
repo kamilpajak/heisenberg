@@ -1,6 +1,6 @@
 //go:build integration
 
-package web
+package dashboard
 
 import (
 	"bufio"
