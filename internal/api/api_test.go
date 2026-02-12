@@ -764,3 +764,170 @@ func TestServerClose(t *testing.T) {
 		server.Close()
 	})
 }
+
+func TestNewServer(t *testing.T) {
+	db := testDB(t)
+
+	billingClient := billing.NewClient(billing.Config{
+		SecretKey: "sk_test_fake",
+	})
+
+	cfg := Config{
+		DB:            db,
+		AuthVerifier:  nil, // nil is OK for tests
+		BillingClient: billingClient,
+	}
+
+	server := NewServer(cfg)
+	assert.NotNil(t, server)
+	assert.NotNil(t, server.mux)
+	assert.NotNil(t, server.usageChecker)
+
+	// Server should be able to handle requests
+	req := httptest.NewRequest(http.MethodGet, "/health", nil)
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+}
+
+func TestWriteJSON(t *testing.T) {
+	rec := httptest.NewRecorder()
+	writeJSON(rec, http.StatusCreated, map[string]string{"key": "value"})
+
+	assert.Equal(t, http.StatusCreated, rec.Code)
+	assert.Equal(t, "application/json", rec.Header().Get("Content-Type"))
+	assert.Contains(t, rec.Body.String(), `"key":"value"`)
+}
+
+func TestWriteError(t *testing.T) {
+	rec := httptest.NewRecorder()
+	writeError(rec, http.StatusBadRequest, "test error")
+
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	assert.Contains(t, rec.Body.String(), `"error":"test error"`)
+}
+
+func TestReadJSON(t *testing.T) {
+	t.Run("valid JSON", func(t *testing.T) {
+		body := bytes.NewBufferString(`{"name": "test"}`)
+		req := httptest.NewRequest(http.MethodPost, "/", body)
+
+		var data struct {
+			Name string `json:"name"`
+		}
+		err := readJSON(req, &data)
+
+		assert.NoError(t, err)
+		assert.Equal(t, "test", data.Name)
+	})
+
+	t.Run("invalid JSON", func(t *testing.T) {
+		body := bytes.NewBufferString(`not json`)
+		req := httptest.NewRequest(http.MethodPost, "/", body)
+
+		var data struct {
+			Name string `json:"name"`
+		}
+		err := readJSON(req, &data)
+
+		assert.Error(t, err)
+	})
+}
+
+func TestListAnalysesFilterByCategory(t *testing.T) {
+	db := testDB(t)
+	ctx := context.Background()
+	server := testServer(t, db)
+
+	// Setup
+	kindeUserID := "kp_" + uuid.New().String()[:8]
+	email := "filter-" + uuid.New().String()[:8] + "@example.com"
+	user, err := db.CreateUser(ctx, kindeUserID, email)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.DeleteUser(ctx, user.ID) })
+
+	org, err := db.CreateOrganizationWithOwner(ctx, "Filter Test Org", user.ID)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.DeleteOrganization(ctx, org.ID) })
+
+	repo, err := db.CreateRepository(ctx, org.ID, "filterowner", "filterrepo")
+	require.NoError(t, err)
+
+	// Create analyses with different categories
+	_, err = db.CreateAnalysis(ctx, database.CreateAnalysisParams{
+		RepoID:   repo.ID,
+		RunID:    5001,
+		Category: llm.CategoryDiagnosis,
+		Text:     "Diagnosis",
+	})
+	require.NoError(t, err)
+
+	_, err = db.CreateAnalysis(ctx, database.CreateAnalysisParams{
+		RepoID:   repo.ID,
+		RunID:    5002,
+		Category: llm.CategoryNoFailures,
+		Text:     "No failures",
+	})
+	require.NoError(t, err)
+
+	t.Run("filter by category", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/api/organizations/"+org.ID.String()+"/repositories/"+repo.ID.String()+"/analyses?category=diagnosis", nil)
+		req = withAuthContext(req, kindeUserID, email)
+		rec := httptest.NewRecorder()
+
+		server.mux.ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+
+		var resp map[string]any
+		err := json.Unmarshal(rec.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.Equal(t, float64(1), resp["total"])
+	})
+}
+
+func TestGetOrganizationNotMember(t *testing.T) {
+	db := testDB(t)
+	ctx := context.Background()
+	server := testServer(t, db)
+
+	// Create owner user
+	kindeUserID := "kp_" + uuid.New().String()[:8]
+	email := "owner-" + uuid.New().String()[:8] + "@example.com"
+	user, err := db.CreateUser(ctx, kindeUserID, email)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.DeleteUser(ctx, user.ID) })
+
+	// Create org
+	org, err := db.CreateOrganizationWithOwner(ctx, "Member Test Org", user.ID)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.DeleteOrganization(ctx, org.ID) })
+
+	// Create another user who is NOT a member
+	otherKindeID := "kp_" + uuid.New().String()[:8]
+	otherEmail := "notmember-" + uuid.New().String()[:8] + "@example.com"
+	otherUser, err := db.CreateUser(ctx, otherKindeID, otherEmail)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.DeleteUser(ctx, otherUser.ID) })
+
+	// Try to access org as non-member
+	req := httptest.NewRequest(http.MethodGet, "/api/organizations/"+org.ID.String(), nil)
+	req = withAuthContext(req, otherKindeID, otherEmail)
+	rec := httptest.NewRecorder()
+
+	server.mux.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusForbidden, rec.Code)
+}
+
+func TestConfig_Fields(t *testing.T) {
+	cfg := Config{
+		DB:            nil,
+		AuthVerifier:  nil,
+		BillingClient: nil,
+	}
+
+	assert.Nil(t, cfg.DB)
+	assert.Nil(t, cfg.AuthVerifier)
+	assert.Nil(t, cfg.BillingClient)
+}
