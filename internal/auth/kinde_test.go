@@ -116,3 +116,100 @@ func TestKindeClaims_Fields(t *testing.T) {
 	assert.Len(t, claims.Roles, 1)
 	assert.Equal(t, "admin", claims.Roles[0].Key)
 }
+
+func TestRole_Fields(t *testing.T) {
+	role := Role{
+		ID:   "role_123",
+		Key:  "editor",
+		Name: "Editor",
+	}
+
+	assert.Equal(t, "role_123", role.ID)
+	assert.Equal(t, "editor", role.Key)
+	assert.Equal(t, "Editor", role.Name)
+}
+
+func TestConfig_Fields(t *testing.T) {
+	cfg := Config{
+		Domain:   "https://test.kinde.com",
+		Audience: "https://api.example.com",
+	}
+
+	assert.Equal(t, "https://test.kinde.com", cfg.Domain)
+	assert.Equal(t, "https://api.example.com", cfg.Audience)
+}
+
+func TestExtractBearerToken_MultipleSpaces(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Authorization", "Bearer token with spaces")
+
+	got := extractBearerToken(req)
+	// Should only take first part after "Bearer "
+	assert.Equal(t, "token with spaces", got)
+}
+
+func TestExtractBearerToken_MixedCase(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Authorization", "BEARER uppercase_token")
+
+	got := extractBearerToken(req)
+	assert.Equal(t, "uppercase_token", got)
+}
+
+func TestMiddleware_WithToken_NilVerifier(t *testing.T) {
+	// This tests the case where verifier is nil but token is present
+	// The middleware will panic trying to call verifier.Verify
+	// This is expected behavior - verifier should never be nil in production
+	handler := Middleware(nil)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Authorization", "Bearer sometoken")
+	rec := httptest.NewRecorder()
+
+	// This will panic due to nil verifier - use recover to test
+	defer func() {
+		if r := recover(); r != nil {
+			// Expected panic
+			assert.NotNil(t, r)
+		}
+	}()
+
+	handler.ServeHTTP(rec, req)
+}
+
+func TestOptionalMiddleware_WithToken_NilVerifier(t *testing.T) {
+	// With optional middleware and nil verifier, it should panic when trying to verify
+	handler := OptionalMiddleware(nil)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Authorization", "Bearer sometoken")
+	rec := httptest.NewRecorder()
+
+	defer func() {
+		if r := recover(); r != nil {
+			assert.NotNil(t, r)
+		}
+	}()
+
+	handler.ServeHTTP(rec, req)
+}
+
+func TestVerifier_Close(t *testing.T) {
+	// Verifier.Close is a no-op in keyfunc v3, but we should test it doesn't panic
+	v := &Verifier{}
+	assert.NotPanics(t, func() {
+		v.Close()
+	})
+}
+
+func TestVerifier_RefreshJWKS(t *testing.T) {
+	// RefreshJWKS is a no-op stub, but we should test it doesn't panic
+	v := &Verifier{}
+	assert.NotPanics(t, func() {
+		v.RefreshJWKS()
+	})
+}

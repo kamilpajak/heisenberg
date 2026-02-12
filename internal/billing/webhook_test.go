@@ -67,3 +67,53 @@ func TestWebhookEvent_Fields(t *testing.T) {
 	assert.Equal(t, "price_789", event.PriceID)
 	assert.Equal(t, "org_abc", event.OrgID)
 }
+
+func TestNewWebhookHandler(t *testing.T) {
+	client := NewClient(Config{
+		WebhookSecret: "whsec_test",
+	})
+
+	var receivedEvent WebhookEvent
+	handler := NewWebhookHandler(client, func(event WebhookEvent) error {
+		receivedEvent = event
+		return nil
+	})
+
+	assert.NotNil(t, handler)
+	assert.NotNil(t, handler.client)
+	assert.NotNil(t, handler.onEvent)
+
+	// Test that onEvent callback is stored correctly
+	testEvent := WebhookEvent{Type: "test.event"}
+	_ = handler.onEvent(testEvent)
+	assert.Equal(t, "test.event", receivedEvent.Type)
+}
+
+func TestWebhookHandler_EmptyBody(t *testing.T) {
+	client := NewClient(Config{
+		WebhookSecret: "whsec_test123",
+	})
+
+	handler := NewWebhookHandler(client, func(event WebhookEvent) error {
+		return nil
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/webhook", nil)
+	req.Header.Set("Stripe-Signature", "t=123,v1=abc")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+}
+
+func TestWebhookHandler_NilCallback(t *testing.T) {
+	client := NewClient(Config{
+		WebhookSecret: "whsec_test123",
+	})
+
+	// Handler with nil callback should not panic
+	handler := NewWebhookHandler(client, nil)
+	assert.NotNil(t, handler)
+	assert.Nil(t, handler.onEvent)
+}

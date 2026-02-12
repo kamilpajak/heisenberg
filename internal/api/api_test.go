@@ -524,3 +524,243 @@ func TestInvalidUUIDs(t *testing.T) {
 		})
 	}
 }
+
+func TestBillingCheckout(t *testing.T) {
+	db := testDB(t)
+	ctx := context.Background()
+	server := testServer(t, db)
+
+	// Setup
+	kindeUserID := "kp_" + uuid.New().String()[:8]
+	email := "checkout-" + uuid.New().String()[:8] + "@example.com"
+	user, err := db.CreateUser(ctx, kindeUserID, email)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.DeleteUser(ctx, user.ID) })
+
+	org, err := db.CreateOrganizationWithOwner(ctx, "Checkout Test Org", user.ID)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.DeleteOrganization(ctx, org.ID) })
+
+	t.Run("invalid request body", func(t *testing.T) {
+		body := bytes.NewBufferString(`not valid json`)
+		req := httptest.NewRequest(http.MethodPost, "/api/billing/checkout", body)
+		req.Header.Set("Content-Type", "application/json")
+		req = withAuthContext(req, kindeUserID, email)
+		rec := httptest.NewRecorder()
+
+		server.mux.ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+	})
+
+	t.Run("invalid org ID", func(t *testing.T) {
+		body := bytes.NewBufferString(`{
+			"org_id": "not-a-uuid",
+			"tier": "team",
+			"success_url": "https://example.com/success",
+			"cancel_url": "https://example.com/cancel"
+		}`)
+		req := httptest.NewRequest(http.MethodPost, "/api/billing/checkout", body)
+		req.Header.Set("Content-Type", "application/json")
+		req = withAuthContext(req, kindeUserID, email)
+		rec := httptest.NewRecorder()
+
+		server.mux.ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+	})
+
+	t.Run("non-admin cannot create checkout", func(t *testing.T) {
+		// Create another user who is not an admin
+		otherKindeID := "kp_" + uuid.New().String()[:8]
+		otherEmail := "other-" + uuid.New().String()[:8] + "@example.com"
+		otherUser, err := db.CreateUser(ctx, otherKindeID, otherEmail)
+		require.NoError(t, err)
+		t.Cleanup(func() { _ = db.DeleteUser(ctx, otherUser.ID) })
+
+		// Add as member (not admin)
+		err = db.AddOrgMember(ctx, org.ID, otherUser.ID, database.RoleMember)
+		require.NoError(t, err)
+
+		body := bytes.NewBufferString(`{
+			"org_id": "` + org.ID.String() + `",
+			"tier": "team",
+			"success_url": "https://example.com/success",
+			"cancel_url": "https://example.com/cancel"
+		}`)
+		req := httptest.NewRequest(http.MethodPost, "/api/billing/checkout", body)
+		req.Header.Set("Content-Type", "application/json")
+		req = withAuthContext(req, otherKindeID, otherEmail)
+		rec := httptest.NewRecorder()
+
+		server.mux.ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusForbidden, rec.Code)
+	})
+
+	t.Run("invalid tier returns error", func(t *testing.T) {
+		body := bytes.NewBufferString(`{
+			"org_id": "` + org.ID.String() + `",
+			"tier": "free",
+			"success_url": "https://example.com/success",
+			"cancel_url": "https://example.com/cancel"
+		}`)
+		req := httptest.NewRequest(http.MethodPost, "/api/billing/checkout", body)
+		req.Header.Set("Content-Type", "application/json")
+		req = withAuthContext(req, kindeUserID, email)
+		rec := httptest.NewRecorder()
+
+		server.mux.ServeHTTP(rec, req)
+
+		// Free tier has no price ID, so it should fail
+		assert.Equal(t, http.StatusInternalServerError, rec.Code)
+	})
+}
+
+func TestBillingPortal(t *testing.T) {
+	db := testDB(t)
+	ctx := context.Background()
+	server := testServer(t, db)
+
+	// Setup
+	kindeUserID := "kp_" + uuid.New().String()[:8]
+	email := "portal-" + uuid.New().String()[:8] + "@example.com"
+	user, err := db.CreateUser(ctx, kindeUserID, email)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.DeleteUser(ctx, user.ID) })
+
+	org, err := db.CreateOrganizationWithOwner(ctx, "Portal Test Org", user.ID)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.DeleteOrganization(ctx, org.ID) })
+
+	t.Run("invalid request body", func(t *testing.T) {
+		body := bytes.NewBufferString(`not valid json`)
+		req := httptest.NewRequest(http.MethodPost, "/api/billing/portal", body)
+		req.Header.Set("Content-Type", "application/json")
+		req = withAuthContext(req, kindeUserID, email)
+		rec := httptest.NewRecorder()
+
+		server.mux.ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+	})
+
+	t.Run("invalid org ID", func(t *testing.T) {
+		body := bytes.NewBufferString(`{
+			"org_id": "not-a-uuid",
+			"return_url": "https://example.com/settings"
+		}`)
+		req := httptest.NewRequest(http.MethodPost, "/api/billing/portal", body)
+		req.Header.Set("Content-Type", "application/json")
+		req = withAuthContext(req, kindeUserID, email)
+		rec := httptest.NewRecorder()
+
+		server.mux.ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+	})
+
+	t.Run("org without stripe customer", func(t *testing.T) {
+		body := bytes.NewBufferString(`{
+			"org_id": "` + org.ID.String() + `",
+			"return_url": "https://example.com/settings"
+		}`)
+		req := httptest.NewRequest(http.MethodPost, "/api/billing/portal", body)
+		req.Header.Set("Content-Type", "application/json")
+		req = withAuthContext(req, kindeUserID, email)
+		rec := httptest.NewRecorder()
+
+		server.mux.ServeHTTP(rec, req)
+
+		// Org has no Stripe customer ID, should return error
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+		assert.Contains(t, rec.Body.String(), "no billing account")
+	})
+
+	t.Run("non-admin cannot access portal", func(t *testing.T) {
+		// Create another user who is not an admin
+		otherKindeID := "kp_" + uuid.New().String()[:8]
+		otherEmail := "other-portal-" + uuid.New().String()[:8] + "@example.com"
+		otherUser, err := db.CreateUser(ctx, otherKindeID, otherEmail)
+		require.NoError(t, err)
+		t.Cleanup(func() { _ = db.DeleteUser(ctx, otherUser.ID) })
+
+		// Add as member (not admin)
+		err = db.AddOrgMember(ctx, org.ID, otherUser.ID, database.RoleMember)
+		require.NoError(t, err)
+
+		body := bytes.NewBufferString(`{
+			"org_id": "` + org.ID.String() + `",
+			"return_url": "https://example.com/settings"
+		}`)
+		req := httptest.NewRequest(http.MethodPost, "/api/billing/portal", body)
+		req.Header.Set("Content-Type", "application/json")
+		req = withAuthContext(req, otherKindeID, otherEmail)
+		rec := httptest.NewRecorder()
+
+		server.mux.ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusForbidden, rec.Code)
+	})
+}
+
+func TestAuthSyncMissingClaims(t *testing.T) {
+	db := testDB(t)
+	server := testServer(t, db)
+
+	// Request without auth context
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/sync", nil)
+	rec := httptest.NewRecorder()
+
+	server.mux.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusUnauthorized, rec.Code)
+}
+
+func TestGetMeMissingClaims(t *testing.T) {
+	db := testDB(t)
+	server := testServer(t, db)
+
+	// Request without auth context
+	req := httptest.NewRequest(http.MethodGet, "/api/me", nil)
+	rec := httptest.NewRecorder()
+
+	server.mux.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusUnauthorized, rec.Code)
+}
+
+func TestOrganizationsMissingClaims(t *testing.T) {
+	db := testDB(t)
+	server := testServer(t, db)
+
+	t.Run("list without auth", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/api/organizations", nil)
+		rec := httptest.NewRecorder()
+
+		server.mux.ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusUnauthorized, rec.Code)
+	})
+
+	t.Run("create without auth", func(t *testing.T) {
+		body := bytes.NewBufferString(`{"name": "Test Org"}`)
+		req := httptest.NewRequest(http.MethodPost, "/api/organizations", body)
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+
+		server.mux.ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusUnauthorized, rec.Code)
+	})
+}
+
+func TestServerClose(t *testing.T) {
+	db := testDB(t)
+	server := testServer(t, db)
+
+	// Close should not panic
+	assert.NotPanics(t, func() {
+		server.Close()
+	})
+}
