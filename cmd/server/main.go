@@ -25,6 +25,11 @@ func main() {
 	)
 	flag.Parse()
 
+	// Handle subcommand style: `go run ./cmd/server migrate`
+	if len(flag.Args()) > 0 && flag.Args()[0] == "migrate" {
+		*migrateOnly = true
+	}
+
 	// Required environment variables
 	dbURL := os.Getenv("DATABASE_URL")
 	if dbURL == "" {
@@ -42,6 +47,18 @@ func main() {
 		return
 	}
 
+	// Auth config (required for server mode)
+	kindeDomain := os.Getenv("KINDE_DOMAIN")
+	if kindeDomain == "" {
+		log.Fatal("KINDE_DOMAIN is required (e.g., https://yourapp.kinde.com)")
+	}
+
+	// Billing config (required for server mode)
+	stripeSecretKey := os.Getenv("STRIPE_SECRET_KEY")
+	if stripeSecretKey == "" {
+		log.Fatal("STRIPE_SECRET_KEY is required")
+	}
+
 	// Connect to database
 	ctx := context.Background()
 	db, err := database.New(ctx, dbURL)
@@ -51,15 +68,9 @@ func main() {
 	defer db.Close()
 
 	// Initialize Kinde auth verifier
-	kindeDomain := os.Getenv("KINDE_DOMAIN")
-	kindeAudience := os.Getenv("KINDE_AUDIENCE")
-	if kindeDomain == "" {
-		log.Fatal("KINDE_DOMAIN is required (e.g., https://yourapp.kinde.com)")
-	}
-
 	authVerifier, err := auth.NewVerifier(auth.Config{
 		Domain:   kindeDomain,
-		Audience: kindeAudience,
+		Audience: os.Getenv("KINDE_AUDIENCE"),
 	})
 	if err != nil {
 		log.Fatalf("Failed to create auth verifier: %v", err)
@@ -67,14 +78,9 @@ func main() {
 	defer authVerifier.Close()
 
 	// Initialize billing client
-	stripeSecretKey := os.Getenv("STRIPE_SECRET_KEY")
-	stripeWebhookSecret := os.Getenv("STRIPE_WEBHOOK_SECRET")
-	if stripeSecretKey == "" {
-		log.Fatal("STRIPE_SECRET_KEY is required")
-	}
 	billingClient := billing.NewClient(billing.Config{
 		SecretKey:     stripeSecretKey,
-		WebhookSecret: stripeWebhookSecret,
+		WebhookSecret: os.Getenv("STRIPE_WEBHOOK_SECRET"),
 		PriceIDs: billing.PriceIDs{
 			Team:       os.Getenv("STRIPE_PRICE_TEAM"),
 			Enterprise: os.Getenv("STRIPE_PRICE_ENTERPRISE"),

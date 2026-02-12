@@ -33,6 +33,21 @@ jobs:
     permissions:
       contents: read
 
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: heisenberg
+          POSTGRES_PASSWORD: heisenberg
+          POSTGRES_DB: heisenberg_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -42,7 +57,14 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Run migrations
+        env:
+          DATABASE_URL: postgres://heisenberg:heisenberg@localhost:5432/heisenberg_test?sslmode=disable
+        run: go run ./cmd/server migrate
+
       - name: Run tests with coverage
+        env:
+          DATABASE_URL: postgres://heisenberg:heisenberg@localhost:5432/heisenberg_test?sslmode=disable
         run: go test -race -coverprofile=coverage.out ./...
 
       - name: Upload coverage for SonarCloud
