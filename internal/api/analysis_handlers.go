@@ -49,7 +49,7 @@ func (s *Server) handleListAnalyses(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	total, err := s.db.CountRepoAnalyses(r.Context(), repoID)
+	total, err := s.db.CountRepoAnalyses(r.Context(), repoID, category)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to count analyses")
 		return

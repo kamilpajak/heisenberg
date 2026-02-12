@@ -168,12 +168,21 @@ func (db *DB) ListRepoAnalyses(ctx context.Context, params ListRepoAnalysesParam
 }
 
 // CountRepoAnalyses returns the total number of analyses for a repository.
-func (db *DB) CountRepoAnalyses(ctx context.Context, repoID uuid.UUID) (int, error) {
+// If category is provided, only analyses matching that category are counted.
+func (db *DB) CountRepoAnalyses(ctx context.Context, repoID uuid.UUID, category *string) (int, error) {
 	var count int
-	err := db.pool.QueryRow(ctx,
-		`SELECT COUNT(*) FROM analyses WHERE repo_id = $1`,
-		repoID,
-	).Scan(&count)
+	var err error
+	if category != nil {
+		err = db.pool.QueryRow(ctx,
+			`SELECT COUNT(*) FROM analyses WHERE repo_id = $1 AND category = $2`,
+			repoID, *category,
+		).Scan(&count)
+	} else {
+		err = db.pool.QueryRow(ctx,
+			`SELECT COUNT(*) FROM analyses WHERE repo_id = $1`,
+			repoID,
+		).Scan(&count)
+	}
 	return count, err
 }
 

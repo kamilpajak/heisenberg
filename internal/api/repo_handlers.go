@@ -45,7 +45,7 @@ func (s *Server) handleGetRepository(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	count, err := s.db.CountRepoAnalyses(r.Context(), repoID)
+	count, err := s.db.CountRepoAnalyses(r.Context(), repoID, nil)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to count analyses")
 		return

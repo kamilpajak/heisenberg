@@ -262,7 +262,7 @@ func TestAnalysisCRUD(t *testing.T) {
 	assert.Len(t, analyses, 1)
 
 	// Count
-	count, err := db.CountRepoAnalyses(ctx, repo.ID)
+	count, err := db.CountRepoAnalyses(ctx, repo.ID, nil)
 	require.NoError(t, err)
 	assert.Equal(t, 1, count)
 
@@ -461,7 +461,7 @@ func TestDeleteOldAnalyses(t *testing.T) {
 	assert.Equal(t, int64(1), deleted)
 
 	// Verify deletion
-	count, err := db.CountRepoAnalyses(ctx, repo.ID)
+	count, err := db.CountRepoAnalyses(ctx, repo.ID, nil)
 	require.NoError(t, err)
 	assert.Equal(t, 0, count)
 }
