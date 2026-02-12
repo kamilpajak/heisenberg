@@ -9,13 +9,19 @@ import (
 	"github.com/kamilpajak/heisenberg/internal/database"
 )
 
+// UsageDB defines the database operations needed by UsageChecker.
+type UsageDB interface {
+	GetOrganizationByID(ctx context.Context, id uuid.UUID) (*database.Organization, error)
+	CountOrgAnalysesSince(ctx context.Context, orgID uuid.UUID, since time.Time) (int, error)
+}
+
 // UsageChecker provides methods to check and enforce usage limits.
 type UsageChecker struct {
-	db *database.DB
+	db UsageDB
 }
 
 // NewUsageChecker creates a new usage checker.
-func NewUsageChecker(db *database.DB) *UsageChecker {
+func NewUsageChecker(db UsageDB) *UsageChecker {
 	return &UsageChecker{db: db}
 }
 

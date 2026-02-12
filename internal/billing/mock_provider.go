@@ -1,6 +1,11 @@
 package billing
 
 import (
+	"context"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/kamilpajak/heisenberg/internal/database"
 	"github.com/stripe/stripe-go/v76"
 )
 
@@ -55,4 +60,26 @@ func (m *MockWebhookVerifier) ConstructEvent(payload []byte, header string, secr
 		return m.ConstructEventFn(payload, header, secret)
 	}
 	return stripe.Event{}, nil
+}
+
+// MockUsageDB is a mock implementation of UsageDB for testing.
+type MockUsageDB struct {
+	GetOrganizationByIDFn   func(ctx context.Context, id uuid.UUID) (*database.Organization, error)
+	CountOrgAnalysesSinceFn func(ctx context.Context, orgID uuid.UUID, since time.Time) (int, error)
+}
+
+// GetOrganizationByID calls the mock function.
+func (m *MockUsageDB) GetOrganizationByID(ctx context.Context, id uuid.UUID) (*database.Organization, error) {
+	if m.GetOrganizationByIDFn != nil {
+		return m.GetOrganizationByIDFn(ctx, id)
+	}
+	return &database.Organization{ID: id, Tier: TierFree}, nil
+}
+
+// CountOrgAnalysesSince calls the mock function.
+func (m *MockUsageDB) CountOrgAnalysesSince(ctx context.Context, orgID uuid.UUID, since time.Time) (int, error) {
+	if m.CountOrgAnalysesSinceFn != nil {
+		return m.CountOrgAnalysesSinceFn(ctx, orgID, since)
+	}
+	return 0, nil
 }

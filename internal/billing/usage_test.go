@@ -206,3 +206,298 @@ func TestIsLimitExceeded(t *testing.T) {
 		assert.False(t, IsLimitExceeded(nil))
 	})
 }
+
+// Unit tests with mocks (run without DATABASE_URL)
+
+func TestNewUsageChecker(t *testing.T) {
+	mockDB := &MockUsageDB{}
+	checker := NewUsageChecker(mockDB)
+	assert.NotNil(t, checker)
+}
+
+func TestGetUsageStats_FreeTier_Mock(t *testing.T) {
+	orgID := uuid.New()
+
+	mockDB := &MockUsageDB{
+		GetOrganizationByIDFn: func(ctx context.Context, id uuid.UUID) (*database.Organization, error) {
+			return &database.Organization{ID: id, Tier: TierFree}, nil
+		},
+		CountOrgAnalysesSinceFn: func(ctx context.Context, oid uuid.UUID, since time.Time) (int, error) {
+			return 5, nil
+		},
+	}
+
+	checker := NewUsageChecker(mockDB)
+	stats, err := checker.GetUsageStats(context.Background(), orgID)
+
+	assert.NoError(t, err)
+	assert.Equal(t, orgID, stats.OrgID)
+	assert.Equal(t, TierFree, stats.Tier)
+	assert.Equal(t, 5, stats.UsedThisMonth)
+	assert.Equal(t, 10, stats.Limit)
+	assert.Equal(t, 5, stats.Remaining)
+}
+
+func TestGetUsageStats_TeamTier_Mock(t *testing.T) {
+	orgID := uuid.New()
+
+	mockDB := &MockUsageDB{
+		GetOrganizationByIDFn: func(ctx context.Context, id uuid.UUID) (*database.Organization, error) {
+			return &database.Organization{ID: id, Tier: TierTeam}, nil
+		},
+		CountOrgAnalysesSinceFn: func(ctx context.Context, oid uuid.UUID, since time.Time) (int, error) {
+			return 500, nil
+		},
+	}
+
+	checker := NewUsageChecker(mockDB)
+	stats, err := checker.GetUsageStats(context.Background(), orgID)
+
+	assert.NoError(t, err)
+	assert.Equal(t, TierTeam, stats.Tier)
+	assert.Equal(t, 500, stats.UsedThisMonth)
+	assert.Equal(t, 1000, stats.Limit)
+	assert.Equal(t, 500, stats.Remaining)
+}
+
+func TestGetUsageStats_EnterpriseTier_Unlimited_Mock(t *testing.T) {
+	orgID := uuid.New()
+
+	mockDB := &MockUsageDB{
+		GetOrganizationByIDFn: func(ctx context.Context, id uuid.UUID) (*database.Organization, error) {
+			return &database.Organization{ID: id, Tier: TierEnterprise}, nil
+		},
+		CountOrgAnalysesSinceFn: func(ctx context.Context, oid uuid.UUID, since time.Time) (int, error) {
+			return 10000, nil
+		},
+	}
+
+	checker := NewUsageChecker(mockDB)
+	stats, err := checker.GetUsageStats(context.Background(), orgID)
+
+	assert.NoError(t, err)
+	assert.Equal(t, TierEnterprise, stats.Tier)
+	assert.Equal(t, -1, stats.Limit)
+	assert.Equal(t, -1, stats.Remaining)
+}
+
+func TestGetUsageStats_ExceededLimit_Mock(t *testing.T) {
+	orgID := uuid.New()
+
+	mockDB := &MockUsageDB{
+		GetOrganizationByIDFn: func(ctx context.Context, id uuid.UUID) (*database.Organization, error) {
+			return &database.Organization{ID: id, Tier: TierFree}, nil
+		},
+		CountOrgAnalysesSinceFn: func(ctx context.Context, oid uuid.UUID, since time.Time) (int, error) {
+			return 15, nil
+		},
+	}
+
+	checker := NewUsageChecker(mockDB)
+	stats, err := checker.GetUsageStats(context.Background(), orgID)
+
+	assert.NoError(t, err)
+	assert.Equal(t, 15, stats.UsedThisMonth)
+	assert.Equal(t, 0, stats.Remaining) // Capped at 0
+}
+
+func TestGetUsageStats_OrgNotFound_Mock(t *testing.T) {
+	orgID := uuid.New()
+
+	mockDB := &MockUsageDB{
+		GetOrganizationByIDFn: func(ctx context.Context, id uuid.UUID) (*database.Organization, error) {
+			return nil, nil
+		},
+	}
+
+	checker := NewUsageChecker(mockDB)
+	_, err := checker.GetUsageStats(context.Background(), orgID)
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "organization not found")
+}
+
+func TestGetUsageStats_DBError_Mock(t *testing.T) {
+	orgID := uuid.New()
+
+	mockDB := &MockUsageDB{
+		GetOrganizationByIDFn: func(ctx context.Context, id uuid.UUID) (*database.Organization, error) {
+			return nil, assert.AnError
+		},
+	}
+
+	checker := NewUsageChecker(mockDB)
+	_, err := checker.GetUsageStats(context.Background(), orgID)
+
+	assert.Error(t, err)
+}
+
+func TestGetUsageStats_CountError_Mock(t *testing.T) {
+	orgID := uuid.New()
+
+	mockDB := &MockUsageDB{
+		GetOrganizationByIDFn: func(ctx context.Context, id uuid.UUID) (*database.Organization, error) {
+			return &database.Organization{ID: id, Tier: TierFree}, nil
+		},
+		CountOrgAnalysesSinceFn: func(ctx context.Context, oid uuid.UUID, since time.Time) (int, error) {
+			return 0, assert.AnError
+		},
+	}
+
+	checker := NewUsageChecker(mockDB)
+	_, err := checker.GetUsageStats(context.Background(), orgID)
+
+	assert.Error(t, err)
+}
+
+func TestCanAnalyze_WithinLimit_Mock(t *testing.T) {
+	orgID := uuid.New()
+
+	mockDB := &MockUsageDB{
+		GetOrganizationByIDFn: func(ctx context.Context, id uuid.UUID) (*database.Organization, error) {
+			return &database.Organization{ID: id, Tier: TierFree}, nil
+		},
+		CountOrgAnalysesSinceFn: func(ctx context.Context, oid uuid.UUID, since time.Time) (int, error) {
+			return 5, nil
+		},
+	}
+
+	checker := NewUsageChecker(mockDB)
+	can, err := checker.CanAnalyze(context.Background(), orgID)
+
+	assert.NoError(t, err)
+	assert.True(t, can)
+}
+
+func TestCanAnalyze_AtLimit_Mock(t *testing.T) {
+	orgID := uuid.New()
+
+	mockDB := &MockUsageDB{
+		GetOrganizationByIDFn: func(ctx context.Context, id uuid.UUID) (*database.Organization, error) {
+			return &database.Organization{ID: id, Tier: TierFree}, nil
+		},
+		CountOrgAnalysesSinceFn: func(ctx context.Context, oid uuid.UUID, since time.Time) (int, error) {
+			return 10, nil
+		},
+	}
+
+	checker := NewUsageChecker(mockDB)
+	can, err := checker.CanAnalyze(context.Background(), orgID)
+
+	assert.NoError(t, err)
+	assert.False(t, can)
+}
+
+func TestCanAnalyze_Unlimited_Mock(t *testing.T) {
+	orgID := uuid.New()
+
+	mockDB := &MockUsageDB{
+		GetOrganizationByIDFn: func(ctx context.Context, id uuid.UUID) (*database.Organization, error) {
+			return &database.Organization{ID: id, Tier: TierEnterprise}, nil
+		},
+		CountOrgAnalysesSinceFn: func(ctx context.Context, oid uuid.UUID, since time.Time) (int, error) {
+			return 999999, nil
+		},
+	}
+
+	checker := NewUsageChecker(mockDB)
+	can, err := checker.CanAnalyze(context.Background(), orgID)
+
+	assert.NoError(t, err)
+	assert.True(t, can)
+}
+
+func TestCanAnalyze_Error_Mock(t *testing.T) {
+	orgID := uuid.New()
+
+	mockDB := &MockUsageDB{
+		GetOrganizationByIDFn: func(ctx context.Context, id uuid.UUID) (*database.Organization, error) {
+			return nil, assert.AnError
+		},
+	}
+
+	checker := NewUsageChecker(mockDB)
+	can, err := checker.CanAnalyze(context.Background(), orgID)
+
+	assert.Error(t, err)
+	assert.False(t, can)
+}
+
+func TestCheckAndDeduct_Success_Mock(t *testing.T) {
+	orgID := uuid.New()
+
+	mockDB := &MockUsageDB{
+		GetOrganizationByIDFn: func(ctx context.Context, id uuid.UUID) (*database.Organization, error) {
+			return &database.Organization{ID: id, Tier: TierTeam}, nil
+		},
+		CountOrgAnalysesSinceFn: func(ctx context.Context, oid uuid.UUID, since time.Time) (int, error) {
+			return 100, nil
+		},
+	}
+
+	checker := NewUsageChecker(mockDB)
+	err := checker.CheckAndDeduct(context.Background(), orgID)
+
+	assert.NoError(t, err)
+}
+
+func TestCheckAndDeduct_LimitExceeded_Mock(t *testing.T) {
+	orgID := uuid.New()
+
+	mockDB := &MockUsageDB{
+		GetOrganizationByIDFn: func(ctx context.Context, id uuid.UUID) (*database.Organization, error) {
+			return &database.Organization{ID: id, Tier: TierFree}, nil
+		},
+		CountOrgAnalysesSinceFn: func(ctx context.Context, oid uuid.UUID, since time.Time) (int, error) {
+			return 10, nil
+		},
+	}
+
+	checker := NewUsageChecker(mockDB)
+	err := checker.CheckAndDeduct(context.Background(), orgID)
+
+	assert.Error(t, err)
+	assert.True(t, IsLimitExceeded(err))
+
+	var limitErr *LimitExceededError
+	assert.ErrorAs(t, err, &limitErr)
+	assert.Equal(t, orgID, limitErr.OrgID)
+	assert.Equal(t, TierFree, limitErr.Tier)
+}
+
+func TestCheckAndDeduct_DBError_Mock(t *testing.T) {
+	orgID := uuid.New()
+
+	mockDB := &MockUsageDB{
+		GetOrganizationByIDFn: func(ctx context.Context, id uuid.UUID) (*database.Organization, error) {
+			return nil, assert.AnError
+		},
+	}
+
+	checker := NewUsageChecker(mockDB)
+	err := checker.CheckAndDeduct(context.Background(), orgID)
+
+	assert.Error(t, err)
+	assert.False(t, IsLimitExceeded(err))
+}
+
+func TestUsageStats_Fields_Mock(t *testing.T) {
+	orgID := uuid.New()
+	resetDate := time.Date(2024, 2, 1, 0, 0, 0, 0, time.UTC)
+
+	stats := UsageStats{
+		OrgID:         orgID,
+		Tier:          TierTeam,
+		UsedThisMonth: 500,
+		Limit:         1000,
+		Remaining:     500,
+		ResetDate:     resetDate,
+	}
+
+	assert.Equal(t, orgID, stats.OrgID)
+	assert.Equal(t, TierTeam, stats.Tier)
+	assert.Equal(t, 500, stats.UsedThisMonth)
+	assert.Equal(t, 1000, stats.Limit)
+	assert.Equal(t, 500, stats.Remaining)
+	assert.Equal(t, resetDate, stats.ResetDate)
+}
