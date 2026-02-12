@@ -6,36 +6,16 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kamilpajak/heisenberg/internal/billing"
-	"github.com/kamilpajak/heisenberg/internal/database"
 )
 
 // handleGetUsage returns usage statistics for an organization.
 func (s *Server) handleGetUsage(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	user, err := s.getCurrentUser(r)
-	if err != nil {
-		writeError(w, http.StatusUnauthorized, err.Error())
+	oc, ok := s.requireOrgMember(w, r)
+	if !ok {
 		return
 	}
 
-	orgID, err := uuid.Parse(r.PathValue("orgID"))
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid organization ID")
-		return
-	}
-
-	// Check membership
-	member, err := s.db.GetOrgMember(ctx, orgID, user.ID)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "database error")
-		return
-	}
-	if member == nil {
-		writeError(w, http.StatusForbidden, "not a member of this organization")
-		return
-	}
-
-	stats, err := s.usageChecker.GetUsageStats(ctx, orgID)
+	stats, err := s.usageChecker.GetUsageStats(r.Context(), oc.OrgID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to get usage stats")
 		return
@@ -52,13 +32,6 @@ func (s *Server) handleGetUsage(w http.ResponseWriter, r *http.Request) {
 
 // handleCreateCheckout creates a Stripe checkout session.
 func (s *Server) handleCreateCheckout(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	user, err := s.getCurrentUser(r)
-	if err != nil {
-		writeError(w, http.StatusUnauthorized, err.Error())
-		return
-	}
-
 	var req struct {
 		OrgID      string `json:"org_id"`
 		Tier       string `json:"tier"`
@@ -70,28 +43,12 @@ func (s *Server) handleCreateCheckout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	orgID, err := uuid.Parse(req.OrgID)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid organization ID")
+	oc, ok := s.requireOrgAdminFromBody(w, r, req.OrgID)
+	if !ok {
 		return
 	}
 
-	// Check membership and role
-	member, err := s.db.GetOrgMember(ctx, orgID, user.ID)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "database error")
-		return
-	}
-	if member == nil {
-		writeError(w, http.StatusForbidden, "not a member of this organization")
-		return
-	}
-	if member.Role != database.RoleOwner && member.Role != database.RoleAdmin {
-		writeError(w, http.StatusForbidden, "only owners and admins can manage billing")
-		return
-	}
-
-	org, err := s.db.GetOrganizationByID(ctx, orgID)
+	org, err := s.db.GetOrganizationByID(r.Context(), oc.OrgID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "database error")
 		return
@@ -104,8 +61,8 @@ func (s *Server) handleCreateCheckout(w http.ResponseWriter, r *http.Request) {
 
 	session, err := s.billingClient.CreateCheckoutSession(billing.CreateCheckoutParams{
 		CustomerID: customerID,
-		Email:      user.Email,
-		OrgID:      orgID.String(),
+		Email:      oc.User.Email,
+		OrgID:      oc.OrgID.String(),
 		Tier:       req.Tier,
 		SuccessURL: req.SuccessURL,
 		CancelURL:  req.CancelURL,
@@ -122,13 +79,6 @@ func (s *Server) handleCreateCheckout(w http.ResponseWriter, r *http.Request) {
 
 // handleCreatePortal creates a Stripe billing portal session.
 func (s *Server) handleCreatePortal(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	user, err := s.getCurrentUser(r)
-	if err != nil {
-		writeError(w, http.StatusUnauthorized, err.Error())
-		return
-	}
-
 	var req struct {
 		OrgID     string `json:"org_id"`
 		ReturnURL string `json:"return_url"`
@@ -138,28 +88,12 @@ func (s *Server) handleCreatePortal(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	orgID, err := uuid.Parse(req.OrgID)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid organization ID")
+	oc, ok := s.requireOrgAdminFromBody(w, r, req.OrgID)
+	if !ok {
 		return
 	}
 
-	// Check membership
-	member, err := s.db.GetOrgMember(ctx, orgID, user.ID)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "database error")
-		return
-	}
-	if member == nil {
-		writeError(w, http.StatusForbidden, "not a member of this organization")
-		return
-	}
-	if member.Role != database.RoleOwner && member.Role != database.RoleAdmin {
-		writeError(w, http.StatusForbidden, "only owners and admins can manage billing")
-		return
-	}
-
-	org, err := s.db.GetOrganizationByID(ctx, orgID)
+	org, err := s.db.GetOrganizationByID(r.Context(), oc.OrgID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "database error")
 		return
@@ -185,36 +119,26 @@ func (s *Server) createWebhookHandler() http.Handler {
 	return billing.NewWebhookHandler(s.billingClient, func(event billing.WebhookEvent) error {
 		ctx := context.Background()
 
+		if event.OrgID == "" {
+			return nil
+		}
+
+		orgID, err := uuid.Parse(event.OrgID)
+		if err != nil {
+			return nil
+		}
+
 		switch event.Type {
 		case "checkout.session.completed":
-			// Update org with Stripe customer ID
-			if event.OrgID != "" && event.CustomerID != "" {
-				orgID, err := uuid.Parse(event.OrgID)
-				if err != nil {
-					return nil // Log and continue
-				}
+			if event.CustomerID != "" {
 				tier := s.billingClient.TierFromPriceID(event.PriceID)
 				return s.db.UpdateOrganizationStripe(ctx, orgID, event.CustomerID, tier)
 			}
-
 		case "customer.subscription.updated":
-			if event.OrgID != "" {
-				orgID, err := uuid.Parse(event.OrgID)
-				if err != nil {
-					return nil
-				}
-				tier := s.billingClient.TierFromPriceID(event.PriceID)
-				return s.db.UpdateOrganizationTier(ctx, orgID, tier)
-			}
-
+			tier := s.billingClient.TierFromPriceID(event.PriceID)
+			return s.db.UpdateOrganizationTier(ctx, orgID, tier)
 		case "customer.subscription.deleted":
-			if event.OrgID != "" {
-				orgID, err := uuid.Parse(event.OrgID)
-				if err != nil {
-					return nil
-				}
-				return s.db.UpdateOrganizationTier(ctx, orgID, billing.TierFree)
-			}
+			return s.db.UpdateOrganizationTier(ctx, orgID, billing.TierFree)
 		}
 
 		return nil

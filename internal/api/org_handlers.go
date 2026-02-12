@@ -3,21 +3,19 @@ package api
 import (
 	"net/http"
 
-	"github.com/google/uuid"
 	"github.com/kamilpajak/heisenberg/internal/auth"
 	"github.com/kamilpajak/heisenberg/internal/database"
 )
 
 // handleListOrganizations returns all organizations the user belongs to.
 func (s *Server) handleListOrganizations(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
 	user, err := s.getCurrentUser(r)
 	if err != nil {
 		writeError(w, http.StatusUnauthorized, err.Error())
 		return
 	}
 
-	orgs, err := s.db.ListUserOrganizations(ctx, user.ID)
+	orgs, err := s.db.ListUserOrganizations(r.Context(), user.ID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to list organizations")
 		return
@@ -30,7 +28,6 @@ func (s *Server) handleListOrganizations(w http.ResponseWriter, r *http.Request)
 
 // handleCreateOrganization creates a new organization with the user as owner.
 func (s *Server) handleCreateOrganization(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
 	user, err := s.getCurrentUser(r)
 	if err != nil {
 		writeError(w, http.StatusUnauthorized, err.Error())
@@ -49,7 +46,7 @@ func (s *Server) handleCreateOrganization(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	org, err := s.db.CreateOrganizationWithOwner(ctx, req.Name, user.ID)
+	org, err := s.db.CreateOrganizationWithOwner(r.Context(), req.Name, user.ID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to create organization")
 		return
@@ -60,31 +57,12 @@ func (s *Server) handleCreateOrganization(w http.ResponseWriter, r *http.Request
 
 // handleGetOrganization returns a single organization.
 func (s *Server) handleGetOrganization(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	user, err := s.getCurrentUser(r)
-	if err != nil {
-		writeError(w, http.StatusUnauthorized, err.Error())
+	oc, ok := s.requireOrgMember(w, r)
+	if !ok {
 		return
 	}
 
-	orgID, err := uuid.Parse(r.PathValue("orgID"))
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid organization ID")
-		return
-	}
-
-	// Check membership
-	member, err := s.db.GetOrgMember(ctx, orgID, user.ID)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "database error")
-		return
-	}
-	if member == nil {
-		writeError(w, http.StatusForbidden, "not a member of this organization")
-		return
-	}
-
-	org, err := s.db.GetOrganizationByID(ctx, orgID)
+	org, err := s.db.GetOrganizationByID(r.Context(), oc.OrgID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "database error")
 		return
@@ -94,8 +72,7 @@ func (s *Server) handleGetOrganization(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get members
-	members, err := s.db.ListOrgMembers(ctx, orgID)
+	members, err := s.db.ListOrgMembers(r.Context(), oc.OrgID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to list members")
 		return
@@ -104,19 +81,19 @@ func (s *Server) handleGetOrganization(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"organization": org,
 		"members":      members,
-		"role":         member.Role,
+		"role":         oc.Member.Role,
 	})
 }
 
 // getCurrentUser returns the database user for the authenticated request.
 func (s *Server) getCurrentUser(r *http.Request) (*database.User, error) {
 	ctx := r.Context()
-	clerkUserID := auth.UserID(ctx)
-	if clerkUserID == "" {
+	kindeUserID := auth.UserID(ctx)
+	if kindeUserID == "" {
 		return nil, &authError{"not authenticated"}
 	}
 
-	user, err := s.db.GetUserByClerkID(ctx, clerkUserID)
+	user, err := s.db.GetUserByClerkID(ctx, kindeUserID)
 	if err != nil {
 		return nil, &authError{"database error"}
 	}

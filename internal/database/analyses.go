@@ -39,6 +39,38 @@ type CreateAnalysisParams struct {
 	Text        string
 }
 
+// analysisColumns is the standard column list for analysis queries.
+const analysisColumns = `id, repo_id, run_id, branch, commit_sha, category, confidence, sensitivity, rca, text, created_at`
+
+// scanAnalysis scans a row into an Analysis struct and unmarshals the RCA JSON.
+func scanAnalysis(row pgx.Row) (*Analysis, error) {
+	var a Analysis
+	var rcaJSON []byte
+	err := row.Scan(
+		&a.ID, &a.RepoID, &a.RunID, &a.Branch, &a.CommitSHA,
+		&a.Category, &a.Confidence, &a.Sensitivity, &rcaJSON, &a.Text, &a.CreatedAt,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if err := unmarshalRCA(rcaJSON, &a); err != nil {
+		return nil, err
+	}
+	return &a, nil
+}
+
+// unmarshalRCA unmarshals RCA JSON into an Analysis if present.
+func unmarshalRCA(rcaJSON []byte, a *Analysis) error {
+	if rcaJSON != nil {
+		a.RCA = &llm.RootCauseAnalysis{}
+		return json.Unmarshal(rcaJSON, a.RCA)
+	}
+	return nil
+}
+
 // CreateAnalysis stores a new analysis result.
 func (db *DB) CreateAnalysis(ctx context.Context, params CreateAnalysisParams) (*Analysis, error) {
 	var rcaJSON []byte
@@ -50,87 +82,32 @@ func (db *DB) CreateAnalysis(ctx context.Context, params CreateAnalysisParams) (
 		}
 	}
 
-	var analysis Analysis
-	err = db.pool.QueryRow(ctx,
+	row := db.pool.QueryRow(ctx,
 		`INSERT INTO analyses (repo_id, run_id, branch, commit_sha, category, confidence, sensitivity, rca, text)
 		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-		 RETURNING id, repo_id, run_id, branch, commit_sha, category, confidence, sensitivity, rca, text, created_at`,
+		 RETURNING `+analysisColumns,
 		params.RepoID, params.RunID, params.Branch, params.CommitSHA, params.Category,
 		params.Confidence, params.Sensitivity, rcaJSON, params.Text,
-	).Scan(
-		&analysis.ID, &analysis.RepoID, &analysis.RunID, &analysis.Branch, &analysis.CommitSHA,
-		&analysis.Category, &analysis.Confidence, &analysis.Sensitivity, &rcaJSON, &analysis.Text, &analysis.CreatedAt,
 	)
-	if err != nil {
-		return nil, err
-	}
-
-	if rcaJSON != nil {
-		analysis.RCA = &llm.RootCauseAnalysis{}
-		if err := json.Unmarshal(rcaJSON, analysis.RCA); err != nil {
-			return nil, err
-		}
-	}
-
-	return &analysis, nil
+	return scanAnalysis(row)
 }
 
 // GetAnalysisByID retrieves an analysis by ID.
 func (db *DB) GetAnalysisByID(ctx context.Context, id uuid.UUID) (*Analysis, error) {
-	var analysis Analysis
-	var rcaJSON []byte
-	err := db.pool.QueryRow(ctx,
-		`SELECT id, repo_id, run_id, branch, commit_sha, category, confidence, sensitivity, rca, text, created_at
-		 FROM analyses WHERE id = $1`,
+	row := db.pool.QueryRow(ctx,
+		`SELECT `+analysisColumns+` FROM analyses WHERE id = $1`,
 		id,
-	).Scan(
-		&analysis.ID, &analysis.RepoID, &analysis.RunID, &analysis.Branch, &analysis.CommitSHA,
-		&analysis.Category, &analysis.Confidence, &analysis.Sensitivity, &rcaJSON, &analysis.Text, &analysis.CreatedAt,
 	)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	if rcaJSON != nil {
-		analysis.RCA = &llm.RootCauseAnalysis{}
-		if err := json.Unmarshal(rcaJSON, analysis.RCA); err != nil {
-			return nil, err
-		}
-	}
-
-	return &analysis, nil
+	return scanAnalysis(row)
 }
 
 // GetAnalysisByRunID retrieves an analysis by repository and run ID.
 func (db *DB) GetAnalysisByRunID(ctx context.Context, repoID uuid.UUID, runID int64) (*Analysis, error) {
-	var analysis Analysis
-	var rcaJSON []byte
-	err := db.pool.QueryRow(ctx,
-		`SELECT id, repo_id, run_id, branch, commit_sha, category, confidence, sensitivity, rca, text, created_at
-		 FROM analyses WHERE repo_id = $1 AND run_id = $2`,
+	row := db.pool.QueryRow(ctx,
+		`SELECT `+analysisColumns+` FROM analyses WHERE repo_id = $1 AND run_id = $2`,
 		repoID, runID,
-	).Scan(
-		&analysis.ID, &analysis.RepoID, &analysis.RunID, &analysis.Branch, &analysis.CommitSHA,
-		&analysis.Category, &analysis.Confidence, &analysis.Sensitivity, &rcaJSON, &analysis.Text, &analysis.CreatedAt,
 	)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	if rcaJSON != nil {
-		analysis.RCA = &llm.RootCauseAnalysis{}
-		if err := json.Unmarshal(rcaJSON, analysis.RCA); err != nil {
-			return nil, err
-		}
-	}
-
-	return &analysis, nil
+	return scanAnalysis(row)
 }
 
 // ListRepoAnalysesParams contains parameters for listing analyses.
@@ -152,8 +129,7 @@ func (db *DB) ListRepoAnalyses(ctx context.Context, params ListRepoAnalysesParam
 
 	if params.Category != nil {
 		rows, err = db.pool.Query(ctx,
-			`SELECT id, repo_id, run_id, branch, commit_sha, category, confidence, sensitivity, rca, text, created_at
-			 FROM analyses
+			`SELECT `+analysisColumns+` FROM analyses
 			 WHERE repo_id = $1 AND category = $2
 			 ORDER BY created_at DESC
 			 LIMIT $3 OFFSET $4`,
@@ -161,8 +137,7 @@ func (db *DB) ListRepoAnalyses(ctx context.Context, params ListRepoAnalysesParam
 		)
 	} else {
 		rows, err = db.pool.Query(ctx,
-			`SELECT id, repo_id, run_id, branch, commit_sha, category, confidence, sensitivity, rca, text, created_at
-			 FROM analyses
+			`SELECT `+analysisColumns+` FROM analyses
 			 WHERE repo_id = $1
 			 ORDER BY created_at DESC
 			 LIMIT $2 OFFSET $3`,
@@ -184,11 +159,8 @@ func (db *DB) ListRepoAnalyses(ctx context.Context, params ListRepoAnalysesParam
 		); err != nil {
 			return nil, err
 		}
-		if rcaJSON != nil {
-			a.RCA = &llm.RootCauseAnalysis{}
-			if err := json.Unmarshal(rcaJSON, a.RCA); err != nil {
-				return nil, err
-			}
+		if err := unmarshalRCA(rcaJSON, &a); err != nil {
+			return nil, err
 		}
 		analyses = append(analyses, a)
 	}
