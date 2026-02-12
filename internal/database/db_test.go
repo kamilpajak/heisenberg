@@ -275,3 +275,289 @@ func TestAnalysisCRUD(t *testing.T) {
 	err = db.DeleteAnalysis(ctx, analysis.ID)
 	require.NoError(t, err)
 }
+
+func TestAnalysisWithBranch(t *testing.T) {
+	db := testDB(t)
+	ctx := context.Background()
+
+	// Setup
+	clerkID := "clerk_" + uuid.New().String()[:8]
+	user, _ := db.CreateUser(ctx, clerkID, "branch@example.com")
+	t.Cleanup(func() { _ = db.DeleteUser(ctx, user.ID) })
+
+	org, _ := db.CreateOrganizationWithOwner(ctx, "Branch Test Org", user.ID)
+	t.Cleanup(func() { _ = db.DeleteOrganization(ctx, org.ID) })
+
+	repo, _ := db.CreateRepository(ctx, org.ID, "branchowner", "branchrepo")
+
+	branch := "feature/test"
+	commitSHA := "abc123def456"
+
+	analysis, err := db.CreateAnalysis(ctx, CreateAnalysisParams{
+		RepoID:    repo.ID,
+		RunID:     99999,
+		Branch:    &branch,
+		CommitSHA: &commitSHA,
+		Category:  llm.CategoryDiagnosis,
+		Text:      "Analysis with branch",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, &branch, analysis.Branch)
+	assert.Equal(t, &commitSHA, analysis.CommitSHA)
+}
+
+func TestAnalysisWithoutRCA(t *testing.T) {
+	db := testDB(t)
+	ctx := context.Background()
+
+	// Setup
+	clerkID := "clerk_" + uuid.New().String()[:8]
+	user, _ := db.CreateUser(ctx, clerkID, "norca@example.com")
+	t.Cleanup(func() { _ = db.DeleteUser(ctx, user.ID) })
+
+	org, _ := db.CreateOrganizationWithOwner(ctx, "No RCA Test Org", user.ID)
+	t.Cleanup(func() { _ = db.DeleteOrganization(ctx, org.ID) })
+
+	repo, _ := db.CreateRepository(ctx, org.ID, "norcaowner", "norcarepo")
+
+	// Create analysis without RCA (like no_failures category)
+	analysis, err := db.CreateAnalysis(ctx, CreateAnalysisParams{
+		RepoID:   repo.ID,
+		RunID:    88888,
+		Category: llm.CategoryNoFailures,
+		Text:     "No failures detected",
+	})
+	require.NoError(t, err)
+	assert.Nil(t, analysis.RCA)
+	assert.Nil(t, analysis.Confidence)
+
+	// Get by ID should also have nil RCA
+	found, err := db.GetAnalysisByID(ctx, analysis.ID)
+	require.NoError(t, err)
+	assert.Nil(t, found.RCA)
+}
+
+func TestListRepoAnalysesWithCategory(t *testing.T) {
+	db := testDB(t)
+	ctx := context.Background()
+
+	// Setup
+	clerkID := "clerk_" + uuid.New().String()[:8]
+	user, _ := db.CreateUser(ctx, clerkID, "category@example.com")
+	t.Cleanup(func() { _ = db.DeleteUser(ctx, user.ID) })
+
+	org, _ := db.CreateOrganizationWithOwner(ctx, "Category Test Org", user.ID)
+	t.Cleanup(func() { _ = db.DeleteOrganization(ctx, org.ID) })
+
+	repo, _ := db.CreateRepository(ctx, org.ID, "catowner", "catrepo")
+
+	// Create analyses with different categories
+	_, err := db.CreateAnalysis(ctx, CreateAnalysisParams{
+		RepoID:   repo.ID,
+		RunID:    1001,
+		Category: llm.CategoryDiagnosis,
+		Text:     "Diagnosis 1",
+	})
+	require.NoError(t, err)
+
+	_, err = db.CreateAnalysis(ctx, CreateAnalysisParams{
+		RepoID:   repo.ID,
+		RunID:    1002,
+		Category: llm.CategoryNoFailures,
+		Text:     "No failures",
+	})
+	require.NoError(t, err)
+
+	// List with category filter
+	category := llm.CategoryDiagnosis
+	analyses, err := db.ListRepoAnalyses(ctx, ListRepoAnalysesParams{
+		RepoID:   repo.ID,
+		Category: &category,
+	})
+	require.NoError(t, err)
+	assert.Len(t, analyses, 1)
+	assert.Equal(t, llm.CategoryDiagnosis, analyses[0].Category)
+}
+
+func TestListRepoAnalysesPagination(t *testing.T) {
+	db := testDB(t)
+	ctx := context.Background()
+
+	// Setup
+	clerkID := "clerk_" + uuid.New().String()[:8]
+	user, _ := db.CreateUser(ctx, clerkID, "pagination@example.com")
+	t.Cleanup(func() { _ = db.DeleteUser(ctx, user.ID) })
+
+	org, _ := db.CreateOrganizationWithOwner(ctx, "Pagination Test Org", user.ID)
+	t.Cleanup(func() { _ = db.DeleteOrganization(ctx, org.ID) })
+
+	repo, _ := db.CreateRepository(ctx, org.ID, "pageowner", "pagerepo")
+
+	// Create 5 analyses
+	for i := 0; i < 5; i++ {
+		_, err := db.CreateAnalysis(ctx, CreateAnalysisParams{
+			RepoID:   repo.ID,
+			RunID:    int64(2000 + i),
+			Category: llm.CategoryDiagnosis,
+			Text:     "Analysis",
+		})
+		require.NoError(t, err)
+	}
+
+	// List with limit
+	analyses, err := db.ListRepoAnalyses(ctx, ListRepoAnalysesParams{
+		RepoID: repo.ID,
+		Limit:  2,
+		Offset: 0,
+	})
+	require.NoError(t, err)
+	assert.Len(t, analyses, 2)
+
+	// List with offset
+	analyses, err = db.ListRepoAnalyses(ctx, ListRepoAnalysesParams{
+		RepoID: repo.ID,
+		Limit:  2,
+		Offset: 2,
+	})
+	require.NoError(t, err)
+	assert.Len(t, analyses, 2)
+
+	// List with offset past end
+	analyses, err = db.ListRepoAnalyses(ctx, ListRepoAnalysesParams{
+		RepoID: repo.ID,
+		Limit:  10,
+		Offset: 10,
+	})
+	require.NoError(t, err)
+	assert.Len(t, analyses, 0)
+}
+
+func TestDeleteOldAnalyses(t *testing.T) {
+	db := testDB(t)
+	ctx := context.Background()
+
+	// Setup
+	clerkID := "clerk_" + uuid.New().String()[:8]
+	user, _ := db.CreateUser(ctx, clerkID, "delete@example.com")
+	t.Cleanup(func() { _ = db.DeleteUser(ctx, user.ID) })
+
+	org, _ := db.CreateOrganizationWithOwner(ctx, "Delete Test Org", user.ID)
+	t.Cleanup(func() { _ = db.DeleteOrganization(ctx, org.ID) })
+
+	repo, _ := db.CreateRepository(ctx, org.ID, "delowner", "delrepo")
+
+	// Create analysis
+	_, err := db.CreateAnalysis(ctx, CreateAnalysisParams{
+		RepoID:   repo.ID,
+		RunID:    3000,
+		Category: llm.CategoryDiagnosis,
+		Text:     "To delete",
+	})
+	require.NoError(t, err)
+
+	// Delete analyses older than future date (should delete all)
+	deleted, err := db.DeleteOldAnalyses(ctx, time.Now().Add(time.Hour))
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), deleted)
+
+	// Verify deletion
+	count, err := db.CountRepoAnalyses(ctx, repo.ID)
+	require.NoError(t, err)
+	assert.Equal(t, 0, count)
+}
+
+func TestUpdateOrganizationStripe(t *testing.T) {
+	db := testDB(t)
+	ctx := context.Background()
+
+	// Setup
+	clerkID := "clerk_" + uuid.New().String()[:8]
+	user, _ := db.CreateUser(ctx, clerkID, "stripe@example.com")
+	t.Cleanup(func() { _ = db.DeleteUser(ctx, user.ID) })
+
+	org, _ := db.CreateOrganizationWithOwner(ctx, "Stripe Test Org", user.ID)
+	t.Cleanup(func() { _ = db.DeleteOrganization(ctx, org.ID) })
+
+	// Update Stripe customer ID and tier
+	err := db.UpdateOrganizationStripe(ctx, org.ID, "cus_test123", TierTeam)
+	require.NoError(t, err)
+
+	// Verify update
+	found, err := db.GetOrganizationByID(ctx, org.ID)
+	require.NoError(t, err)
+	assert.NotNil(t, found.StripeCustomerID)
+	assert.Equal(t, "cus_test123", *found.StripeCustomerID)
+	assert.Equal(t, TierTeam, found.Tier)
+}
+
+func TestGetNonExistent(t *testing.T) {
+	db := testDB(t)
+	ctx := context.Background()
+	fakeID := uuid.New()
+
+	t.Run("user by ID", func(t *testing.T) {
+		user, err := db.GetUserByID(ctx, fakeID)
+		require.NoError(t, err)
+		assert.Nil(t, user)
+	})
+
+	t.Run("user by clerk ID", func(t *testing.T) {
+		user, err := db.GetUserByClerkID(ctx, "nonexistent")
+		require.NoError(t, err)
+		assert.Nil(t, user)
+	})
+
+	t.Run("organization by ID", func(t *testing.T) {
+		org, err := db.GetOrganizationByID(ctx, fakeID)
+		require.NoError(t, err)
+		assert.Nil(t, org)
+	})
+
+	t.Run("repository by ID", func(t *testing.T) {
+		repo, err := db.GetRepositoryByID(ctx, fakeID)
+		require.NoError(t, err)
+		assert.Nil(t, repo)
+	})
+
+	t.Run("analysis by ID", func(t *testing.T) {
+		analysis, err := db.GetAnalysisByID(ctx, fakeID)
+		require.NoError(t, err)
+		assert.Nil(t, analysis)
+	})
+
+	t.Run("analysis by run ID", func(t *testing.T) {
+		analysis, err := db.GetAnalysisByRunID(ctx, fakeID, 99999)
+		require.NoError(t, err)
+		assert.Nil(t, analysis)
+	})
+}
+
+func TestAddOrgMemberUpsert(t *testing.T) {
+	db := testDB(t)
+	ctx := context.Background()
+
+	// Setup
+	clerkID := "clerk_" + uuid.New().String()[:8]
+	user, _ := db.CreateUser(ctx, clerkID, "role@example.com")
+	t.Cleanup(func() { _ = db.DeleteUser(ctx, user.ID) })
+
+	clerkID2 := "clerk_" + uuid.New().String()[:8]
+	user2, _ := db.CreateUser(ctx, clerkID2, "role2@example.com")
+	t.Cleanup(func() { _ = db.DeleteUser(ctx, user2.ID) })
+
+	org, _ := db.CreateOrganizationWithOwner(ctx, "Role Test Org", user.ID)
+	t.Cleanup(func() { _ = db.DeleteOrganization(ctx, org.ID) })
+
+	// Add member
+	err := db.AddOrgMember(ctx, org.ID, user2.ID, RoleMember)
+	require.NoError(t, err)
+
+	// Update role via AddOrgMember (upsert)
+	err = db.AddOrgMember(ctx, org.ID, user2.ID, RoleAdmin)
+	require.NoError(t, err)
+
+	// Verify role was updated
+	member, err := db.GetOrgMember(ctx, org.ID, user2.ID)
+	require.NoError(t, err)
+	assert.Equal(t, RoleAdmin, member.Role)
+}
