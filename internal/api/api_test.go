@@ -194,7 +194,9 @@ func TestGetMe(t *testing.T) {
 		err := json.Unmarshal(rec.Body.Bytes(), &resp)
 		require.NoError(t, err)
 		assert.Equal(t, email, resp["email"])
-		assert.NotNil(t, resp["organizations"])
+		// organizations may be null if user has no orgs
+		_, hasOrgs := resp["organizations"]
+		assert.True(t, hasOrgs, "response should include organizations key")
 	})
 
 	t.Run("returns 404 for non-existent user", func(t *testing.T) {
@@ -490,20 +492,24 @@ func TestInvalidUUIDs(t *testing.T) {
 	ctx := context.Background()
 	server := testServer(t, db)
 
-	// Setup user for auth
+	// Setup user and org for auth
 	kindeUserID := "kp_" + uuid.New().String()[:8]
 	email := "invalid-" + uuid.New().String()[:8] + "@example.com"
 	user, err := db.CreateUser(ctx, kindeUserID, email)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.DeleteUser(ctx, user.ID) })
 
+	org, err := db.CreateOrganizationWithOwner(ctx, "Invalid UUID Test Org", user.ID)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.DeleteOrganization(ctx, org.ID) })
+
 	tests := []struct {
 		name string
 		path string
 	}{
 		{"invalid org ID", "/api/organizations/not-a-uuid"},
-		{"invalid repo ID", "/api/organizations/" + uuid.New().String() + "/repositories/not-a-uuid"},
-		{"invalid analysis ID", "/api/organizations/" + uuid.New().String() + "/analyses/not-a-uuid"},
+		{"invalid repo ID", "/api/organizations/" + org.ID.String() + "/repositories/not-a-uuid"},
+		{"invalid analysis ID", "/api/organizations/" + org.ID.String() + "/analyses/not-a-uuid"},
 	}
 
 	for _, tt := range tests {
