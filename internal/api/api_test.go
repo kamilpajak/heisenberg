@@ -39,7 +39,8 @@ func testDB(t *testing.T) *database.DB {
 	return db
 }
 
-// testServer creates a test API server with an authenticated user context.
+// testServer creates a test API server without auth middleware.
+// Tests inject auth via withAuthContext helper.
 func testServer(t *testing.T, db *database.DB) *Server {
 	t.Helper()
 
@@ -53,12 +54,27 @@ func testServer(t *testing.T, db *database.DB) *Server {
 
 	server := &Server{
 		db:            db,
-		authVerifier:  nil, // Not used in tests - we inject auth via context
+		authVerifier:  nil,
 		billingClient: billingClient,
 		usageChecker:  billing.NewUsageChecker(db),
 		mux:           http.NewServeMux(),
 	}
-	server.registerRoutes()
+
+	// Register routes WITHOUT auth middleware for testing
+	// Tests use withAuthContext to inject claims directly
+	server.mux.HandleFunc("GET /health", server.handleHealth)
+	server.mux.HandleFunc("POST /api/auth/sync", server.handleAuthSync)
+	server.mux.HandleFunc("GET /api/me", server.handleGetMe)
+	server.mux.HandleFunc("GET /api/organizations", server.handleListOrganizations)
+	server.mux.HandleFunc("POST /api/organizations", server.handleCreateOrganization)
+	server.mux.HandleFunc("GET /api/organizations/{orgID}", server.handleGetOrganization)
+	server.mux.HandleFunc("GET /api/organizations/{orgID}/repositories", server.handleListRepositories)
+	server.mux.HandleFunc("GET /api/organizations/{orgID}/repositories/{repoID}", server.handleGetRepository)
+	server.mux.HandleFunc("GET /api/organizations/{orgID}/repositories/{repoID}/analyses", server.handleListAnalyses)
+	server.mux.HandleFunc("GET /api/organizations/{orgID}/analyses/{analysisID}", server.handleGetAnalysis)
+	server.mux.HandleFunc("GET /api/organizations/{orgID}/usage", server.handleGetUsage)
+	server.mux.HandleFunc("POST /api/billing/checkout", server.handleCreateCheckout)
+	server.mux.HandleFunc("POST /api/billing/portal", server.handleCreatePortal)
 
 	return server
 }
