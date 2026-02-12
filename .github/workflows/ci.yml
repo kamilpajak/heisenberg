@@ -33,13 +33,19 @@ jobs:
     permissions:
       contents: read
 
+    env:
+      # Test database credentials (ephemeral, CI-only)
+      POSTGRES_USER: heisenberg
+      POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD || 'ci_test_password_not_secret' }}
+      POSTGRES_DB: heisenberg_test
+
     services:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_USER: heisenberg
-          POSTGRES_PASSWORD: heisenberg
-          POSTGRES_DB: heisenberg_test
+          POSTGRES_USER: ${{ env.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
+          POSTGRES_DB: ${{ env.POSTGRES_DB }}
         ports:
           - 5432:5432
         options: >-
@@ -59,12 +65,12 @@ jobs:
 
       - name: Run migrations
         env:
-          DATABASE_URL: postgres://heisenberg:heisenberg@localhost:5432/heisenberg_test?sslmode=disable
+          DATABASE_URL: postgres://${{ env.POSTGRES_USER }}:${{ env.POSTGRES_PASSWORD }}@localhost:5432/${{ env.POSTGRES_DB }}?sslmode=disable
         run: go run ./cmd/server migrate
 
       - name: Run tests with coverage
         env:
-          DATABASE_URL: postgres://heisenberg:heisenberg@localhost:5432/heisenberg_test?sslmode=disable
+          DATABASE_URL: postgres://${{ env.POSTGRES_USER }}:${{ env.POSTGRES_PASSWORD }}@localhost:5432/${{ env.POSTGRES_DB }}?sslmode=disable
         run: go test -race -coverprofile=coverage.out ./...
 
       - name: Upload coverage for SonarCloud
