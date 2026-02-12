@@ -14,12 +14,17 @@ import (
 )
 
 // testDB returns a connected DB or skips if DATABASE_URL is not set.
+// It also ensures migrations are run before tests.
 func testDB(t *testing.T) *database.DB {
 	t.Helper()
 	dbURL := os.Getenv("DATABASE_URL")
 	if dbURL == "" {
 		t.Skip("DATABASE_URL not set")
 	}
+
+	// Ensure migrations are run (idempotent)
+	err := database.Migrate(dbURL)
+	require.NoError(t, err)
 
 	ctx := context.Background()
 	db, err := database.New(ctx, dbURL)
