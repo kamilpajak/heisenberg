@@ -111,7 +111,7 @@ func (rca *RootCauseAnalysis) FormatForCLI() string {
 		b.WriteString("EVIDENCE\n")
 		for _, ev := range rca.Evidence {
 			icon := evidenceIcon(ev.Type)
-			b.WriteString(fmt.Sprintf("%s %s\n", icon, ev.Content))
+			fmt.Fprintf(&b, "%s %s\n", icon, ev.Content)
 		}
 		b.WriteString("\n")
 	}
