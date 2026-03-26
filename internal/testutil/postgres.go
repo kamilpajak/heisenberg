@@ -4,6 +4,7 @@ package testutil
 import (
 	"context"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
@@ -43,9 +44,9 @@ func NewTestDB(t *testing.T) *database.DB {
 
 // PostgresURL returns a PostgreSQL connection string for integration tests.
 // If DATABASE_URL is set (CI), it returns that.
-// Otherwise, it starts a PostgreSQL container via testcontainers and returns its URL.
-// This function does not import the database package, so it can be used from
-// database package tests without circular dependencies.
+// Otherwise, it starts a shared PostgreSQL container via testcontainers.
+// This is separate from NewTestDB to allow database package tests
+// to get a URL without creating a circular import through NewTestDB.
 func PostgresURL(t *testing.T) string {
 	t.Helper()
 
@@ -56,32 +57,40 @@ func PostgresURL(t *testing.T) string {
 	return startContainer(t)
 }
 
+var (
+	sharedURL  string
+	sharedOnce sync.Once
+	sharedErr  error
+)
+
 func startContainer(t *testing.T) string {
 	t.Helper()
 
-	ctx := context.Background()
+	sharedOnce.Do(func() {
+		ctx := context.Background()
 
-	container, err := postgres.Run(ctx,
-		"postgres:16-alpine",
-		postgres.WithDatabase(testDBName),
-		postgres.WithUsername(testDBUser),
-		postgres.WithPassword(testDBPass),
-		testcontainers.WithWaitStrategy(
-			wait.ForLog("database system is ready to accept connections").
-				WithOccurrence(2).
-				WithStartupTimeout(30*time.Second),
-		),
-	)
-	require.NoError(t, err)
-
-	t.Cleanup(func() {
-		if err := container.Terminate(ctx); err != nil {
-			t.Logf("failed to terminate postgres container: %v", err)
+		container, err := postgres.Run(ctx,
+			"postgres:16-alpine",
+			postgres.WithDatabase(testDBName),
+			postgres.WithUsername(testDBUser),
+			postgres.WithPassword(testDBPass),
+			testcontainers.WithWaitStrategy(
+				wait.ForLog("database system is ready to accept connections").
+					WithOccurrence(2).
+					WithStartupTimeout(30*time.Second),
+			),
+		)
+		if err != nil {
+			sharedErr = err
+			return
 		}
+
+		// Ryuk sidecar automatically cleans up the container when the process exits.
+		sharedURL, sharedErr = container.ConnectionString(ctx, "sslmode=disable")
 	})
 
-	connStr, err := container.ConnectionString(ctx, "sslmode=disable")
-	require.NoError(t, err)
-
-	return connStr
+	if sharedErr != nil {
+		t.Skipf("Docker not available: %v", sharedErr)
+	}
+	return sharedURL
 }
