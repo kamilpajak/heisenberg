@@ -2,36 +2,20 @@ package billing
 
 import (
 	"context"
-	"os"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/kamilpajak/heisenberg/internal/database"
+	"github.com/kamilpajak/heisenberg/internal/testutil"
 	"github.com/kamilpajak/heisenberg/pkg/llm"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// testDB returns a connected DB or skips if DATABASE_URL is not set.
-// It also ensures migrations are run before tests.
 func testDB(t *testing.T) *database.DB {
 	t.Helper()
-	dbURL := os.Getenv("DATABASE_URL")
-	if dbURL == "" {
-		t.Skip("DATABASE_URL not set")
-	}
-
-	// Ensure migrations are run (idempotent)
-	err := database.Migrate(dbURL)
-	require.NoError(t, err)
-
-	ctx := context.Background()
-	db, err := database.New(ctx, dbURL)
-	require.NoError(t, err)
-	t.Cleanup(func() { db.Close() })
-
-	return db
+	return testutil.NewTestDB(t)
 }
 
 func TestUsageChecker_GetUsageStats(t *testing.T) {

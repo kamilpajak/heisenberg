@@ -1,42 +1,30 @@
-package database
+package database_test
 
 import (
 	"context"
-	"os"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/kamilpajak/heisenberg/pkg/llm"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/kamilpajak/heisenberg/internal/database"
+	"github.com/kamilpajak/heisenberg/internal/testutil"
+	"github.com/kamilpajak/heisenberg/pkg/llm"
 )
 
-// testDB returns a connected DB or skips if DATABASE_URL is not set.
-func testDB(t *testing.T) *DB {
+func testDB(t *testing.T) *database.DB {
 	t.Helper()
-	dbURL := os.Getenv("DATABASE_URL")
-	if dbURL == "" {
-		t.Skip("DATABASE_URL not set")
-	}
-
-	ctx := context.Background()
-	db, err := New(ctx, dbURL)
-	require.NoError(t, err)
-	t.Cleanup(func() { db.Close() })
-
-	return db
+	return testutil.NewTestDB(t)
 }
 
 func TestMigrations(t *testing.T) {
-	dbURL := os.Getenv("DATABASE_URL")
-	if dbURL == "" {
-		t.Skip("DATABASE_URL not set")
-	}
+	dbURL := testutil.PostgresURL(t)
 
 	// Just test that migrations can run (idempotent)
 	// Don't run MigrateDown as it interferes with parallel test packages
-	err := Migrate(dbURL)
+	err := database.Migrate(dbURL)
 	require.NoError(t, err)
 }
 
@@ -105,7 +93,7 @@ func TestOrganizationCRUD(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotEqual(t, uuid.Nil, org.ID)
 	assert.Equal(t, "Test Org", org.Name)
-	assert.Equal(t, TierFree, org.Tier)
+	assert.Equal(t, database.TierFree, org.Tier)
 	t.Cleanup(func() { _ = db.DeleteOrganization(ctx, org.ID) })
 
 	// Get by ID
@@ -122,20 +110,20 @@ func TestOrganizationCRUD(t *testing.T) {
 	// Check membership
 	member, err := db.GetOrgMember(ctx, org.ID, user.ID)
 	require.NoError(t, err)
-	assert.Equal(t, RoleOwner, member.Role)
+	assert.Equal(t, database.RoleOwner, member.Role)
 
 	// Update tier
-	err = db.UpdateOrganizationTier(ctx, org.ID, TierTeam)
+	err = db.UpdateOrganizationTier(ctx, org.ID, database.TierTeam)
 	require.NoError(t, err)
 	found, _ = db.GetOrganizationByID(ctx, org.ID)
-	assert.Equal(t, TierTeam, found.Tier)
+	assert.Equal(t, database.TierTeam, found.Tier)
 
 	// Add another member
 	clerkID2 := "clerk_" + uuid.New().String()[:8]
 	user2, _ := db.CreateUser(ctx, clerkID2, "member@example.com")
 	t.Cleanup(func() { _ = db.DeleteUser(ctx, user2.ID) })
 
-	err = db.AddOrgMember(ctx, org.ID, user2.ID, RoleMember)
+	err = db.AddOrgMember(ctx, org.ID, user2.ID, database.RoleMember)
 	require.NoError(t, err)
 
 	members, err := db.ListOrgMembers(ctx, org.ID)
@@ -231,7 +219,7 @@ func TestAnalysisCRUD(t *testing.T) {
 		},
 	}
 
-	analysis, err := db.CreateAnalysis(ctx, CreateAnalysisParams{
+	analysis, err := db.CreateAnalysis(ctx, database.CreateAnalysisParams{
 		RepoID:      repo.ID,
 		RunID:       12345,
 		Category:    llm.CategoryDiagnosis,
@@ -257,7 +245,7 @@ func TestAnalysisCRUD(t *testing.T) {
 	assert.Equal(t, analysis.ID, found.ID)
 
 	// List
-	analyses, err := db.ListRepoAnalyses(ctx, ListRepoAnalysesParams{RepoID: repo.ID})
+	analyses, err := db.ListRepoAnalyses(ctx, database.ListRepoAnalysesParams{RepoID: repo.ID})
 	require.NoError(t, err)
 	assert.Len(t, analyses, 1)
 
@@ -293,7 +281,7 @@ func TestAnalysisWithBranch(t *testing.T) {
 	branch := "feature/test"
 	commitSHA := "abc123def456"
 
-	analysis, err := db.CreateAnalysis(ctx, CreateAnalysisParams{
+	analysis, err := db.CreateAnalysis(ctx, database.CreateAnalysisParams{
 		RepoID:    repo.ID,
 		RunID:     99999,
 		Branch:    &branch,
@@ -321,7 +309,7 @@ func TestAnalysisWithoutRCA(t *testing.T) {
 	repo, _ := db.CreateRepository(ctx, org.ID, "norcaowner", "norcarepo")
 
 	// Create analysis without RCA (like no_failures category)
-	analysis, err := db.CreateAnalysis(ctx, CreateAnalysisParams{
+	analysis, err := db.CreateAnalysis(ctx, database.CreateAnalysisParams{
 		RepoID:   repo.ID,
 		RunID:    88888,
 		Category: llm.CategoryNoFailures,
@@ -352,7 +340,7 @@ func TestListRepoAnalysesWithCategory(t *testing.T) {
 	repo, _ := db.CreateRepository(ctx, org.ID, "catowner", "catrepo")
 
 	// Create analyses with different categories
-	_, err := db.CreateAnalysis(ctx, CreateAnalysisParams{
+	_, err := db.CreateAnalysis(ctx, database.CreateAnalysisParams{
 		RepoID:   repo.ID,
 		RunID:    1001,
 		Category: llm.CategoryDiagnosis,
@@ -360,7 +348,7 @@ func TestListRepoAnalysesWithCategory(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	_, err = db.CreateAnalysis(ctx, CreateAnalysisParams{
+	_, err = db.CreateAnalysis(ctx, database.CreateAnalysisParams{
 		RepoID:   repo.ID,
 		RunID:    1002,
 		Category: llm.CategoryNoFailures,
@@ -370,7 +358,7 @@ func TestListRepoAnalysesWithCategory(t *testing.T) {
 
 	// List with category filter
 	category := llm.CategoryDiagnosis
-	analyses, err := db.ListRepoAnalyses(ctx, ListRepoAnalysesParams{
+	analyses, err := db.ListRepoAnalyses(ctx, database.ListRepoAnalysesParams{
 		RepoID:   repo.ID,
 		Category: &category,
 	})
@@ -395,7 +383,7 @@ func TestListRepoAnalysesPagination(t *testing.T) {
 
 	// Create 5 analyses
 	for i := 0; i < 5; i++ {
-		_, err := db.CreateAnalysis(ctx, CreateAnalysisParams{
+		_, err := db.CreateAnalysis(ctx, database.CreateAnalysisParams{
 			RepoID:   repo.ID,
 			RunID:    int64(2000 + i),
 			Category: llm.CategoryDiagnosis,
@@ -405,7 +393,7 @@ func TestListRepoAnalysesPagination(t *testing.T) {
 	}
 
 	// List with limit
-	analyses, err := db.ListRepoAnalyses(ctx, ListRepoAnalysesParams{
+	analyses, err := db.ListRepoAnalyses(ctx, database.ListRepoAnalysesParams{
 		RepoID: repo.ID,
 		Limit:  2,
 		Offset: 0,
@@ -414,7 +402,7 @@ func TestListRepoAnalysesPagination(t *testing.T) {
 	assert.Len(t, analyses, 2)
 
 	// List with offset
-	analyses, err = db.ListRepoAnalyses(ctx, ListRepoAnalysesParams{
+	analyses, err = db.ListRepoAnalyses(ctx, database.ListRepoAnalysesParams{
 		RepoID: repo.ID,
 		Limit:  2,
 		Offset: 2,
@@ -423,7 +411,7 @@ func TestListRepoAnalysesPagination(t *testing.T) {
 	assert.Len(t, analyses, 2)
 
 	// List with offset past end
-	analyses, err = db.ListRepoAnalyses(ctx, ListRepoAnalysesParams{
+	analyses, err = db.ListRepoAnalyses(ctx, database.ListRepoAnalysesParams{
 		RepoID: repo.ID,
 		Limit:  10,
 		Offset: 10,
@@ -447,7 +435,7 @@ func TestDeleteOldAnalyses(t *testing.T) {
 	repo, _ := db.CreateRepository(ctx, org.ID, "delowner", "delrepo")
 
 	// Create analysis
-	_, err := db.CreateAnalysis(ctx, CreateAnalysisParams{
+	_, err := db.CreateAnalysis(ctx, database.CreateAnalysisParams{
 		RepoID:   repo.ID,
 		RunID:    3000,
 		Category: llm.CategoryDiagnosis,
@@ -479,7 +467,7 @@ func TestUpdateOrganizationStripe(t *testing.T) {
 	t.Cleanup(func() { _ = db.DeleteOrganization(ctx, org.ID) })
 
 	// Update Stripe customer ID and tier
-	err := db.UpdateOrganizationStripe(ctx, org.ID, "cus_test123", TierTeam)
+	err := db.UpdateOrganizationStripe(ctx, org.ID, "cus_test123", database.TierTeam)
 	require.NoError(t, err)
 
 	// Verify update
@@ -487,7 +475,7 @@ func TestUpdateOrganizationStripe(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotNil(t, found.StripeCustomerID)
 	assert.Equal(t, "cus_test123", *found.StripeCustomerID)
-	assert.Equal(t, TierTeam, found.Tier)
+	assert.Equal(t, database.TierTeam, found.Tier)
 }
 
 func TestGetNonExistent(t *testing.T) {
@@ -549,15 +537,15 @@ func TestAddOrgMemberUpsert(t *testing.T) {
 	t.Cleanup(func() { _ = db.DeleteOrganization(ctx, org.ID) })
 
 	// Add member
-	err := db.AddOrgMember(ctx, org.ID, user2.ID, RoleMember)
+	err := db.AddOrgMember(ctx, org.ID, user2.ID, database.RoleMember)
 	require.NoError(t, err)
 
 	// Update role via AddOrgMember (upsert)
-	err = db.AddOrgMember(ctx, org.ID, user2.ID, RoleAdmin)
+	err = db.AddOrgMember(ctx, org.ID, user2.ID, database.RoleAdmin)
 	require.NoError(t, err)
 
 	// Verify role was updated
 	member, err := db.GetOrgMember(ctx, org.ID, user2.ID)
 	require.NoError(t, err)
-	assert.Equal(t, RoleAdmin, member.Role)
+	assert.Equal(t, database.RoleAdmin, member.Role)
 }
