@@ -56,6 +56,7 @@ func testServer(t *testing.T, db *database.DB) *Server {
 	server.mux.HandleFunc("GET /api/organizations/{orgID}/repositories/{repoID}", server.handleGetRepository)
 	server.mux.HandleFunc("GET /api/organizations/{orgID}/repositories/{repoID}/analyses", server.handleListAnalyses)
 	server.mux.HandleFunc("GET /api/organizations/{orgID}/analyses/{analysisID}", server.handleGetAnalysis)
+	server.mux.HandleFunc("POST /api/organizations/{orgID}/analyses", server.handleCreateAnalysis)
 	server.mux.HandleFunc("GET /api/organizations/{orgID}/usage", server.handleGetUsage)
 	server.mux.HandleFunc("POST /api/billing/checkout", server.handleCreateCheckout)
 	server.mux.HandleFunc("POST /api/billing/portal", server.handleCreatePortal)
@@ -433,6 +434,115 @@ func TestAnalyses(t *testing.T) {
 		server.mux.ServeHTTP(rec, req)
 
 		assert.Equal(t, http.StatusNotFound, rec.Code)
+	})
+}
+
+func TestCreateAnalysis(t *testing.T) {
+	db := testDB(t)
+	ctx := context.Background()
+	server := testServer(t, db)
+
+	// Setup
+	kindeUserID := "kp_" + uuid.New().String()[:8]
+	email := "create-analysis-" + uuid.New().String()[:8] + "@example.com"
+	user, err := db.CreateUser(ctx, kindeUserID, email)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.DeleteUser(ctx, user.ID) })
+
+	org, err := db.CreateOrganizationWithOwner(ctx, "Create Analysis Org", user.ID)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.DeleteOrganization(ctx, org.ID) })
+
+	t.Run("creates analysis and repository", func(t *testing.T) {
+		body := bytes.NewBufferString(`{
+			"owner": "testowner",
+			"repo": "testrepo",
+			"run_id": 99001,
+			"branch": "main",
+			"commit_sha": "abc123",
+			"category": "diagnosis",
+			"confidence": 85,
+			"sensitivity": "medium",
+			"text": "Root cause analysis text"
+		}`)
+		req := httptest.NewRequest(http.MethodPost, "/api/organizations/"+org.ID.String()+"/analyses", body)
+		req.Header.Set("Content-Type", "application/json")
+		req = withAuthContext(req, kindeUserID, email)
+		rec := httptest.NewRecorder()
+
+		server.mux.ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusCreated, rec.Code)
+
+		var resp map[string]any
+		err := json.Unmarshal(rec.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.NotEmpty(t, resp["id"])
+	})
+
+	t.Run("duplicate run_id returns conflict", func(t *testing.T) {
+		body := bytes.NewBufferString(`{
+			"owner": "testowner",
+			"repo": "testrepo",
+			"run_id": 99001,
+			"category": "diagnosis",
+			"text": "Duplicate"
+		}`)
+		req := httptest.NewRequest(http.MethodPost, "/api/organizations/"+org.ID.String()+"/analyses", body)
+		req.Header.Set("Content-Type", "application/json")
+		req = withAuthContext(req, kindeUserID, email)
+		rec := httptest.NewRecorder()
+
+		server.mux.ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusConflict, rec.Code)
+	})
+
+	t.Run("invalid request body", func(t *testing.T) {
+		body := bytes.NewBufferString(`not json`)
+		req := httptest.NewRequest(http.MethodPost, "/api/organizations/"+org.ID.String()+"/analyses", body)
+		req.Header.Set("Content-Type", "application/json")
+		req = withAuthContext(req, kindeUserID, email)
+		rec := httptest.NewRecorder()
+
+		server.mux.ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+	})
+
+	t.Run("missing required fields", func(t *testing.T) {
+		body := bytes.NewBufferString(`{"owner": "testowner"}`)
+		req := httptest.NewRequest(http.MethodPost, "/api/organizations/"+org.ID.String()+"/analyses", body)
+		req.Header.Set("Content-Type", "application/json")
+		req = withAuthContext(req, kindeUserID, email)
+		rec := httptest.NewRecorder()
+
+		server.mux.ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+	})
+
+	t.Run("non-member forbidden", func(t *testing.T) {
+		otherUserID := "kp_" + uuid.New().String()[:8]
+		otherEmail := "other-" + uuid.New().String()[:8] + "@example.com"
+		_, err := db.CreateUser(ctx, otherUserID, otherEmail)
+		require.NoError(t, err)
+
+		body := bytes.NewBufferString(`{
+			"owner": "testowner",
+			"repo": "testrepo",
+			"run_id": 99002,
+			"category": "diagnosis",
+			"text": "Should fail"
+		}`)
+		req := httptest.NewRequest(http.MethodPost, "/api/organizations/"+org.ID.String()+"/analyses", body)
+		req.Header.Set("Content-Type", "application/json")
+		req = withAuthContext(req, otherUserID, otherEmail)
+		rec := httptest.NewRecorder()
+
+		server.mux.ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusForbidden, rec.Code)
 	})
 }
 

@@ -58,6 +58,7 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("GET /api/organizations/{orgID}/repositories/{repoID}", s.withAuth(authMiddleware, s.handleGetRepository))
 	s.mux.HandleFunc("GET /api/organizations/{orgID}/repositories/{repoID}/analyses", s.withAuth(authMiddleware, s.handleListAnalyses))
 	s.mux.HandleFunc("GET /api/organizations/{orgID}/analyses/{analysisID}", s.withAuth(authMiddleware, s.handleGetAnalysis))
+	s.mux.HandleFunc("POST /api/organizations/{orgID}/analyses", s.withAuth(authMiddleware, s.handleCreateAnalysis))
 	s.mux.HandleFunc("GET /api/organizations/{orgID}/usage", s.withAuth(authMiddleware, s.handleGetUsage))
 
 	// Billing endpoints

@@ -3,8 +3,10 @@ package api
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/kamilpajak/heisenberg/internal/database"
+	"github.com/kamilpajak/heisenberg/pkg/llm"
 )
 
 // handleListAnalyses returns analyses for a repository.
@@ -120,4 +122,87 @@ func parsePagination(r *http.Request) (limit, offset int) {
 	}
 
 	return limit, offset
+}
+
+// handleCreateAnalysis accepts an analysis result from the CLI and persists it.
+func (s *Server) handleCreateAnalysis(w http.ResponseWriter, r *http.Request) {
+	oc, ok := s.requireOrgMember(w, r)
+	if !ok {
+		return
+	}
+
+	var req struct {
+		Owner       string                 `json:"owner"`
+		Repo        string                 `json:"repo"`
+		RunID       int64                  `json:"run_id"`
+		Branch      string                 `json:"branch"`
+		CommitSHA   string                 `json:"commit_sha"`
+		Category    string                 `json:"category"`
+		Confidence  *int                   `json:"confidence"`
+		Sensitivity string                 `json:"sensitivity"`
+		RCA         *llm.RootCauseAnalysis `json:"rca"`
+		Text        string                 `json:"text"`
+	}
+	if err := readJSON(r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if req.Owner == "" || req.Repo == "" || req.RunID == 0 || req.Category == "" || req.Text == "" {
+		writeError(w, http.StatusBadRequest, "owner, repo, run_id, category, and text are required")
+		return
+	}
+
+	// Check usage limit
+	canAnalyze, err := s.usageChecker.CanAnalyze(r.Context(), oc.OrgID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to check usage")
+		return
+	}
+	if !canAnalyze {
+		writeError(w, http.StatusTooManyRequests, "monthly analysis limit exceeded")
+		return
+	}
+
+	// Get or create repository
+	repo, err := s.db.GetOrCreateRepository(r.Context(), oc.OrgID, req.Owner, req.Repo)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to resolve repository")
+		return
+	}
+
+	// Build params
+	params := database.CreateAnalysisParams{
+		RepoID:   repo.ID,
+		RunID:    req.RunID,
+		Category: req.Category,
+		Text:     req.Text,
+		RCA:      req.RCA,
+	}
+	if req.Branch != "" {
+		params.Branch = &req.Branch
+	}
+	if req.CommitSHA != "" {
+		params.CommitSHA = &req.CommitSHA
+	}
+	if req.Confidence != nil {
+		params.Confidence = req.Confidence
+	}
+	if req.Sensitivity != "" {
+		params.Sensitivity = &req.Sensitivity
+	}
+
+	analysis, err := s.db.CreateAnalysis(r.Context(), params)
+	if err != nil {
+		if strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "unique constraint") {
+			writeError(w, http.StatusConflict, "analysis for this run already exists")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to create analysis")
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, map[string]any{
+		"id": analysis.ID,
+	})
 }

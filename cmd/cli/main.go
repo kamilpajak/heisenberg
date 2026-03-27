@@ -15,6 +15,7 @@ import (
 	"github.com/kamilpajak/heisenberg/internal/dashboard"
 	"github.com/kamilpajak/heisenberg/pkg/analysis"
 	"github.com/kamilpajak/heisenberg/pkg/llm"
+	"github.com/kamilpajak/heisenberg/pkg/saas"
 	"github.com/kamilpajak/heisenberg/pkg/trace"
 	"github.com/spf13/cobra"
 )
@@ -96,6 +97,24 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	emitter.Close()
+
+	// Persist to SaaS dashboard (if configured)
+	if client := saas.NewClient(); client != nil {
+		id, err := client.SubmitAnalysis(context.Background(), saas.SubmitParams{
+			OrgID:     os.Getenv("HEISENBERG_ORG_ID"),
+			Owner:     owner,
+			Repo:      repoName,
+			RunID:     result.RunID,
+			Branch:    result.Branch,
+			CommitSHA: result.CommitSHA,
+			Result:    result,
+		})
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to save to dashboard: %v\n", err)
+		} else {
+			fmt.Fprintf(os.Stderr, "Saved to dashboard: %s/analyses/%s\n", client.BaseURL(), id)
+		}
+	}
 
 	if jsonOutput {
 		return json.NewEncoder(os.Stdout).Encode(result)
