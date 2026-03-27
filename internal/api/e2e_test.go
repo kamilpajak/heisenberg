@@ -87,8 +87,7 @@ func TestE2E_CLIPersistence(t *testing.T) {
 	ts := e2eServer(t, db)
 
 	// Create SaaS client (same as CLI would use)
-	client := &saas.Client{}
-	*client = *mustNewTestClient(ts.URL, apiKey)
+	client := mustNewTestClient(ts.URL, apiKey)
 
 	// Submit analysis (simulating CLI after analysis.Run())
 	confidence := 85

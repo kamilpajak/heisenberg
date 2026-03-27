@@ -7,13 +7,18 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kamilpajak/heisenberg/internal/auth"
+	"github.com/kamilpajak/heisenberg/internal/database"
 )
 
-// handleCreateAPIKey generates a new API key for the organization.
+// handleCreateAPIKey generates a new API key for the organization. Requires admin or owner role.
 // The plaintext key is returned once and never stored.
 func (s *Server) handleCreateAPIKey(w http.ResponseWriter, r *http.Request) {
 	oc, ok := s.requireOrgMember(w, r)
 	if !ok {
+		return
+	}
+	if oc.Member.Role != database.RoleOwner && oc.Member.Role != database.RoleAdmin {
+		writeError(w, http.StatusForbidden, "only owners and admins can manage API keys")
 		return
 	}
 
@@ -89,10 +94,14 @@ func (s *Server) handleListAPIKeys(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"keys": result})
 }
 
-// handleDeleteAPIKey revokes an API key.
+// handleDeleteAPIKey revokes an API key. Requires admin or owner role.
 func (s *Server) handleDeleteAPIKey(w http.ResponseWriter, r *http.Request) {
-	_, ok := s.requireOrgMember(w, r)
+	oc, ok := s.requireOrgMember(w, r)
 	if !ok {
+		return
+	}
+	if oc.Member.Role != database.RoleOwner && oc.Member.Role != database.RoleAdmin {
+		writeError(w, http.StatusForbidden, "only owners and admins can manage API keys")
 		return
 	}
 
@@ -102,7 +111,7 @@ func (s *Server) handleDeleteAPIKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.db.DeleteAPIKey(r.Context(), keyID); err != nil {
+	if err := s.db.DeleteAPIKey(r.Context(), keyID, oc.OrgID); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to delete API key")
 		return
 	}

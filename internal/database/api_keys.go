@@ -80,8 +80,8 @@ func (db *DB) ListOrgAPIKeys(ctx context.Context, orgID uuid.UUID) ([]APIKey, er
 	return keys, rows.Err()
 }
 
-// DeleteAPIKey removes an API key.
-func (db *DB) DeleteAPIKey(ctx context.Context, id uuid.UUID) error {
-	_, err := db.pool.Exec(ctx, `DELETE FROM api_keys WHERE id = $1`, id)
+// DeleteAPIKey removes an API key, scoped to the organization for safety.
+func (db *DB) DeleteAPIKey(ctx context.Context, id, orgID uuid.UUID) error {
+	_, err := db.pool.Exec(ctx, `DELETE FROM api_keys WHERE id = $1 AND org_id = $2`, id, orgID)
 	return err
 }

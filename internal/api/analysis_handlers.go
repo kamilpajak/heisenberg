@@ -1,10 +1,11 @@
 package api
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
-	"strings"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/kamilpajak/heisenberg/internal/database"
 	"github.com/kamilpajak/heisenberg/pkg/llm"
 )
@@ -194,7 +195,8 @@ func (s *Server) handleCreateAnalysis(w http.ResponseWriter, r *http.Request) {
 
 	analysis, err := s.db.CreateAnalysis(r.Context(), params)
 	if err != nil {
-		if strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "unique constraint") {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
 			writeError(w, http.StatusConflict, "analysis for this run already exists")
 			return
 		}

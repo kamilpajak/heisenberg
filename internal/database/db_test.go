@@ -598,7 +598,7 @@ func TestAPIKeyCRUD(t *testing.T) {
 	assert.Len(t, keys, 1)
 
 	// Delete
-	err = db.DeleteAPIKey(ctx, key.ID)
+	err = db.DeleteAPIKey(ctx, key.ID, org.ID)
 	require.NoError(t, err)
 	deleted, _ := db.GetAPIKeyByHash(ctx, keyHash)
 	assert.Nil(t, deleted)
