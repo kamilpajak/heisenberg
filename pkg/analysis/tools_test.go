@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	gh "github.com/kamilpajak/heisenberg/pkg/github"
@@ -1121,4 +1122,186 @@ func buildZip(t *testing.T, files map[string][]byte) []byte {
 	}
 	require.NoError(t, w.Close())
 	return buf.Bytes()
+}
+
+func TestPrerequisiteGating_BlocksRepoFileBeforeArtifacts(t *testing.T) {
+	h := &ToolHandler{
+		artifacts: []gh.Artifact{{Name: "playwright-report", Expired: false}},
+	}
+	result, _, err := h.Execute(context.Background(), llm.FunctionCall{
+		Name: "get_repo_file",
+		Args: map[string]any{"path": "package.json"},
+	})
+	require.NoError(t, err)
+	assert.Contains(t, result, "ACCESS_DENIED")
+	assert.Contains(t, result, "fetch test failure data")
+}
+
+func TestPrerequisiteGating_AllowsAfterJobLogs(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "/logs") {
+			w.Write([]byte("test log output"))
+		} else if strings.Contains(r.URL.Path, "/contents/") {
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"content":  "cGFja2FnZS5qc29u", // base64 "package.json"
+				"encoding": "base64",
+			})
+		}
+	}))
+	defer srv.Close()
+
+	ghClient := gh.NewTestClient(srv.URL, srv.Client())
+	h := &ToolHandler{
+		GitHub:    ghClient,
+		Owner:     "owner",
+		Repo:      "repo",
+		RunID:     123,
+		artifacts: []gh.Artifact{{Name: "playwright-report", Expired: false}},
+	}
+
+	// Before job logs → blocked
+	result, _, _ := h.Execute(context.Background(), llm.FunctionCall{
+		Name: "get_repo_file",
+		Args: map[string]any{"path": "package.json"},
+	})
+	assert.Contains(t, result, "ACCESS_DENIED")
+
+	// Fetch job logs
+	_, _, _ = h.Execute(context.Background(), llm.FunctionCall{
+		Name: "get_job_logs",
+		Args: map[string]any{"job_id": float64(1)},
+	})
+
+	// After job logs → allowed
+	result, _, _ = h.Execute(context.Background(), llm.FunctionCall{
+		Name: "get_repo_file",
+		Args: map[string]any{"path": "package.json"},
+	})
+	assert.NotContains(t, result, "ACCESS_DENIED")
+}
+
+func TestPrerequisiteGating_DisabledWhenNoTestArtifacts(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"content":  "cGFja2FnZS5qc29u",
+			"encoding": "base64",
+		})
+	}))
+	defer srv.Close()
+
+	ghClient := gh.NewTestClient(srv.URL, srv.Client())
+	h := &ToolHandler{
+		GitHub:    ghClient,
+		Owner:     "owner",
+		Repo:      "repo",
+		RunID:     123,
+		artifacts: []gh.Artifact{}, // no artifacts
+	}
+
+	// No artifacts → get_repo_file allowed immediately
+	result, _, err := h.Execute(context.Background(), llm.FunctionCall{
+		Name: "get_repo_file",
+		Args: map[string]any{"path": "package.json"},
+	})
+	require.NoError(t, err)
+	assert.NotContains(t, result, "ACCESS_DENIED")
+}
+
+func TestHasTestArtifacts(t *testing.T) {
+	tests := []struct {
+		name      string
+		artifacts []gh.Artifact
+		want      bool
+	}{
+		{"with playwright report", []gh.Artifact{{Name: "playwright-report", Expired: false}}, true},
+		{"with blob report", []gh.Artifact{{Name: "blob-report-1", Expired: false}}, true},
+		{"with test results", []gh.Artifact{{Name: "test-results", Expired: false}}, true},
+		{"with html report", []gh.Artifact{{Name: "html-report--attempt-1", Expired: false}}, true},
+		{"build cache only", []gh.Artifact{{Name: "build-cache", Expired: false}}, false},
+		{"docker image only", []gh.Artifact{{Name: "docker-image.tar", Expired: false}}, false},
+		{"expired report", []gh.Artifact{{Name: "playwright-report", Expired: true}}, false},
+		{"empty", []gh.Artifact{}, false},
+		{"mixed", []gh.Artifact{
+			{Name: "build-cache", Expired: false},
+			{Name: "playwright-report", Expired: false},
+		}, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := &ToolHandler{artifacts: tt.artifacts}
+			assert.Equal(t, tt.want, h.HasTestArtifacts())
+		})
+	}
+}
+
+func TestSmartNotFound_ReturnsDirectoryListing(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path := r.URL.Path
+		if strings.Contains(path, "/contents/tests/auth.spec.ts") {
+			w.WriteHeader(http.StatusNotFound)
+			w.Write([]byte(`{"message": "Not Found"}`))
+		} else if strings.Contains(path, "/contents/tests") {
+			_ = json.NewEncoder(w).Encode([]map[string]string{
+				{"name": "e2e", "type": "dir"},
+				{"name": "setup.ts", "type": "file"},
+				{"name": "utils.ts", "type": "file"},
+			})
+		}
+	}))
+	defer srv.Close()
+
+	ghClient := gh.NewTestClient(srv.URL, srv.Client())
+	h := &ToolHandler{
+		GitHub:              ghClient,
+		Owner:               "owner",
+		Repo:                "repo",
+		RunID:               123,
+		hasReadErrorContext: true, // bypass prerequisite gating
+	}
+
+	result, _, err := h.Execute(context.Background(), llm.FunctionCall{
+		Name: "get_repo_file",
+		Args: map[string]any{"path": "tests/auth.spec.ts"},
+	})
+	require.NoError(t, err)
+
+	assert.Contains(t, result, "file not found")
+	assert.Contains(t, result, "e2e/")
+	assert.Contains(t, result, "setup.ts")
+	assert.Contains(t, result, "contents")
+}
+
+func TestSmartNotFound_RootDirectory(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path := r.URL.Path
+		if strings.Contains(path, "/contents/nonexistent.ts") {
+			w.WriteHeader(http.StatusNotFound)
+			w.Write([]byte(`{"message": "Not Found"}`))
+		} else if strings.HasSuffix(path, "/contents/.") || strings.HasSuffix(path, "/contents/") {
+			_ = json.NewEncoder(w).Encode([]map[string]string{
+				{"name": "src", "type": "dir"},
+				{"name": "package.json", "type": "file"},
+			})
+		}
+	}))
+	defer srv.Close()
+
+	ghClient := gh.NewTestClient(srv.URL, srv.Client())
+	h := &ToolHandler{
+		GitHub:              ghClient,
+		Owner:               "owner",
+		Repo:                "repo",
+		RunID:               123,
+		hasReadErrorContext: true,
+	}
+
+	result, _, err := h.Execute(context.Background(), llm.FunctionCall{
+		Name: "get_repo_file",
+		Args: map[string]any{"path": "nonexistent.ts"},
+	})
+	require.NoError(t, err)
+
+	assert.Contains(t, result, "file not found")
+	assert.Contains(t, result, "package.json")
 }

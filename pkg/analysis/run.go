@@ -83,6 +83,7 @@ func Run(ctx context.Context, p Params) (*llm.AnalysisResult, error) {
 		RunID:        resolvedRunID,
 		SnapshotHTML: p.SnapshotHTML,
 		Emitter:      p.Emitter,
+		artifacts:    artifacts, // pre-populate so HasTestArtifacts() works immediately
 	}
 
 	llmClient, err := llm.NewClient()
@@ -132,20 +133,35 @@ func buildInitialContext(run *gh.WorkflowRun, jobs []gh.Job, artifacts []gh.Arti
 	if len(artifacts) == 0 {
 		b.WriteString("No artifacts found.\n")
 	}
+	hasTestArtifacts := false
 	for _, a := range artifacts {
 		expired := ""
 		if a.Expired {
 			expired = " [EXPIRED]"
 		}
-		fmt.Fprintf(&b, "- %s (%d bytes)%s\n", a.Name, a.SizeBytes, expired)
+		label := ""
+		if !a.Expired && isTestArtifact(a.Name) {
+			label = " [TEST REPORT]"
+			hasTestArtifacts = true
+		}
+		fmt.Fprintf(&b, "- %s (%d bytes)%s%s\n", a.Name, a.SizeBytes, label, expired)
 	}
 
 	b.WriteString("\n## Instructions\n")
 	b.WriteString("Analyze this workflow run to determine why it failed.\n")
-	b.WriteString("Use the available tools to fetch artifacts, logs, and source files as needed.\n")
+	if hasTestArtifacts {
+		b.WriteString("IMPORTANT: Test report artifacts are available. Start by fetching them using get_artifact to understand which tests failed and why. Only read source files after analyzing test reports.\n")
+	}
 	b.WriteString("When you have enough information, you MUST call the 'done' tool first, then provide your final root cause analysis.\n")
 
 	return b.String()
+}
+
+// isTestArtifact returns true if the artifact name suggests it contains test results.
+func isTestArtifact(name string) bool {
+	lower := strings.ToLower(name)
+	return strings.Contains(lower, "report") || strings.Contains(lower, "test-results") ||
+		strings.Contains(lower, "blob")
 }
 
 // findRunToAnalyze determines which run to analyze based on smart selection logic.

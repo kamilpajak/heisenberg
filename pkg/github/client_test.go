@@ -321,3 +321,33 @@ func TestSelectAndFetch(t *testing.T) {
 	require.NotNil(t, result)
 	assert.Equal(t, ArtifactHTML, result.Type)
 }
+
+func TestListDirectory(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`[
+			{"name": "e2e", "type": "dir"},
+			{"name": "setup.ts", "type": "file"},
+			{"name": "utils.ts", "type": "file"}
+		]`))
+	}))
+	defer srv.Close()
+
+	c := NewTestClient(srv.URL, srv.Client())
+	entries, err := c.ListDirectory(context.Background(), "owner", "repo", "tests")
+	require.NoError(t, err)
+	assert.Len(t, entries, 3)
+	assert.Equal(t, "e2e/", entries[0])
+	assert.Equal(t, "setup.ts", entries[1])
+}
+
+func TestListDirectory_NotFound(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	c := NewTestClient(srv.URL, srv.Client())
+	_, err := c.ListDirectory(context.Background(), "owner", "repo", "nonexistent")
+	assert.Error(t, err)
+}

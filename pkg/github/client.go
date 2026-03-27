@@ -460,6 +460,45 @@ func (c *Client) doRequest(ctx context.Context, url string, result interface{}) 
 	return json.NewDecoder(resp.Body).Decode(result)
 }
 
+// ListDirectory returns the names of files and directories at the given path.
+// Directory names have a trailing "/".
+func (c *Client) ListDirectory(ctx context.Context, owner, repo, path string) ([]string, error) {
+	url := fmt.Sprintf("%s/repos/%s/%s/contents/%s", c.baseURL, owner, repo, path)
+
+	req, err := c.newAPIRequest(ctx, url)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("directory not found: %s", path)
+	}
+
+	var entries []struct {
+		Name string `json:"name"`
+		Type string `json:"type"` // "file" or "dir"
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&entries); err != nil {
+		return nil, fmt.Errorf("failed to parse directory listing: %w", err)
+	}
+
+	names := make([]string, 0, len(entries))
+	for _, e := range entries {
+		if e.Type == "dir" {
+			names = append(names, e.Name+"/")
+		} else {
+			names = append(names, e.Name)
+		}
+	}
+	return names, nil
+}
+
 func base64Decode(s string) ([]byte, error) {
 	// GitHub returns base64 with newlines
 	s = strings.ReplaceAll(s, "\n", "")
