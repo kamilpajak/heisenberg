@@ -15,7 +15,12 @@ func init() {
 
 func newTestEmitter() (*TextEmitter, *bytes.Buffer) {
 	var buf bytes.Buffer
-	return &TextEmitter{w: &buf, tty: false}, &buf
+	return &TextEmitter{w: &buf, tty: false, verbose: true}, &buf
+}
+
+func newCompactTestEmitter() (*TextEmitter, *bytes.Buffer) {
+	var buf bytes.Buffer
+	return &TextEmitter{w: &buf, tty: false, verbose: false}, &buf
 }
 
 func TestEmit_Step(t *testing.T) {
@@ -239,7 +244,67 @@ func TestHumanizeArgs_DeterministicOrder(t *testing.T) {
 
 func TestNewTextEmitter_NoColor(t *testing.T) {
 	var buf bytes.Buffer
-	e := NewTextEmitter(&buf)
+	e := NewTextEmitter(&buf, false)
 	// Non-TTY writer should have noColor=true
 	assert.True(t, e.noColor, "non-TTY should have noColor=true")
+}
+
+func TestToolPhase(t *testing.T) {
+	tests := []struct {
+		tool string
+		want string
+	}{
+		{"list_jobs", "Listing jobs"},
+		{"get_job_logs", "Reading logs"},
+		{"get_artifact", "Fetching artifacts"},
+		{"get_test_traces", "Analyzing traces"},
+		{"get_repo_file", "Reading source"},
+		{"get_workflow_file", "Reading source"},
+		{"done", "Finalizing"},
+		{"unknown_tool", "Analyzing"},
+	}
+	for _, tt := range tests {
+		assert.Equal(t, tt.want, toolPhase(tt.tool), "toolPhase(%q)", tt.tool)
+	}
+}
+
+func TestCompactMode_ToolShowsPhaseAndCounter(t *testing.T) {
+	e, buf := newCompactTestEmitter()
+	e.Emit(ProgressEvent{Type: "tool", Step: 3, MaxStep: 30, Tool: "get_repo_file"})
+	out := buf.String()
+	assert.Contains(t, out, "Reading source")
+	assert.Contains(t, out, "3/30")
+}
+
+func TestCompactMode_StepDoesNotPrint(t *testing.T) {
+	e, buf := newCompactTestEmitter()
+	e.Emit(ProgressEvent{Type: "step", Step: 1, MaxStep: 30, Message: "Calling model..."})
+	assert.Empty(t, buf.String(), "compact mode should not print step events")
+}
+
+func TestCompactMode_ResultSuppressed(t *testing.T) {
+	e, buf := newCompactTestEmitter()
+	e.Emit(ProgressEvent{Type: "result", ModelMs: 3200, Tokens: 12847})
+	assert.Empty(t, buf.String(), "compact mode should suppress result events")
+}
+
+func TestCompactMode_ClosePrintsSummary(t *testing.T) {
+	e, buf := newCompactTestEmitter()
+	e.Emit(ProgressEvent{Type: "tool", Step: 9, MaxStep: 30, Tool: "done"})
+	buf.Reset()
+	e.Close()
+	out := buf.String()
+	assert.Contains(t, out, "Used 9/30 iterations")
+}
+
+func TestCompactMode_InfoStillPrints(t *testing.T) {
+	e, buf := newCompactTestEmitter()
+	e.Emit(ProgressEvent{Type: "info", Message: "Analyzing run 123..."})
+	assert.Contains(t, buf.String(), "Analyzing run 123...")
+}
+
+func TestCompactMode_ErrorStillPrints(t *testing.T) {
+	e, buf := newCompactTestEmitter()
+	e.Emit(ProgressEvent{Type: "error", Message: "something failed"})
+	assert.Contains(t, buf.String(), "Error: something failed")
 }

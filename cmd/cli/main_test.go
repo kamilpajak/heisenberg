@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/fatih/color"
 	"github.com/kamilpajak/heisenberg/pkg/llm"
@@ -145,13 +146,123 @@ func TestPrintResult_WithStructuredRCA(t *testing.T) {
 	out := stdout.String()
 	assert.Contains(t, out, "TIMEOUT")
 	assert.Contains(t, out, "tests/checkout.spec.ts:45")
-	assert.Contains(t, out, "ROOT CAUSE")
+	assert.Contains(t, out, "Root Cause")
 	assert.Contains(t, out, "Cookie banner overlays submit button")
-	assert.Contains(t, out, "EVIDENCE")
+	assert.Contains(t, out, "Evidence")
 	assert.Contains(t, out, "[Screenshot]")
 	assert.Contains(t, out, "Overlay visible")
-	assert.Contains(t, out, "FIX")
+	assert.Contains(t, out, "Fix")
 	assert.Contains(t, out, "Dismiss cookie banner")
+}
+
+func TestWrapText(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		maxWidth int
+		indent   string
+		want     string
+	}{
+		{
+			name:     "short text no wrap",
+			input:    "hello world",
+			maxWidth: 40,
+			indent:   "  ",
+			want:     "  hello world",
+		},
+		{
+			name:     "wraps at word boundary",
+			input:    "the quick brown fox jumps over the lazy dog",
+			maxWidth: 25,
+			indent:   "  ",
+			want:     "  the quick brown fox\n  jumps over the lazy dog",
+		},
+		{
+			name:     "empty string",
+			input:    "",
+			maxWidth: 40,
+			indent:   "  ",
+			want:     "",
+		},
+		{
+			name:     "single long word",
+			input:    "supercalifragilisticexpialidocious",
+			maxWidth: 20,
+			indent:   "  ",
+			want:     "  supercalifragilisticexpialidocious",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := wrapText(tt.input, tt.maxWidth, tt.indent)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestWrapBullets(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{
+			name:  "numbered item continuation aligns past marker",
+			input: "1. This is a long numbered item that should wrap with continuation aligned past the marker",
+			want:  "  1. This is a long numbered item that should\n     wrap with continuation aligned past the marker",
+		},
+		{
+			name:  "bullet item continuation aligns past marker",
+			input: "- This is a long bullet item that should wrap with continuation aligned past the dash",
+			want:  "  - This is a long bullet item that should wrap\n    with continuation aligned past the dash",
+		},
+		{
+			name:  "plain paragraph uses base indent",
+			input: "This is a plain paragraph without any bullet marker that wraps normally here",
+			want:  "  This is a plain paragraph without any bullet\n  marker that wraps normally here",
+		},
+		{
+			name:  "multiple paragraphs",
+			input: "1. First item\n2. Second item",
+			want:  "  1. First item\n  2. Second item",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := wrapBullets(tt.input, 52, "  ")
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestPrintStructuredRCA_WordWrap(t *testing.T) {
+	var buf bytes.Buffer
+	rca := &llm.RootCauseAnalysis{
+		Title:       "Timeout Error",
+		FailureType: llm.FailureTypeTimeout,
+		Location:    &llm.CodeLocation{FilePath: "test.spec.ts", LineNumber: 1},
+		Symptom:     "Timeout",
+		RootCause:   "This is a very long root cause description that should definitely be wrapped across multiple lines because it exceeds the maximum line width of seventy-six characters",
+		Evidence:    []llm.Evidence{},
+		Remediation: "This is a very long remediation that should also be wrapped across multiple lines to ensure readability on standard terminal widths of eighty columns",
+	}
+
+	printStructuredRCA(&buf, rca)
+	out := buf.String()
+
+	// Verify content is present
+	assert.Contains(t, out, "very long root cause")
+	assert.Contains(t, out, "very long remediation")
+
+	// Verify wrapping occurred — no visible line should exceed 80 runes
+	lines := bytes.Split(buf.Bytes(), []byte("\n"))
+	for _, line := range lines {
+		visible := bytes.TrimSpace(line)
+		if len(visible) > 0 {
+			runeCount := utf8.RuneCount(visible)
+			assert.LessOrEqual(t, runeCount, 80, "line too long (%d runes): %q", runeCount, string(line))
+		}
+	}
 }
 
 func TestPrintResult_FallbackToText(t *testing.T) {
