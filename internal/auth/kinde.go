@@ -97,8 +97,14 @@ func (v *Verifier) Verify(tokenString string) (*KindeClaims, error) {
 	return claims, nil
 }
 
-// Middleware creates HTTP middleware that verifies Kinde JWTs.
-func Middleware(verifier *Verifier) func(http.Handler) http.Handler {
+// Middleware creates HTTP middleware that verifies Kinde JWTs and API keys.
+// If apiKeyStore is non-nil, tokens prefixed with "hsb_" are authenticated as API keys.
+func Middleware(verifier *Verifier, apiKeyStore ...APIKeyStore) func(http.Handler) http.Handler {
+	var store APIKeyStore
+	if len(apiKeyStore) > 0 {
+		store = apiKeyStore[0]
+	}
+
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			token := extractBearerToken(r)
@@ -107,13 +113,35 @@ func Middleware(verifier *Verifier) func(http.Handler) http.Handler {
 				return
 			}
 
+			// API key authentication
+			if IsAPIKey(token) && store != nil {
+				keyHash := HashAPIKey(token)
+				info, err := store.GetAPIKeyByHash(r.Context(), keyHash)
+				if err != nil {
+					http.Error(w, "Unauthorized: invalid API key", http.StatusUnauthorized)
+					return
+				}
+
+				// Update last used (fire-and-forget)
+				go func() { _ = store.UpdateAPIKeyLastUsed(context.Background(), info.ID) }()
+
+				claims := &KindeClaims{
+					RegisteredClaims: jwt.RegisteredClaims{
+						Subject: info.ClerkID,
+					},
+				}
+				ctx := context.WithValue(r.Context(), claimsKey, claims)
+				next.ServeHTTP(w, r.WithContext(ctx))
+				return
+			}
+
+			// Kinde JWT authentication
 			claims, err := verifier.Verify(token)
 			if err != nil {
 				http.Error(w, "Unauthorized: invalid token", http.StatusUnauthorized)
 				return
 			}
 
-			// Attach claims to context
 			ctx := context.WithValue(r.Context(), claimsKey, claims)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})

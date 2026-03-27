@@ -57,6 +57,9 @@ func testServer(t *testing.T, db *database.DB) *Server {
 	server.mux.HandleFunc("GET /api/organizations/{orgID}/repositories/{repoID}/analyses", server.handleListAnalyses)
 	server.mux.HandleFunc("GET /api/organizations/{orgID}/analyses/{analysisID}", server.handleGetAnalysis)
 	server.mux.HandleFunc("POST /api/organizations/{orgID}/analyses", server.handleCreateAnalysis)
+	server.mux.HandleFunc("POST /api/organizations/{orgID}/api-keys", server.handleCreateAPIKey)
+	server.mux.HandleFunc("GET /api/organizations/{orgID}/api-keys", server.handleListAPIKeys)
+	server.mux.HandleFunc("DELETE /api/organizations/{orgID}/api-keys/{keyID}", server.handleDeleteAPIKey)
 	server.mux.HandleFunc("GET /api/organizations/{orgID}/usage", server.handleGetUsage)
 	server.mux.HandleFunc("POST /api/billing/checkout", server.handleCreateCheckout)
 	server.mux.HandleFunc("POST /api/billing/portal", server.handleCreatePortal)
@@ -1024,4 +1027,121 @@ func TestConfig_Fields(t *testing.T) {
 	assert.Nil(t, cfg.DB)
 	assert.Nil(t, cfg.AuthVerifier)
 	assert.Nil(t, cfg.BillingClient)
+}
+
+func TestAPIKeys(t *testing.T) {
+	db := testDB(t)
+	ctx := context.Background()
+	server := testServer(t, db)
+
+	// Setup
+	kindeUserID := "kp_" + uuid.New().String()[:8]
+	email := "apikeys-" + uuid.New().String()[:8] + "@example.com"
+	user, err := db.CreateUser(ctx, kindeUserID, email)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.DeleteUser(ctx, user.ID) })
+
+	org, err := db.CreateOrganizationWithOwner(ctx, "API Keys Test Org", user.ID)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.DeleteOrganization(ctx, org.ID) })
+
+	var createdKeyID string
+
+	t.Run("create API key", func(t *testing.T) {
+		body := bytes.NewBufferString(`{"name": "CI Key"}`)
+		req := httptest.NewRequest(http.MethodPost, "/api/organizations/"+org.ID.String()+"/api-keys", body)
+		req.Header.Set("Content-Type", "application/json")
+		req = withAuthContext(req, kindeUserID, email)
+		rec := httptest.NewRecorder()
+
+		server.mux.ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusCreated, rec.Code)
+
+		var resp map[string]any
+		err := json.Unmarshal(rec.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.NotEmpty(t, resp["id"])
+		assert.NotEmpty(t, resp["key"])
+		assert.Equal(t, "CI Key", resp["name"])
+
+		// Key should start with hsb_ prefix
+		key, ok := resp["key"].(string)
+		require.True(t, ok)
+		assert.True(t, len(key) > 4)
+		assert.Equal(t, "hsb_", key[:4])
+
+		createdKeyID, _ = resp["id"].(string)
+	})
+
+	t.Run("create API key - missing name", func(t *testing.T) {
+		body := bytes.NewBufferString(`{}`)
+		req := httptest.NewRequest(http.MethodPost, "/api/organizations/"+org.ID.String()+"/api-keys", body)
+		req.Header.Set("Content-Type", "application/json")
+		req = withAuthContext(req, kindeUserID, email)
+		rec := httptest.NewRecorder()
+
+		server.mux.ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusBadRequest, rec.Code)
+	})
+
+	t.Run("list API keys", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/api/organizations/"+org.ID.String()+"/api-keys", nil)
+		req = withAuthContext(req, kindeUserID, email)
+		rec := httptest.NewRecorder()
+
+		server.mux.ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusOK, rec.Code)
+
+		var resp map[string]any
+		err := json.Unmarshal(rec.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		keys, ok := resp["keys"].([]any)
+		require.True(t, ok)
+		assert.Len(t, keys, 1)
+
+		// Listed keys should NOT contain the plaintext key
+		first := keys[0].(map[string]any)
+		assert.NotEmpty(t, first["id"])
+		assert.Equal(t, "CI Key", first["name"])
+		_, hasKey := first["key"]
+		assert.False(t, hasKey, "listed keys must not expose plaintext key")
+	})
+
+	t.Run("delete API key", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodDelete, "/api/organizations/"+org.ID.String()+"/api-keys/"+createdKeyID, nil)
+		req = withAuthContext(req, kindeUserID, email)
+		rec := httptest.NewRecorder()
+
+		server.mux.ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusNoContent, rec.Code)
+
+		// Verify deleted
+		listReq := httptest.NewRequest(http.MethodGet, "/api/organizations/"+org.ID.String()+"/api-keys", nil)
+		listReq = withAuthContext(listReq, kindeUserID, email)
+		listRec := httptest.NewRecorder()
+		server.mux.ServeHTTP(listRec, listReq)
+
+		var resp map[string]any
+		_ = json.Unmarshal(listRec.Body.Bytes(), &resp)
+		keys := resp["keys"].([]any)
+		assert.Len(t, keys, 0)
+	})
+
+	t.Run("non-member forbidden", func(t *testing.T) {
+		otherUserID := "kp_" + uuid.New().String()[:8]
+		otherEmail := "other-ak-" + uuid.New().String()[:8] + "@example.com"
+		_, _ = db.CreateUser(ctx, otherUserID, otherEmail)
+
+		req := httptest.NewRequest(http.MethodGet, "/api/organizations/"+org.ID.String()+"/api-keys", nil)
+		req = withAuthContext(req, otherUserID, otherEmail)
+		rec := httptest.NewRecorder()
+
+		server.mux.ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusForbidden, rec.Code)
+	})
 }

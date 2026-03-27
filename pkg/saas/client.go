@@ -35,6 +35,15 @@ func NewClient() *Client {
 	}
 }
 
+// NewTestClient creates a client with explicit URL and key (for testing).
+func NewTestClient(baseURL, apiKey string) *Client {
+	return &Client{
+		baseURL: baseURL,
+		apiKey:  apiKey,
+		http:    &http.Client{Timeout: 30 * time.Second},
+	}
+}
+
 // BaseURL returns the configured API base URL.
 func (c *Client) BaseURL() string {
 	return c.baseURL
