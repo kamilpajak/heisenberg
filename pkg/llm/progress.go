@@ -49,6 +49,13 @@ type TextEmitter struct {
 	lastStep int
 	lastMax  int
 	lastTool string
+	failed   bool
+}
+
+// MarkFailed signals that the analysis ended with an error.
+// This changes the Close() summary from ✓ to ✗.
+func (e *TextEmitter) MarkFailed() {
+	e.failed = true
 }
 
 // NewTextEmitter creates a TextEmitter that writes to w.
@@ -70,14 +77,23 @@ func (e *TextEmitter) Close() {
 	e.stopSpinner()
 	if !e.verbose && e.lastStep > 0 {
 		dim := color.New(color.FgHiBlack)
+		green := color.New(color.FgGreen)
+		red := color.New(color.FgRed)
 		if e.noColor {
 			dim.DisableColor()
+			green.DisableColor()
+			red.DisableColor()
 		}
 		if e.tty {
-			// Clear the compact progress line
 			fmt.Fprintf(e.w, "\r\033[K")
 		}
-		_, _ = dim.Fprintf(e.w, "  Used %d/%d iterations\n", e.lastStep, e.lastMax)
+		if e.failed {
+			_, _ = red.Fprint(e.w, "  ✗  ")
+			_, _ = dim.Fprintf(e.w, "Stopped at %d/%d iterations\n", e.lastStep, e.lastMax)
+		} else {
+			_, _ = green.Fprint(e.w, "  ✓  ")
+			_, _ = dim.Fprintf(e.w, "Used %d/%d iterations\n", e.lastStep, e.lastMax)
+		}
 	}
 }
 
@@ -120,9 +136,8 @@ func toolPhase(tool string) string {
 	}
 }
 
-// compactProgress renders a single-line progress indicator using \r on TTY.
-// Format: "  Analyzing  ██████░░░░  7/30"
-func (e *TextEmitter) compactProgress() {
+// compactProgressLine builds the compact progress string (without \r prefix).
+func (e *TextEmitter) compactProgressLine() string {
 	const barWidth = 20
 	filled := e.lastStep * barWidth / e.lastMax
 	filled = min(filled, barWidth)
@@ -131,23 +146,31 @@ func (e *TextEmitter) compactProgress() {
 	phase := toolPhase(e.lastTool)
 	counter := fmt.Sprintf("%d/%d", e.lastStep, e.lastMax)
 
-	dim := color.New(color.FgHiBlack)
-	cyan := color.New(color.FgCyan)
-	if e.noColor {
-		dim.DisableColor()
-		cyan.DisableColor()
-	}
+	return fmt.Sprintf("  %s  %s  %s", phase, bar, counter)
+}
 
+// compactProgress renders a single-line progress indicator using \r on TTY.
+// Format: "  Analyzing  ██████░░░░  7/30"
+func (e *TextEmitter) compactProgress() {
 	if e.tty {
-		fmt.Fprintf(e.w, "\r\033[K")
-		fmt.Fprintf(e.w, "  %s  ", phase)
-		_, _ = dim.Fprintf(e.w, "%s", bar)
-		fmt.Fprintf(e.w, "  ")
-		_, _ = cyan.Fprintf(e.w, "%s", counter)
+		fmt.Fprintf(e.w, "\r\033[K%s", e.compactProgressLine())
 	} else {
-		// Non-TTY: print one line per tool (no \r)
+		phase := toolPhase(e.lastTool)
+		counter := fmt.Sprintf("%d/%d", e.lastStep, e.lastMax)
 		fmt.Fprintf(e.w, "  %s  %s\n", phase, counter)
 	}
+}
+
+// startCompactSpinner starts a spinner with the compact progress as prefix.
+// This provides visual feedback while waiting for slow API calls.
+func (e *TextEmitter) startCompactSpinner() {
+	e.stopSpinner()
+	if !e.tty {
+		return
+	}
+	e.sp = spinner.New(spinner.CharSets[14], 80*time.Millisecond, spinner.WithWriter(e.w))
+	e.sp.Prefix = e.compactProgressLine() + "  "
+	e.sp.Start()
 }
 
 // emitToolVerbose prints a detailed tool call line with aligned counter.
@@ -189,6 +212,10 @@ func (e *TextEmitter) Emit(ev ProgressEvent) {
 	case "step":
 		if e.verbose {
 			e.startSpinner(ev.Message)
+		} else {
+			e.lastStep = ev.Step - 1 // show progress at start of step (before tool completes)
+			e.lastMax = ev.MaxStep
+			e.startCompactSpinner()
 		}
 
 	case "tool":
@@ -198,6 +225,7 @@ func (e *TextEmitter) Emit(ev ProgressEvent) {
 		if e.verbose {
 			e.emitToolVerbose(ev)
 		} else {
+			e.stopSpinner()
 			e.compactProgress()
 		}
 

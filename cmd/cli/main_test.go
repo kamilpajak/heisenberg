@@ -409,3 +409,60 @@ func TestPrintError_GenericError(t *testing.T) {
 	assert.Contains(t, out, "something went wrong")
 	assert.NotContains(t, out, "Hint:")
 }
+
+// State 3: Executive summary — future work
+func TestPrintResult_ExecutiveSummary(t *testing.T) {
+	t.Skip("TODO: executive summary — one-line Result: header above structured RCA")
+
+	var stderr, stdout bytes.Buffer
+	r := &llm.AnalysisResult{
+		Category:    llm.CategoryDiagnosis,
+		Confidence:  95,
+		Sensitivity: "low",
+		RCA: &llm.RootCauseAnalysis{
+			Title:       "Flaky Test Detected",
+			FailureType: llm.FailureTypeFlake,
+			Location:    &llm.CodeLocation{FilePath: "tests/perf.spec.ts", LineNumber: 29},
+			Symptom:     "utilsBundle not in output",
+			RootCause:   "utilsBundle loads too fast on macOS runners",
+			Evidence:    []llm.Evidence{{Type: llm.EvidenceTrace, Content: "Trace data"}},
+			Remediation: "Relax assertion in perf.spec.ts",
+		},
+	}
+
+	printResult(&stderr, &stdout, r)
+
+	out := stdout.String()
+	// One-line summary above detailed sections
+	assert.Contains(t, out, "Result:")
+	assert.Contains(t, out, "FLAKE")
+	assert.Contains(t, out, "95%")
+	assert.Contains(t, out, "Test:")
+	assert.Contains(t, out, "tests/perf.spec.ts:29")
+}
+
+func TestPrintResult_ExecutiveSummary_SectionNames(t *testing.T) {
+	t.Skip("TODO: executive summary — rename sections to Cause/Fix/Details")
+
+	var stderr, stdout bytes.Buffer
+	r := &llm.AnalysisResult{
+		Category:    llm.CategoryDiagnosis,
+		Confidence:  90,
+		Sensitivity: "low",
+		RCA: &llm.RootCauseAnalysis{
+			Title:       "Timeout Error",
+			FailureType: llm.FailureTypeTimeout,
+			Location:    &llm.CodeLocation{FilePath: "test.spec.ts", LineNumber: 1},
+			Symptom:     "Timeout",
+			RootCause:   "Slow network",
+			Remediation: "Add retry",
+		},
+	}
+
+	printResult(&stderr, &stdout, r)
+
+	out := stdout.String()
+	assert.Contains(t, out, "Cause")
+	assert.Contains(t, out, "Fix")
+	assert.NotContains(t, out, "Root Cause", "should use shorter 'Cause' heading")
+}

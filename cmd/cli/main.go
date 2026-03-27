@@ -118,6 +118,7 @@ func run(cmd *cobra.Command, args []string) error {
 		SnapshotHTML: trace.SnapshotHTML,
 	})
 	if err != nil {
+		emitter.MarkFailed()
 		emitter.Close()
 		return err
 	}

@@ -276,10 +276,10 @@ func TestCompactMode_ToolShowsPhaseAndCounter(t *testing.T) {
 	assert.Contains(t, out, "3/30")
 }
 
-func TestCompactMode_StepDoesNotPrint(t *testing.T) {
+func TestCompactMode_StepIsQuietOnNonTTY(t *testing.T) {
 	e, buf := newCompactTestEmitter()
 	e.Emit(ProgressEvent{Type: "step", Step: 1, MaxStep: 30, Message: "Calling model..."})
-	assert.Empty(t, buf.String(), "compact mode should not print step events")
+	assert.Empty(t, buf.String(), "compact spinner is a no-op on non-TTY")
 }
 
 func TestCompactMode_ResultSuppressed(t *testing.T) {
@@ -288,13 +288,27 @@ func TestCompactMode_ResultSuppressed(t *testing.T) {
 	assert.Empty(t, buf.String(), "compact mode should suppress result events")
 }
 
-func TestCompactMode_ClosePrintsSummary(t *testing.T) {
+func TestCompactMode_CloseSuccess(t *testing.T) {
 	e, buf := newCompactTestEmitter()
 	e.Emit(ProgressEvent{Type: "tool", Step: 9, MaxStep: 30, Tool: "done"})
 	buf.Reset()
 	e.Close()
 	out := buf.String()
+	assert.Contains(t, out, "✓")
 	assert.Contains(t, out, "Used 9/30 iterations")
+	assert.NotContains(t, out, "✗")
+}
+
+func TestCompactMode_CloseError(t *testing.T) {
+	e, buf := newCompactTestEmitter()
+	e.Emit(ProgressEvent{Type: "tool", Step: 2, MaxStep: 30, Tool: "get_job_logs"})
+	e.MarkFailed()
+	buf.Reset()
+	e.Close()
+	out := buf.String()
+	assert.Contains(t, out, "✗")
+	assert.Contains(t, out, "Stopped at 2/30 iterations")
+	assert.NotContains(t, out, "✓")
 }
 
 func TestCompactMode_InfoStillPrints(t *testing.T) {
@@ -307,4 +321,23 @@ func TestCompactMode_ErrorStillPrints(t *testing.T) {
 	e, buf := newCompactTestEmitter()
 	e.Emit(ProgressEvent{Type: "error", Message: "something failed"})
 	assert.Contains(t, buf.String(), "Error: something failed")
+}
+
+func TestCompactProgressLine(t *testing.T) {
+	e, _ := newCompactTestEmitter()
+
+	// Initial state (before any tool)
+	e.lastStep = 0
+	e.lastMax = 30
+	e.lastTool = ""
+	line := e.compactProgressLine()
+	assert.Contains(t, line, "Analyzing")
+	assert.Contains(t, line, "0/30")
+
+	// Mid-progress
+	e.lastStep = 3
+	e.lastTool = "get_job_logs"
+	line = e.compactProgressLine()
+	assert.Contains(t, line, "Reading logs")
+	assert.Contains(t, line, "3/30")
 }
