@@ -264,6 +264,7 @@ func (m *mockToolHandler) DiagnosisConfidence() int         { return m.confidenc
 func (m *mockToolHandler) DiagnosisSensitivity() string     { return m.sensitivity }
 func (m *mockToolHandler) DiagnosisRCA() *RootCauseAnalysis { return nil }
 func (m *mockToolHandler) GetEmitter() ProgressEmitter      { return m.emitter }
+func (m *mockToolHandler) HasTestArtifacts() bool           { return false }
 
 // testToolDeclarations returns minimal tool declarations for tests.
 func testToolDeclarations() []FunctionDeclaration {
@@ -872,4 +873,98 @@ func TestRunAgentLoop_GenerateFinalNoCandidates(t *testing.T) {
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "empty response")
+}
+
+// mockToolHandlerWithArtifacts has test artifacts (for circuit breaker tests).
+type mockToolHandlerWithArtifacts struct {
+	mockToolHandler
+	executedCalls []string
+}
+
+func (m *mockToolHandlerWithArtifacts) HasTestArtifacts() bool { return true }
+func (m *mockToolHandlerWithArtifacts) Execute(_ context.Context, call FunctionCall) (string, bool, error) {
+	m.executedCalls = append(m.executedCalls, call.Name)
+	if call.Name == "done" {
+		m.category = CategoryDiagnosis
+		m.confidence = 80
+		m.sensitivity = "low"
+		return "", true, nil
+	}
+	return "file content for " + call.Name, false, nil
+}
+
+func TestCircuitBreaker_FiresAfter3ConsecutiveReads(t *testing.T) {
+	c := &Client{}
+	handler := &mockToolHandlerWithArtifacts{mockToolHandler: mockToolHandler{emitter: noopEmitter{}}}
+	s := &loopState{calledTools: make(map[string]bool)}
+	si := &stepInfo{step: 1}
+
+	// 4 consecutive get_repo_file calls — 4th should be intercepted
+	calls := []FunctionCall{
+		{Name: "get_repo_file", Args: map[string]any{"path": "file1.ts"}},
+		{Name: "get_repo_file", Args: map[string]any{"path": "file2.ts"}},
+		{Name: "get_repo_file", Args: map[string]any{"path": "file3.ts"}},
+		{Name: "get_repo_file", Args: map[string]any{"path": "file4.ts"}},
+	}
+
+	parts, _, err := c.executeCalls(context.Background(), s, handler, calls, si)
+	require.NoError(t, err)
+
+	// First 3 should execute, 4th should be circuit breaker error
+	assert.Len(t, parts, 4)
+	lastResult := parts[3].FunctionResponse.Response["result"].(string)
+	assert.Contains(t, lastResult, "CIRCUIT_BREAKER")
+
+	// Only 3 actual executions (4th was intercepted)
+	assert.Len(t, handler.executedCalls, 3)
+}
+
+func TestCircuitBreaker_ResetsOnArtifactFetch(t *testing.T) {
+	c := &Client{}
+	handler := &mockToolHandlerWithArtifacts{mockToolHandler: mockToolHandler{emitter: noopEmitter{}}}
+	s := &loopState{calledTools: make(map[string]bool)}
+	si := &stepInfo{step: 1}
+
+	// 2 file reads, then artifact, then 2 more file reads — no circuit breaker
+	calls := []FunctionCall{
+		{Name: "get_repo_file", Args: map[string]any{"path": "file1.ts"}},
+		{Name: "get_repo_file", Args: map[string]any{"path": "file2.ts"}},
+		{Name: "get_artifact", Args: map[string]any{"artifact_name": "report"}},
+		{Name: "get_repo_file", Args: map[string]any{"path": "file3.ts"}},
+		{Name: "get_repo_file", Args: map[string]any{"path": "file4.ts"}},
+	}
+
+	parts, _, err := c.executeCalls(context.Background(), s, handler, calls, si)
+	require.NoError(t, err)
+
+	// All 5 should execute (no circuit breaker)
+	assert.Len(t, handler.executedCalls, 5)
+	for _, p := range parts {
+		result := p.FunctionResponse.Response["result"].(string)
+		assert.NotContains(t, result, "CIRCUIT_BREAKER")
+	}
+}
+
+func TestCircuitBreaker_NoFireWithoutArtifacts(t *testing.T) {
+	c := &Client{}
+	handler := &mockToolHandler{emitter: noopEmitter{}} // HasTestArtifacts() = false
+	s := &loopState{calledTools: make(map[string]bool)}
+	si := &stepInfo{step: 1}
+
+	calls := []FunctionCall{
+		{Name: "get_repo_file", Args: map[string]any{"path": "file1.ts"}},
+		{Name: "get_repo_file", Args: map[string]any{"path": "file2.ts"}},
+		{Name: "get_repo_file", Args: map[string]any{"path": "file3.ts"}},
+		{Name: "get_repo_file", Args: map[string]any{"path": "file4.ts"}},
+		{Name: "get_repo_file", Args: map[string]any{"path": "file5.ts"}},
+	}
+
+	parts, _, err := c.executeCalls(context.Background(), s, handler, calls, si)
+	require.NoError(t, err)
+
+	// No circuit breaker without test artifacts
+	for _, p := range parts {
+		result := p.FunctionResponse.Response["result"].(string)
+		assert.NotContains(t, result, "CIRCUIT_BREAKER")
+	}
 }

@@ -5,6 +5,7 @@ import (
 
 	gh "github.com/kamilpajak/heisenberg/pkg/github"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestFormatRunDate_ValidRFC3339(t *testing.T) {
@@ -90,4 +91,47 @@ func TestFindRunToAnalyze_LatestIsCancelled(t *testing.T) {
 
 	assert.False(t, skip, "should analyze failure even if latest is cancelled")
 	assert.Equal(t, int64(2), runID)
+}
+
+func TestBuildInitialContext_WithTestArtifacts(t *testing.T) {
+	run := &gh.WorkflowRun{ID: 123, Name: "CI", Conclusion: "failure"}
+	jobs := []gh.Job{{Name: "test", ID: 1, Status: "completed", Conclusion: "failure"}}
+	artifacts := []gh.Artifact{
+		{Name: "playwright-report", SizeBytes: 45000, Expired: false},
+		{Name: "build-cache", SizeBytes: 500000, Expired: false},
+	}
+
+	ctx := buildInitialContext(run, jobs, artifacts)
+
+	// Should classify test artifacts
+	assert.Contains(t, ctx, "TEST REPORT")
+	// Should have prioritized instruction
+	assert.Contains(t, ctx, "IMPORTANT")
+	assert.Contains(t, ctx, "get_artifact")
+	// Build cache should not be labeled as test report
+	require.NotContains(t, ctx, "build-cache (500000 bytes) [TEST REPORT]")
+}
+
+func TestBuildInitialContext_WithoutTestArtifacts(t *testing.T) {
+	run := &gh.WorkflowRun{ID: 123, Name: "CI", Conclusion: "failure"}
+	jobs := []gh.Job{{Name: "build", ID: 1, Status: "completed", Conclusion: "failure"}}
+	artifacts := []gh.Artifact{
+		{Name: "build-output", SizeBytes: 100000, Expired: false},
+	}
+
+	ctx := buildInitialContext(run, jobs, artifacts)
+
+	assert.NotContains(t, ctx, "IMPORTANT")
+	assert.NotContains(t, ctx, "TEST REPORT")
+}
+
+func TestBuildInitialContext_NoArtifacts(t *testing.T) {
+	run := &gh.WorkflowRun{ID: 123, Name: "CI", Conclusion: "failure"}
+	jobs := []gh.Job{}
+	artifacts := []gh.Artifact{}
+
+	ctx := buildInitialContext(run, jobs, artifacts)
+
+	assert.Contains(t, ctx, "No artifacts found")
+	assert.NotContains(t, ctx, "IMPORTANT")
 }

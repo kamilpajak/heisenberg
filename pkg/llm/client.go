@@ -178,13 +178,14 @@ type stepInfo struct {
 
 // loopState tracks mutable state across agent loop iterations.
 type loopState struct {
-	history        []Content
-	pendingDone    bool
-	hasCalledTools bool
-	doneNudged     bool
-	savedText      string
-	calledTools    map[string]bool // tracks tool+args hashes to detect duplicates
-	softWarned     bool            // true after soft limit warning injected
+	history              []Content
+	pendingDone          bool
+	hasCalledTools       bool
+	doneNudged           bool
+	savedText            string
+	calledTools          map[string]bool // tracks tool+args hashes to detect duplicates
+	softWarned           bool            // true after soft limit warning injected
+	consecutiveFileReads int             // counts consecutive get_repo_file/get_workflow_file calls
 }
 
 // RunAgentLoop runs the agentic conversation loop. The model can call tools
@@ -448,6 +449,27 @@ func (c *Client) executeCalls(ctx context.Context, s *loopState, handler ToolExe
 			continue
 		}
 		s.calledTools[key] = true
+
+		// Circuit breaker: track consecutive file reads
+		isFileRead := call.Name == "get_repo_file" || call.Name == "get_workflow_file"
+		if isFileRead {
+			s.consecutiveFileReads++
+		} else {
+			s.consecutiveFileReads = 0
+		}
+
+		// Intercept after 3 consecutive file reads when test artifacts exist
+		if isFileRead && s.consecutiveFileReads > 3 && handler.HasTestArtifacts() {
+			result := `{"error": "CIRCUIT_BREAKER: You have fetched multiple source files consecutively. Review the information you have gathered so far, state your current hypothesis, and determine if you need test artifacts or logs before reading more files."}`
+			emitToolResult(handler, si, ci, len(calls), 0, result)
+			responseParts = append(responseParts, Part{
+				FunctionResponse: &FunctionResponse{
+					Name:     call.Name,
+					Response: map[string]any{"result": result},
+				},
+			})
+			continue
+		}
 
 		t1 := time.Now()
 		result, isDone, err := handler.Execute(ctx, call)

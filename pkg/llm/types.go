@@ -104,6 +104,7 @@ type ToolExecutor interface {
 	DiagnosisSensitivity() string
 	DiagnosisRCA() *RootCauseAnalysis
 	GetEmitter() ProgressEmitter
+	HasTestArtifacts() bool
 }
 
 // AnalysisResult holds the final output from the agent loop.

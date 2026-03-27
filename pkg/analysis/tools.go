@@ -20,12 +20,13 @@ type ToolHandler struct {
 	SnapshotHTML func([]byte) ([]byte, error)
 	Emitter      llm.ProgressEmitter
 
-	artifacts    []gh.Artifact          // cached after first list
-	calledTraces bool                   // whether get_test_traces has been called
-	category     string                 // set by done tool
-	confidence   int                    // 0-100, set by done tool
-	sensitivity  string                 // "high", "medium", "low", set by done tool
-	rca          *llm.RootCauseAnalysis // structured RCA, set by done tool
+	artifacts           []gh.Artifact          // cached after first list
+	calledTraces        bool                   // whether get_test_traces has been called
+	hasReadErrorContext bool                   // set after fetching logs/artifacts/traces
+	category            string                 // set by done tool
+	confidence          int                    // 0-100, set by done tool
+	sensitivity         string                 // "high", "medium", "low", set by done tool
+	rca                 *llm.RootCauseAnalysis // structured RCA, set by done tool
 }
 
 // Execute dispatches a function call, returning the result string and whether
@@ -90,6 +91,8 @@ func (h *ToolHandler) listJobs(ctx context.Context) (string, bool, error) {
 }
 
 func (h *ToolHandler) getJobLogs(ctx context.Context, args map[string]any) (string, bool, error) {
+	h.hasReadErrorContext = true
+
 	jobID, err := intArg(args, "job_id")
 	if err != nil {
 		return errorResult(err), false, nil
@@ -131,6 +134,8 @@ func (h *ToolHandler) findArtifactByName(name string) *gh.Artifact {
 }
 
 func (h *ToolHandler) getArtifact(ctx context.Context, args map[string]any) (string, bool, error) {
+	h.hasReadErrorContext = true
+
 	name, _ := args["artifact_name"].(string)
 	if name == "" {
 		return errorResult(fmt.Errorf("artifact_name is required")), false, nil
@@ -194,6 +199,11 @@ func (h *ToolHandler) fetchDefaultArtifact(ctx context.Context, artifactID int64
 }
 
 func (h *ToolHandler) getRepoFile(ctx context.Context, args map[string]any) (string, bool, error) {
+	// Prerequisite gating: must fetch error context before reading source files
+	if !h.hasReadErrorContext && h.HasTestArtifacts() {
+		return errorResult(fmt.Errorf("ACCESS_DENIED: You must fetch test failure data (job logs, artifacts, or traces) before reading source code. Use get_job_logs, get_artifact, or get_test_traces first")), false, nil
+	}
+
 	path, _ := args["path"].(string)
 	if path == "" {
 		return errorResult(fmt.Errorf("path is required")), false, nil
@@ -201,10 +211,40 @@ func (h *ToolHandler) getRepoFile(ctx context.Context, args map[string]any) (str
 
 	content, err := h.GitHub.GetRepoFile(ctx, h.Owner, h.Repo, path)
 	if err != nil {
+		// Smart 404: if file not found, return directory listing of parent
+		if strings.Contains(err.Error(), "404") {
+			return h.smartNotFound(ctx, path), false, nil
+		}
 		return errorResult(err), false, nil
 	}
 
 	return content, false, nil
+}
+
+// smartNotFound returns an error with a directory listing of the parent folder.
+func (h *ToolHandler) smartNotFound(ctx context.Context, path string) string {
+	dir := "."
+	if idx := strings.LastIndex(path, "/"); idx >= 0 {
+		dir = path[:idx]
+	}
+
+	entries, err := h.GitHub.ListDirectory(ctx, h.Owner, h.Repo, dir)
+	if err != nil || len(entries) == 0 {
+		return errorResult(fmt.Errorf("file not found: %s", path))
+	}
+
+	// Limit to 30 entries to avoid huge responses
+	if len(entries) > 30 {
+		entries = entries[:30]
+	}
+
+	result := map[string]any{
+		"error":     fmt.Sprintf("file not found: %s", path),
+		"directory": dir + "/",
+		"contents":  entries,
+	}
+	b, _ := json.Marshal(result)
+	return string(b)
 }
 
 func (h *ToolHandler) findTraceArtifact(name string) *gh.Artifact {
@@ -223,6 +263,7 @@ func (h *ToolHandler) findTraceArtifact(name string) *gh.Artifact {
 }
 
 func (h *ToolHandler) getTestTraces(ctx context.Context, args map[string]any) (string, bool, error) {
+	h.hasReadErrorContext = true
 	h.calledTraces = true
 	name, _ := args["artifact_name"].(string)
 
@@ -286,6 +327,21 @@ func (h *ToolHandler) DiagnosisRCA() *llm.RootCauseAnalysis { return h.rca }
 
 // GetEmitter returns the progress emitter for this handler.
 func (h *ToolHandler) GetEmitter() llm.ProgressEmitter { return h.Emitter }
+
+// HasTestArtifacts returns true if non-expired test-related artifacts exist.
+func (h *ToolHandler) HasTestArtifacts() bool {
+	for _, a := range h.artifacts {
+		if a.Expired {
+			continue
+		}
+		name := strings.ToLower(a.Name)
+		if strings.Contains(name, "report") || strings.Contains(name, "test-results") ||
+			strings.Contains(name, "blob") {
+			return true
+		}
+	}
+	return false
+}
 
 func errorResult(err error) string {
 	b, _ := json.Marshal(map[string]string{"error": err.Error()})
