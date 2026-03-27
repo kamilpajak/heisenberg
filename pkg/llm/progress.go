@@ -150,58 +150,63 @@ func (e *TextEmitter) compactProgress() {
 	}
 }
 
-// Emit writes a formatted progress event.
-func (e *TextEmitter) Emit(ev ProgressEvent) {
+// emitToolVerbose prints a detailed tool call line with aligned counter.
+func (e *TextEmitter) emitToolVerbose(ev ProgressEvent) {
 	dim := color.New(color.FgHiBlack)
 	green := color.New(color.FgGreen)
 	cyan := color.New(color.FgCyan)
-
 	if e.noColor {
 		dim.DisableColor()
 		green.DisableColor()
 		cyan.DisableColor()
 	}
 
+	e.stopSpinner()
+
+	check := green.Sprint("✓")
+	toolName := cyan.Sprint(ev.Tool)
+
+	argsStr := ""
+	argsVisible := ""
+	if ev.Args != "" && ev.Tool != "done" {
+		if h := humanizeArgs(ev.Args); h != "" {
+			argsVisible = " " + h
+			argsStr = " " + dim.Sprint(h)
+		}
+	}
+
+	// Right-align counter: "  ✓ " (4 visible chars) + tool + args
+	visibleLeft := 4 + len(ev.Tool) + len(argsVisible)
+	counterText := fmt.Sprintf("%d/%d", ev.Step, ev.MaxStep)
+	padding := max(alignWidth-visibleLeft-len(counterText), 1)
+
+	fmt.Fprintf(e.w, "  %s %s%s%s%s\n", check, toolName, argsStr, strings.Repeat(" ", padding), dim.Sprint(counterText))
+}
+
+// Emit writes a formatted progress event.
+func (e *TextEmitter) Emit(ev ProgressEvent) {
 	switch ev.Type {
 	case "step":
 		if e.verbose {
 			e.startSpinner(ev.Message)
 		}
-		// In compact mode, the spinner is replaced by compactProgress on tool events.
 
 	case "tool":
 		e.lastStep = ev.Step
 		e.lastMax = ev.MaxStep
 		e.lastTool = ev.Tool
-
 		if e.verbose {
-			e.stopSpinner()
-
-			check := green.Sprint("✓")
-			toolName := cyan.Sprint(ev.Tool)
-
-			argsStr := ""
-			argsVisible := ""
-			if ev.Args != "" && ev.Tool != "done" {
-				if h := humanizeArgs(ev.Args); h != "" {
-					argsVisible = " " + h
-					argsStr = " " + dim.Sprint(h)
-				}
-			}
-
-			// Right-align counter: "  ✓ " (4 visible chars) + tool + args
-			visibleLeft := 4 + len(ev.Tool) + len(argsVisible)
-			counterText := fmt.Sprintf("%d/%d", ev.Step, ev.MaxStep)
-			padding := alignWidth - visibleLeft - len(counterText)
-			padding = max(padding, 1)
-
-			fmt.Fprintf(e.w, "  %s %s%s%s%s\n", check, toolName, argsStr, strings.Repeat(" ", padding), dim.Sprint(counterText))
+			e.emitToolVerbose(ev)
 		} else {
 			e.compactProgress()
 		}
 
 	case "result":
 		if e.verbose {
+			dim := color.New(color.FgHiBlack)
+			if e.noColor {
+				dim.DisableColor()
+			}
 			_, _ = dim.Fprintf(e.w, "    ↳ %s\n", formatStats(ev))
 		}
 

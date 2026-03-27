@@ -15,12 +15,12 @@ func init() {
 
 func newTestEmitter() (*TextEmitter, *bytes.Buffer) {
 	var buf bytes.Buffer
-	return &TextEmitter{w: &buf, tty: false, verbose: true}, &buf
+	return &TextEmitter{w: &buf, tty: false, noColor: true, verbose: true}, &buf
 }
 
 func newCompactTestEmitter() (*TextEmitter, *bytes.Buffer) {
 	var buf bytes.Buffer
-	return &TextEmitter{w: &buf, tty: false, verbose: false}, &buf
+	return &TextEmitter{w: &buf, tty: false, noColor: true, verbose: false}, &buf
 }
 
 func TestEmit_Step(t *testing.T) {
