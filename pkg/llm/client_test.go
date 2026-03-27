@@ -968,3 +968,60 @@ func TestCircuitBreaker_NoFireWithoutArtifacts(t *testing.T) {
 		assert.NotContains(t, result, "CIRCUIT_BREAKER")
 	}
 }
+
+func TestFilterFileTools(t *testing.T) {
+	tools := []Tool{{FunctionDeclarations: []FunctionDeclaration{
+		{Name: "get_job_logs"},
+		{Name: "get_artifact"},
+		{Name: "get_repo_file"},
+		{Name: "get_workflow_file"},
+		{Name: "get_test_traces"},
+		{Name: "done"},
+	}}}
+
+	filtered := filterFileTools(tools)
+
+	assert.Len(t, filtered[0].FunctionDeclarations, 4)
+	for _, d := range filtered[0].FunctionDeclarations {
+		assert.NotEqual(t, "get_repo_file", d.Name)
+		assert.NotEqual(t, "get_workflow_file", d.Name)
+	}
+}
+
+func TestCircuitBreaker_SetsHiddenUntil(t *testing.T) {
+	c := &Client{}
+	handler := &mockToolHandlerWithArtifacts{mockToolHandler: mockToolHandler{emitter: noopEmitter{}}}
+	s := &loopState{calledTools: make(map[string]bool)}
+	si := &stepInfo{step: 5, iteration: 4}
+
+	calls := []FunctionCall{
+		{Name: "get_repo_file", Args: map[string]any{"path": "f1.ts"}},
+		{Name: "get_repo_file", Args: map[string]any{"path": "f2.ts"}},
+		{Name: "get_repo_file", Args: map[string]any{"path": "f3.ts"}},
+		{Name: "get_repo_file", Args: map[string]any{"path": "f4.ts"}},
+	}
+
+	_, _, err := c.executeCalls(context.Background(), s, handler, calls, si)
+	require.NoError(t, err)
+
+	// After circuit breaker fires, fileToolsHiddenUntil should be set
+	assert.Greater(t, s.fileToolsHiddenUntil, si.iteration)
+}
+
+func TestActiveTools_HidesFileToolsDuringCooldown(t *testing.T) {
+	tools := []Tool{{FunctionDeclarations: []FunctionDeclaration{
+		{Name: "get_job_logs"},
+		{Name: "get_repo_file"},
+		{Name: "done"},
+	}}}
+
+	s := &loopState{fileToolsHiddenUntil: 5}
+
+	// Iteration 3: tools should be hidden (3 < 5)
+	active := activeTools(tools, s, 3)
+	assert.Len(t, active[0].FunctionDeclarations, 2) // get_job_logs + done
+
+	// Iteration 5: tools should be restored (5 >= 5)
+	active = activeTools(tools, s, 5)
+	assert.Len(t, active[0].FunctionDeclarations, 3) // all tools back
+}

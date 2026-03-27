@@ -22,6 +22,8 @@ func emit(h ToolExecutor, ev ProgressEvent) {
 
 const maxIterations = 30
 const softLimitIteration = 15
+const circuitBreakerThreshold = 3 // consecutive file reads before breaker fires
+const circuitBreakerCooldown = 3  // iterations to hide file tools (current + 2 more)
 
 var ansiRe = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
 
@@ -186,6 +188,7 @@ type loopState struct {
 	calledTools          map[string]bool // tracks tool+args hashes to detect duplicates
 	softWarned           bool            // true after soft limit warning injected
 	consecutiveFileReads int             // counts consecutive get_repo_file/get_workflow_file calls
+	fileToolsHiddenUntil int             // iteration index after which file tools are restored
 }
 
 // RunAgentLoop runs the agentic conversation loop. The model can call tools
@@ -220,7 +223,8 @@ func (c *Client) RunAgentLoop(ctx context.Context, handler ToolExecutor, toolDec
 		}
 		emit(handler, ProgressEvent{Type: "step", Step: si.step, MaxStep: maxIterations, Message: stepMsg})
 
-		candidate, err := c.callModel(ctx, s, tools, system, handler, si)
+		currentTools := activeTools(tools, s, i)
+		candidate, err := c.callModel(ctx, s, currentTools, system, handler, si)
 		if err != nil {
 			return nil, err
 		}
@@ -459,8 +463,9 @@ func (c *Client) executeCalls(ctx context.Context, s *loopState, handler ToolExe
 		}
 
 		// Intercept after 3 consecutive file reads when test artifacts exist
-		if isFileRead && s.consecutiveFileReads > 3 && handler.HasTestArtifacts() {
-			result := `{"error": "CIRCUIT_BREAKER: You have fetched multiple source files consecutively. Review the information you have gathered so far, state your current hypothesis, and determine if you need test artifacts or logs before reading more files."}`
+		if isFileRead && s.consecutiveFileReads > circuitBreakerThreshold && handler.HasTestArtifacts() {
+			s.fileToolsHiddenUntil = si.iteration + circuitBreakerCooldown
+			result := `{"error": "CIRCUIT_BREAKER: You have fetched multiple source files consecutively. File reading is temporarily disabled. Use get_artifact, get_job_logs, or get_test_traces to analyze test failures, then call done with your diagnosis."}`
 			emitToolResult(handler, si, ci, len(calls), 0, result)
 			responseParts = append(responseParts, Part{
 				FunctionResponse: &FunctionResponse{
@@ -492,6 +497,30 @@ func (c *Client) executeCalls(ctx context.Context, s *loopState, handler ToolExe
 		})
 	}
 	return responseParts, done, nil
+}
+
+// activeTools returns the tool list for the current iteration,
+// hiding file tools during circuit breaker cooldown.
+func activeTools(tools []Tool, s *loopState, iteration int) []Tool {
+	if s.fileToolsHiddenUntil > iteration {
+		return filterFileTools(tools)
+	}
+	return tools
+}
+
+// filterFileTools returns a copy of tools without get_repo_file and get_workflow_file.
+func filterFileTools(tools []Tool) []Tool {
+	result := make([]Tool, 0, len(tools))
+	for _, t := range tools {
+		var filtered []FunctionDeclaration
+		for _, decl := range t.FunctionDeclarations {
+			if decl.Name != "get_repo_file" && decl.Name != "get_workflow_file" {
+				filtered = append(filtered, decl)
+			}
+		}
+		result = append(result, Tool{FunctionDeclarations: filtered})
+	}
+	return result
 }
 
 // emitToolResult sends a verbose progress event for a completed tool call.
