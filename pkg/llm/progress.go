@@ -220,6 +220,7 @@ func (e *TextEmitter) Emit(ev ProgressEvent) {
 		if e.verbose {
 			e.startSpinner(ev.Message)
 		} else {
+			e.lastStep = ev.Step
 			e.lastMax = ev.MaxStep
 			e.startCompactSpinner(ev.Step, "calling model...")
 		}

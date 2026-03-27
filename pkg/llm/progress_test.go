@@ -304,6 +304,22 @@ func TestCompactMode_CloseError(t *testing.T) {
 	assert.Equal(t, "  ✗  Stopped at 2/30 iterations\n", buf.String())
 }
 
+func TestCompactMode_CloseError_AfterStepWithoutTool(t *testing.T) {
+	e, buf := newCompactTestEmitter()
+	// Step 1 + tool 1 complete
+	e.Emit(ProgressEvent{Type: "step", Step: 1, MaxStep: 30, Message: "Calling model..."})
+	e.Emit(ProgressEvent{Type: "tool", Step: 1, MaxStep: 30, Tool: "get_artifact"})
+	// Step 2 + tool 2 complete
+	e.Emit(ProgressEvent{Type: "step", Step: 2, MaxStep: 30, Message: "Calling model..."})
+	e.Emit(ProgressEvent{Type: "tool", Step: 2, MaxStep: 30, Tool: "get_job_logs"})
+	// Step 3 starts but model returns error — no tool event
+	e.Emit(ProgressEvent{Type: "step", Step: 3, MaxStep: 30, Message: "Calling model..."})
+	e.MarkFailed()
+	buf.Reset()
+	e.Close()
+	assert.Equal(t, "  ✗  Stopped at 3/30 iterations\n", buf.String())
+}
+
 func TestCompactMode_InfoStillPrints(t *testing.T) {
 	e, buf := newCompactTestEmitter()
 	e.Emit(ProgressEvent{Type: "info", Message: "Analyzing run 123..."})
