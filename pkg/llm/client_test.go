@@ -151,7 +151,7 @@ func TestGenerate_Success(t *testing.T) {
 func TestGenerate_APIError(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusTooManyRequests)
-		w.Write([]byte(`{"error": "rate limited"}`))
+		w.Write([]byte(gemini429Body))
 	}))
 	defer ts.Close()
 
@@ -243,13 +243,16 @@ func TestIsRetryable(t *testing.T) {
 	}
 }
 
+// gemini429Body is a real Gemini API 429 response captured from production.
+const gemini429Body = `{"error":{"code":429,"message":"You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit.\n\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_requests_per_model_per_day, limit: 250, model: gemini-3.1-pro\n\nPlease retry in 4h59m27.724879759s.","status":"RESOURCE_EXHAUSTED"}}`
+
 func TestGenerate_RetriesOn429(t *testing.T) {
 	attempts := 0
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		attempts++
 		if attempts <= 2 {
 			w.WriteHeader(429)
-			w.Write([]byte(`{"error":{"code":429,"message":"Resource exhausted","status":"RESOURCE_EXHAUSTED"}}`))
+			w.Write([]byte(gemini429Body))
 			return
 		}
 		resp := GenerateResponse{Candidates: []Candidate{{Content: Content{Parts: []Part{{Text: "ok"}}}}}}
@@ -289,7 +292,7 @@ func TestGenerate_MaxRetriesExhausted(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		attempts++
 		w.WriteHeader(429)
-		w.Write([]byte(`{"error":{"code":429,"message":"Resource exhausted"}}`))
+		w.Write([]byte(gemini429Body))
 	}))
 	defer ts.Close()
 
@@ -302,12 +305,14 @@ func TestGenerate_MaxRetriesExhausted(t *testing.T) {
 	assert.Equal(t, 429, apiErr.StatusCode)
 	assert.Equal(t, 3, apiErr.Retries, "should report retry count")
 	assert.Equal(t, 4, attempts, "1 initial + 3 retries")
+	assert.Equal(t, "250 req/day for gemini-3.1-pro", apiErr.QuotaDetail)
+	assert.Equal(t, "5h", apiErr.RetryAfter)
 }
 
 func TestGenerate_RetriesRespectContext(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(429)
-		w.Write([]byte(`{"error":{"code":429,"message":"Resource exhausted"}}`))
+		w.Write([]byte(gemini429Body))
 	}))
 	defer ts.Close()
 
