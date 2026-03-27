@@ -139,8 +139,10 @@ func toolPhase(tool string) string {
 // compactProgressLine builds the compact progress string (without \r prefix).
 func (e *TextEmitter) compactProgressLine() string {
 	const barWidth = 20
-	filled := e.lastStep * barWidth / e.lastMax
-	filled = min(filled, barWidth)
+	filled := 0
+	if e.lastMax > 0 {
+		filled = min(e.lastStep*barWidth/e.lastMax, barWidth)
+	}
 
 	bar := strings.Repeat("█", filled) + strings.Repeat("░", barWidth-filled)
 	phase := toolPhase(e.lastTool)

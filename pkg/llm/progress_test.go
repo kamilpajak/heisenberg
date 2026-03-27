@@ -2,6 +2,7 @@ package llm
 
 import (
 	"bytes"
+	"strings"
 	"testing"
 
 	"github.com/fatih/color"
@@ -333,6 +334,7 @@ func TestCompactProgressLine(t *testing.T) {
 	line := e.compactProgressLine()
 	assert.Contains(t, line, "Analyzing")
 	assert.Contains(t, line, "0/30")
+	assert.Contains(t, line, "░", "should contain empty bar chars")
 
 	// Mid-progress
 	e.lastStep = 3
@@ -340,4 +342,33 @@ func TestCompactProgressLine(t *testing.T) {
 	line = e.compactProgressLine()
 	assert.Contains(t, line, "Reading logs")
 	assert.Contains(t, line, "3/30")
+	assert.Contains(t, line, "█", "should contain filled bar chars")
+}
+
+func TestCompactProgressLine_ZeroMaxStep(t *testing.T) {
+	e, _ := newCompactTestEmitter()
+	e.lastStep = 0
+	e.lastMax = 0
+
+	// Should not panic on division by zero
+	assert.NotPanics(t, func() {
+		line := e.compactProgressLine()
+		assert.Contains(t, line, "0/0")
+	})
+}
+
+func TestVerboseClose_WithProgress_IsNoOp(t *testing.T) {
+	e, buf := newTestEmitter()
+	e.Emit(ProgressEvent{Type: "tool", Step: 5, MaxStep: 30, Tool: "get_job_logs"})
+	buf.Reset()
+	e.Close()
+	assert.Empty(t, buf.String(), "verbose Close should not print iteration summary")
+}
+
+func TestCompactMode_ToolNonTTY_HasNewline(t *testing.T) {
+	e, buf := newCompactTestEmitter()
+	e.Emit(ProgressEvent{Type: "tool", Step: 1, MaxStep: 10, Tool: "get_job_logs"})
+	out := buf.String()
+	assert.True(t, strings.HasSuffix(out, "\n"), "non-TTY compact tool output should end with newline")
+	assert.NotContains(t, out, "\033", "non-TTY output should not contain ANSI escapes")
 }
