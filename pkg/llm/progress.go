@@ -138,21 +138,13 @@ func toolPhase(tool string) string {
 
 // compactProgressLine builds the compact progress string (without \r prefix).
 func (e *TextEmitter) compactProgressLine() string {
-	const barWidth = 20
-	filled := 0
-	if e.lastMax > 0 {
-		filled = min(e.lastStep*barWidth/e.lastMax, barWidth)
-	}
-
-	bar := strings.Repeat("█", filled) + strings.Repeat("░", barWidth-filled)
 	phase := toolPhase(e.lastTool)
 	counter := fmt.Sprintf("%d/%d", e.lastStep, e.lastMax)
-
-	return fmt.Sprintf("  %s  %s  %s", phase, bar, counter)
+	return fmt.Sprintf("  %s  %s", phase, counter)
 }
 
 // compactProgress renders a single-line progress indicator using \r on TTY.
-// Format: "  Analyzing  ██████░░░░  7/30"
+// Format: "  Analyzing  7/30"
 func (e *TextEmitter) compactProgress() {
 	if e.tty {
 		fmt.Fprintf(e.w, "\r\033[K%s", e.compactProgressLine())

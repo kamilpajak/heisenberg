@@ -331,18 +331,17 @@ func TestCompactProgressLine(t *testing.T) {
 	e.lastStep = 0
 	e.lastMax = 30
 	e.lastTool = ""
-	line := e.compactProgressLine()
-	assert.Contains(t, line, "Analyzing")
-	assert.Contains(t, line, "0/30")
-	assert.Contains(t, line, "░", "should contain empty bar chars")
+	assert.Equal(t, "  Analyzing  0/30", e.compactProgressLine())
 
-	// Mid-progress
+	// Mid-progress with known tool
 	e.lastStep = 3
 	e.lastTool = "get_job_logs"
-	line = e.compactProgressLine()
-	assert.Contains(t, line, "Reading logs")
-	assert.Contains(t, line, "3/30")
-	assert.Contains(t, line, "█", "should contain filled bar chars")
+	assert.Equal(t, "  Reading logs  3/30", e.compactProgressLine())
+
+	// Done tool
+	e.lastStep = 9
+	e.lastTool = "done"
+	assert.Equal(t, "  Finalizing  9/30", e.compactProgressLine())
 }
 
 func TestCompactProgressLine_ZeroMaxStep(t *testing.T) {
