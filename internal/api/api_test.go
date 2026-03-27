@@ -1144,4 +1144,40 @@ func TestAPIKeys(t *testing.T) {
 
 		assert.Equal(t, http.StatusForbidden, rec.Code)
 	})
+
+	t.Run("member cannot create API key", func(t *testing.T) {
+		memberUserID := "kp_" + uuid.New().String()[:8]
+		memberEmail := "member-ak-" + uuid.New().String()[:8] + "@example.com"
+		memberUser, err := db.CreateUser(ctx, memberUserID, memberEmail)
+		require.NoError(t, err)
+		t.Cleanup(func() { _ = db.DeleteUser(ctx, memberUser.ID) })
+		_ = db.AddOrgMember(ctx, org.ID, memberUser.ID, database.RoleMember)
+
+		body := bytes.NewBufferString(`{"name": "Member Key"}`)
+		req := httptest.NewRequest(http.MethodPost, "/api/organizations/"+org.ID.String()+"/api-keys", body)
+		req.Header.Set("Content-Type", "application/json")
+		req = withAuthContext(req, memberUserID, memberEmail)
+		rec := httptest.NewRecorder()
+
+		server.mux.ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusForbidden, rec.Code)
+	})
+
+	t.Run("member cannot delete API key", func(t *testing.T) {
+		memberUserID := "kp_" + uuid.New().String()[:8]
+		memberEmail := "member-del-" + uuid.New().String()[:8] + "@example.com"
+		memberUser, err := db.CreateUser(ctx, memberUserID, memberEmail)
+		require.NoError(t, err)
+		t.Cleanup(func() { _ = db.DeleteUser(ctx, memberUser.ID) })
+		_ = db.AddOrgMember(ctx, org.ID, memberUser.ID, database.RoleMember)
+
+		req := httptest.NewRequest(http.MethodDelete, "/api/organizations/"+org.ID.String()+"/api-keys/"+uuid.New().String(), nil)
+		req = withAuthContext(req, memberUserID, memberEmail)
+		rec := httptest.NewRecorder()
+
+		server.mux.ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusForbidden, rec.Code)
+	})
 }
