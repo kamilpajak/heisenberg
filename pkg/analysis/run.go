@@ -90,7 +90,16 @@ func Run(ctx context.Context, p Params) (*llm.AnalysisResult, error) {
 		return nil, err
 	}
 
-	return llmClient.RunAgentLoop(ctx, handler, ToolDeclarations(), initialContext, p.Verbose)
+	result, err := llmClient.RunAgentLoop(ctx, handler, ToolDeclarations(), initialContext, p.Verbose)
+	if err != nil {
+		return nil, err
+	}
+
+	result.RunID = resolvedRunID
+	result.Branch = wfRun.HeadBranch
+	result.CommitSHA = wfRun.HeadSHA
+
+	return result, nil
 }
 
 func emitInfo(e llm.ProgressEmitter, msg string) {

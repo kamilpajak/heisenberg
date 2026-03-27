@@ -109,10 +109,13 @@ type ToolExecutor interface {
 // AnalysisResult holds the final output from the agent loop.
 type AnalysisResult struct {
 	Text        string             `json:"text"`
-	Category    string             `json:"category"`      // "diagnosis", "no_failures", "not_supported", or "" (model skipped done)
-	Confidence  int                `json:"confidence"`    // 0-100, meaningful only for "diagnosis"
-	Sensitivity string             `json:"sensitivity"`   // "high", "medium", "low", meaningful only for "diagnosis"
-	RCA         *RootCauseAnalysis `json:"rca,omitempty"` // Structured diagnosis, only for "diagnosis"
+	Category    string             `json:"category"`             // "diagnosis", "no_failures", "not_supported", or "" (model skipped done)
+	Confidence  int                `json:"confidence"`           // 0-100, meaningful only for "diagnosis"
+	Sensitivity string             `json:"sensitivity"`          // "high", "medium", "low", meaningful only for "diagnosis"
+	RCA         *RootCauseAnalysis `json:"rca,omitempty"`        // Structured diagnosis, only for "diagnosis"
+	RunID       int64              `json:"run_id,omitempty"`     // GitHub workflow run ID
+	Branch      string             `json:"branch,omitempty"`     // Git branch name
+	CommitSHA   string             `json:"commit_sha,omitempty"` // Git commit SHA
 }
 
 // GenerationConfig controls response generation.

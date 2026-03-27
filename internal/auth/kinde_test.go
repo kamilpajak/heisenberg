@@ -2,11 +2,13 @@ package auth
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -245,6 +247,106 @@ func TestMiddleware_InvalidToken_PanicsWithNilJWKS(t *testing.T) {
 	// Verifier with nil JWKS will panic - this is expected behavior
 	// In production, NewVerifier always initializes JWKS
 	t.Skip("Requires mock JWKS server - covered by integration tests")
+}
+
+func TestIsAPIKey(t *testing.T) {
+	assert.True(t, IsAPIKey("hsb_abc123"))
+	assert.False(t, IsAPIKey("eyJhbGciOiJSUzI1NiJ9.jwt"))
+	assert.False(t, IsAPIKey(""))
+	assert.False(t, IsAPIKey("hsb"))
+}
+
+func TestHashAPIKey(t *testing.T) {
+	hash := HashAPIKey("hsb_testkey123")
+	assert.Len(t, hash, 64) // SHA-256 hex = 64 chars
+	// Same input → same output
+	assert.Equal(t, hash, HashAPIKey("hsb_testkey123"))
+	// Different input → different output
+	assert.NotEqual(t, hash, HashAPIKey("hsb_otherkey"))
+}
+
+type mockAPIKeyStore struct {
+	getByHash  func(ctx context.Context, keyHash string) (APIKeyInfo, error)
+	updateUsed func(ctx context.Context, id uuid.UUID) error
+}
+
+func (m *mockAPIKeyStore) GetAPIKeyByHash(ctx context.Context, keyHash string) (APIKeyInfo, error) {
+	return m.getByHash(ctx, keyHash)
+}
+func (m *mockAPIKeyStore) UpdateAPIKeyLastUsed(ctx context.Context, id uuid.UUID) error {
+	if m.updateUsed != nil {
+		return m.updateUsed(ctx, id)
+	}
+	return nil
+}
+
+func TestMiddleware_APIKey_Valid(t *testing.T) {
+	testKeyID := uuid.New()
+	store := &mockAPIKeyStore{
+		getByHash: func(ctx context.Context, keyHash string) (APIKeyInfo, error) {
+			return APIKeyInfo{
+				ID:      testKeyID,
+				UserID:  uuid.New(),
+				OrgID:   uuid.New(),
+				ClerkID: "kp_testuser",
+			}, nil
+		},
+	}
+
+	var capturedUserID string
+	handler := Middleware(nil, store)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		capturedUserID = UserID(r.Context())
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Authorization", "Bearer hsb_testkey123")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, "kp_testuser", capturedUserID)
+}
+
+func TestMiddleware_APIKey_Invalid(t *testing.T) {
+	store := &mockAPIKeyStore{
+		getByHash: func(ctx context.Context, keyHash string) (APIKeyInfo, error) {
+			return APIKeyInfo{}, fmt.Errorf("not found")
+		},
+	}
+
+	handler := Middleware(nil, store)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Authorization", "Bearer hsb_invalidkey")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusUnauthorized, rec.Code)
+}
+
+func TestMiddleware_APIKey_NoStore(t *testing.T) {
+	// API key token without store configured → falls through to JWT (panics with nil verifier)
+	handler := Middleware(nil)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("Authorization", "Bearer hsb_nostore")
+	rec := httptest.NewRecorder()
+
+	defer func() {
+		if r := recover(); r != nil {
+			// Expected: no store, falls to JWT path, nil verifier panics
+			assert.NotNil(t, r)
+		}
+	}()
+
+	handler.ServeHTTP(rec, req)
 }
 
 func TestOptionalMiddleware_InvalidToken_PanicsWithNilJWKS(t *testing.T) {

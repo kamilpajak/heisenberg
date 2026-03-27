@@ -41,7 +41,8 @@ func NewServer(cfg Config) *Server {
 }
 
 func (s *Server) registerRoutes() {
-	authMiddleware := auth.Middleware(s.authVerifier)
+	apiKeyStore := &dbAPIKeyStore{db: s.db}
+	authMiddleware := auth.Middleware(s.authVerifier, apiKeyStore)
 
 	// Public endpoints
 	s.mux.HandleFunc("GET /health", s.handleHealth)
@@ -58,6 +59,10 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("GET /api/organizations/{orgID}/repositories/{repoID}", s.withAuth(authMiddleware, s.handleGetRepository))
 	s.mux.HandleFunc("GET /api/organizations/{orgID}/repositories/{repoID}/analyses", s.withAuth(authMiddleware, s.handleListAnalyses))
 	s.mux.HandleFunc("GET /api/organizations/{orgID}/analyses/{analysisID}", s.withAuth(authMiddleware, s.handleGetAnalysis))
+	s.mux.HandleFunc("POST /api/organizations/{orgID}/analyses", s.withAuth(authMiddleware, s.handleCreateAnalysis))
+	s.mux.HandleFunc("POST /api/organizations/{orgID}/api-keys", s.withAuth(authMiddleware, s.handleCreateAPIKey))
+	s.mux.HandleFunc("GET /api/organizations/{orgID}/api-keys", s.withAuth(authMiddleware, s.handleListAPIKeys))
+	s.mux.HandleFunc("DELETE /api/organizations/{orgID}/api-keys/{keyID}", s.withAuth(authMiddleware, s.handleDeleteAPIKey))
 	s.mux.HandleFunc("GET /api/organizations/{orgID}/usage", s.withAuth(authMiddleware, s.handleGetUsage))
 
 	// Billing endpoints

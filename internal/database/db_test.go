@@ -549,3 +549,57 @@ func TestAddOrgMemberUpsert(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, database.RoleAdmin, member.Role)
 }
+
+func TestAPIKeyCRUD(t *testing.T) {
+	db := testDB(t)
+	ctx := context.Background()
+
+	// Setup
+	clerkID := "clerk_" + uuid.New().String()[:8]
+	user, err := db.CreateUser(ctx, clerkID, "apikey@example.com")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.DeleteUser(ctx, user.ID) })
+
+	org, err := db.CreateOrganizationWithOwner(ctx, "API Key Test Org", user.ID)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.DeleteOrganization(ctx, org.ID) })
+
+	keyHash := "sha256_" + uuid.New().String()
+
+	// Create
+	key, err := db.CreateAPIKey(ctx, keyHash, user.ID, org.ID, "Test Key")
+	require.NoError(t, err)
+	assert.NotEqual(t, uuid.Nil, key.ID)
+	assert.Equal(t, keyHash, key.KeyHash)
+	assert.Equal(t, "Test Key", key.Name)
+	assert.Nil(t, key.LastUsedAt)
+
+	// Get by hash
+	found, err := db.GetAPIKeyByHash(ctx, keyHash)
+	require.NoError(t, err)
+	assert.Equal(t, key.ID, found.ID)
+	assert.Equal(t, user.ID, found.UserID)
+	assert.Equal(t, org.ID, found.OrgID)
+
+	// Get by hash — not found
+	notFound, err := db.GetAPIKeyByHash(ctx, "nonexistent_hash")
+	require.NoError(t, err)
+	assert.Nil(t, notFound)
+
+	// Update last used
+	err = db.UpdateAPIKeyLastUsed(ctx, key.ID)
+	require.NoError(t, err)
+	updated, _ := db.GetAPIKeyByHash(ctx, keyHash)
+	assert.NotNil(t, updated.LastUsedAt)
+
+	// List
+	keys, err := db.ListOrgAPIKeys(ctx, org.ID)
+	require.NoError(t, err)
+	assert.Len(t, keys, 1)
+
+	// Delete
+	err = db.DeleteAPIKey(ctx, key.ID, org.ID)
+	require.NoError(t, err)
+	deleted, _ := db.GetAPIKeyByHash(ctx, keyHash)
+	assert.Nil(t, deleted)
+}
