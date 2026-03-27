@@ -46,6 +46,15 @@ func (e *APIError) Hint() string {
 	}
 }
 
+// ConfigError represents a configuration problem (e.g. missing API key).
+type ConfigError struct {
+	Message string
+}
+
+func (e *ConfigError) Error() string {
+	return e.Message
+}
+
 // parseAPIError creates an APIError from a Gemini API HTTP response.
 func parseAPIError(statusCode int, status string, body []byte) *APIError {
 	apiErr := &APIError{

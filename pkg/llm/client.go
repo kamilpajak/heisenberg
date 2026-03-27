@@ -107,7 +107,7 @@ func describeEmptyResponse(c *Candidate) string {
 func NewClient() (*Client, error) {
 	apiKey := os.Getenv("GOOGLE_API_KEY")
 	if apiKey == "" {
-		return nil, fmt.Errorf("GOOGLE_API_KEY environment variable required")
+		return nil, &ConfigError{Message: "GOOGLE_API_KEY environment variable required"}
 	}
 
 	return &Client{

@@ -28,6 +28,14 @@ var (
 	date    = "unknown"
 )
 
+// Exit codes for scriptability and CI integration.
+const (
+	exitGeneral     = 1 // runtime error
+	exitUsage       = 2 // bad arguments (reserved, handled by cobra)
+	exitAPIError    = 3 // external AI/API error
+	exitConfigError = 4 // missing or invalid configuration
+)
+
 var (
 	verbose    bool
 	jsonOutput bool
@@ -73,17 +81,30 @@ func init() {
 
 func main() {
 	if err := rootCmd.Execute(); err != nil {
-		printError(os.Stderr, err)
-		os.Exit(1)
+		code := printError(os.Stderr, err)
+		os.Exit(code)
 	}
 }
 
-func printError(w io.Writer, err error) {
+// exitCodeLabel maps exit codes to human-readable descriptions.
+var exitCodeLabel = map[int]string{
+	exitGeneral:     "runtime error",
+	exitAPIError:    "external API error",
+	exitConfigError: "configuration error",
+}
+
+func printError(w io.Writer, err error) int {
 	red := color.New(color.FgRed, color.Bold)
 	dim := color.New(color.FgHiBlack)
 
+	code := exitGeneral
+
 	var apiErr *llm.APIError
-	if errors.As(err, &apiErr) {
+	var cfgErr *llm.ConfigError
+
+	switch {
+	case errors.As(err, &apiErr):
+		code = exitAPIError
 		fmt.Fprintln(w)
 		_, _ = red.Fprintf(w, "  Error: %s\n", apiErr)
 		fmt.Fprintln(w)
@@ -92,11 +113,22 @@ func printError(w io.Writer, err error) {
 			fmt.Fprintln(w)
 			_, _ = dim.Fprintf(w, "  Raw response:\n  %s\n", apiErr.RawBody)
 		}
-		return
+
+	case errors.As(err, &cfgErr):
+		code = exitConfigError
+		fmt.Fprintln(w)
+		_, _ = red.Fprintf(w, "  Error: %s\n", cfgErr)
+		fmt.Fprintln(w)
+		_, _ = dim.Fprintln(w, "  Hint: Check your environment variables and configuration")
+
+	default:
+		fmt.Fprintln(w)
+		_, _ = red.Fprintf(w, "  Error: %s\n", err)
 	}
 
 	fmt.Fprintln(w)
-	_, _ = red.Fprintf(w, "  Error: %s\n", err)
+	_, _ = dim.Fprintf(w, "  Exit code: %d  (%s)\n", code, exitCodeLabel[code])
+	return code
 }
 
 func run(cmd *cobra.Command, args []string) error {

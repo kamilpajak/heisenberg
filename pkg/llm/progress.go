@@ -52,6 +52,12 @@ type TextEmitter struct {
 	failed   bool
 }
 
+// InitForTest configures the emitter for testing (non-TTY, no color).
+func (e *TextEmitter) InitForTest(w io.Writer) {
+	e.w = w
+	e.noColor = true
+}
+
 // MarkFailed signals that the analysis ended with an error.
 // This changes the Close() summary from ✓ to ✗.
 func (e *TextEmitter) MarkFailed() {

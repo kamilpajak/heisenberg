@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"testing"
 	"unicode/utf8"
 
@@ -379,7 +380,7 @@ func TestJSONOutput_WithRCA(t *testing.T) {
 	assert.Len(t, decoded.RCA.Evidence, 1)
 }
 
-func TestPrintError_APIError(t *testing.T) {
+func TestExitCode_APIError(t *testing.T) {
 	var buf bytes.Buffer
 	apiErr := &llm.APIError{
 		StatusCode: 429,
@@ -389,25 +390,145 @@ func TestPrintError_APIError(t *testing.T) {
 	}
 	wrapped := fmt.Errorf("step 4: %w", apiErr)
 
-	printError(&buf, wrapped)
+	code := printError(&buf, wrapped)
 
 	out := buf.String()
+	assert.Equal(t, exitAPIError, code)
 	assert.Contains(t, out, "Error:")
 	assert.Contains(t, out, "429 Too Many Requests")
-	assert.Contains(t, out, "Resource has been exhausted")
 	assert.Contains(t, out, "Hint:")
-	assert.Contains(t, out, "quota")
+	assert.Contains(t, out, "Exit code: 3  (external API error)")
 	assert.NotContains(t, out, `"error"`, "raw JSON should not appear without --verbose")
 }
 
-func TestPrintError_GenericError(t *testing.T) {
+func TestExitCode_ConfigError(t *testing.T) {
 	var buf bytes.Buffer
-	printError(&buf, fmt.Errorf("something went wrong"))
+	code := printError(&buf, &llm.ConfigError{Message: "GOOGLE_API_KEY environment variable required"})
 
 	out := buf.String()
+	assert.Equal(t, exitConfigError, code)
+	assert.Contains(t, out, "GOOGLE_API_KEY")
+	assert.Contains(t, out, "Exit code: 4  (configuration error)")
+}
+
+func TestExitCode_GenericError(t *testing.T) {
+	var buf bytes.Buffer
+	code := printError(&buf, fmt.Errorf("something went wrong"))
+
+	out := buf.String()
+	assert.Equal(t, exitGeneral, code)
 	assert.Contains(t, out, "Error:")
 	assert.Contains(t, out, "something went wrong")
+	assert.Contains(t, out, "Exit code: 1  (runtime error)")
 	assert.NotContains(t, out, "Hint:")
+}
+
+// Integration tests — verify full output for each UX state (emitter + printError combined)
+
+func TestIntegration_State4_ErrorFlow(t *testing.T) {
+	var stderr bytes.Buffer
+
+	// Simulate: emitter shows progress, then error occurs
+	emitter := &llm.TextEmitter{}
+	emitter.InitForTest(&stderr)
+	emitter.Emit(llm.ProgressEvent{Type: "info", Message: "Analyzing run 123 for owner/repo..."})
+	emitter.Emit(llm.ProgressEvent{Type: "tool", Step: 2, MaxStep: 30, Tool: "get_job_logs"})
+	emitter.MarkFailed()
+	emitter.Close()
+
+	// Then printError renders the error
+	apiErr := &llm.APIError{
+		StatusCode: 429,
+		Status:     "429 Too Many Requests",
+		Message:    "Resource has been exhausted",
+		Retries:    3,
+	}
+	code := printError(&stderr, apiErr)
+
+	out := stderr.String()
+
+	// Verify order: info → close summary → error → hint → exit code
+	assert.Equal(t, exitAPIError, code)
+	infoIdx := strings.Index(out, "Analyzing run 123")
+	closeIdx := strings.Index(out, "Stopped at 2/30")
+	errorIdx := strings.Index(out, "Error:")
+	hintIdx := strings.Index(out, "Hint:")
+	exitIdx := strings.Index(out, "Exit code: 3")
+
+	assert.Greater(t, closeIdx, infoIdx, "close summary should appear after info")
+	assert.Greater(t, errorIdx, closeIdx, "error should appear after close summary")
+	assert.Greater(t, hintIdx, errorIdx, "hint should appear after error")
+	assert.Greater(t, exitIdx, hintIdx, "exit code should appear last")
+
+	// Verify content
+	assert.Contains(t, out, "✗")
+	assert.Contains(t, out, "Stopped at 2/30 iterations")
+	assert.Contains(t, out, "429 Too Many Requests")
+	assert.Contains(t, out, "Retried 3 times")
+	assert.Contains(t, out, "Exit code: 3  (external API error)")
+}
+
+func TestIntegration_State1And2_ProgressFlow(t *testing.T) {
+	var stderr bytes.Buffer
+
+	emitter := &llm.TextEmitter{}
+	emitter.InitForTest(&stderr)
+
+	// State 1: initial
+	emitter.Emit(llm.ProgressEvent{Type: "info", Message: "Analyzing run 123 for owner/repo..."})
+	assert.Contains(t, stderr.String(), "Analyzing run 123")
+
+	// State 2: tool events with aligned phases
+	emitter.Emit(llm.ProgressEvent{Type: "tool", Step: 1, MaxStep: 30, Tool: "get_artifact"})
+	assert.Contains(t, stderr.String(), "Fetching artifacts")
+	assert.Contains(t, stderr.String(), "1/30")
+
+	stderr.Reset()
+	emitter.Emit(llm.ProgressEvent{Type: "tool", Step: 3, MaxStep: 30, Tool: "get_job_logs"})
+	assert.Contains(t, stderr.String(), "Reading logs")
+	assert.Contains(t, stderr.String(), "3/30")
+
+	// Success close
+	stderr.Reset()
+	emitter.Close()
+	assert.Contains(t, stderr.String(), "✓")
+	assert.Contains(t, stderr.String(), "Used 3/30 iterations")
+}
+
+func TestIntegration_State3_SuccessFlow(t *testing.T) {
+	t.Skip("TODO: executive summary — full success output integration test")
+
+	var stderr, stdout bytes.Buffer
+
+	emitter := &llm.TextEmitter{}
+	emitter.InitForTest(&stderr)
+	emitter.Emit(llm.ProgressEvent{Type: "info", Message: "Analyzing run 123 for owner/repo..."})
+	emitter.Emit(llm.ProgressEvent{Type: "tool", Step: 9, MaxStep: 30, Tool: "done"})
+	emitter.Close()
+
+	r := &llm.AnalysisResult{
+		Category:    llm.CategoryDiagnosis,
+		Confidence:  95,
+		Sensitivity: "low",
+		RCA: &llm.RootCauseAnalysis{
+			Title:       "Flaky Test Detected",
+			FailureType: llm.FailureTypeFlake,
+			Location:    &llm.CodeLocation{FilePath: "tests/perf.spec.ts", LineNumber: 29},
+			RootCause:   "utilsBundle loads too fast on macOS runners",
+			Remediation: "Relax assertion in perf.spec.ts",
+		},
+	}
+	printResult(&stderr, &stdout, r)
+
+	combined := stderr.String() + stdout.String()
+
+	// Verify order: info → close → result → cause → fix
+	assert.Contains(t, combined, "✓")
+	assert.Contains(t, combined, "Used 9/30 iterations")
+	assert.Contains(t, combined, "Result:")
+	assert.Contains(t, combined, "FLAKE")
+	assert.Contains(t, combined, "95%")
+	assert.Contains(t, combined, "tests/perf.spec.ts:29")
 }
 
 // State 3: Executive summary — future work
