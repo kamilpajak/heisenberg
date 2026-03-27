@@ -158,9 +158,7 @@ func (e *TextEmitter) compactProgress() {
 	if e.tty {
 		fmt.Fprintf(e.w, "\r\033[K%s", e.compactProgressLine())
 	} else {
-		phase := toolPhase(e.lastTool)
-		counter := fmt.Sprintf("%d/%d", e.lastStep, e.lastMax)
-		fmt.Fprintf(e.w, "  %s  %s\n", phase, counter)
+		fmt.Fprintf(e.w, "%s\n", e.compactProgressLine())
 	}
 }
 

@@ -272,9 +272,7 @@ func TestToolPhase(t *testing.T) {
 func TestCompactMode_ToolShowsPhaseAndCounter(t *testing.T) {
 	e, buf := newCompactTestEmitter()
 	e.Emit(ProgressEvent{Type: "tool", Step: 3, MaxStep: 30, Tool: "get_repo_file"})
-	out := buf.String()
-	assert.Contains(t, out, "Reading source")
-	assert.Contains(t, out, "3/30")
+	assert.Equal(t, "  Reading source     3/30\n", buf.String())
 }
 
 func TestCompactMode_StepIsQuietOnNonTTY(t *testing.T) {
@@ -294,10 +292,7 @@ func TestCompactMode_CloseSuccess(t *testing.T) {
 	e.Emit(ProgressEvent{Type: "tool", Step: 9, MaxStep: 30, Tool: "done"})
 	buf.Reset()
 	e.Close()
-	out := buf.String()
-	assert.Contains(t, out, "✓")
-	assert.Contains(t, out, "Used 9/30 iterations")
-	assert.NotContains(t, out, "✗")
+	assert.Equal(t, "  ✓  Used 9/30 iterations\n", buf.String())
 }
 
 func TestCompactMode_CloseError(t *testing.T) {
@@ -306,10 +301,7 @@ func TestCompactMode_CloseError(t *testing.T) {
 	e.MarkFailed()
 	buf.Reset()
 	e.Close()
-	out := buf.String()
-	assert.Contains(t, out, "✗")
-	assert.Contains(t, out, "Stopped at 2/30 iterations")
-	assert.NotContains(t, out, "✓")
+	assert.Equal(t, "  ✗  Stopped at 2/30 iterations\n", buf.String())
 }
 
 func TestCompactMode_InfoStillPrints(t *testing.T) {
