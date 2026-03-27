@@ -15,7 +15,7 @@ func TestAPIError_Error(t *testing.T) {
 		wantMsg string
 	}{
 		{
-			name:    "with message",
+			name:    "short message unchanged",
 			err:     &APIError{StatusCode: 429, Status: "429 Too Many Requests", Message: "Resource exhausted"},
 			wantMsg: "gemini API error: 429 Too Many Requests — Resource exhausted",
 		},
@@ -23,6 +23,15 @@ func TestAPIError_Error(t *testing.T) {
 			name:    "without message",
 			err:     &APIError{StatusCode: 500, Status: "500 Internal Server Error"},
 			wantMsg: "gemini API error: 500 Internal Server Error",
+		},
+		{
+			name: "long message truncated to first clause",
+			err: &APIError{
+				StatusCode: 429,
+				Status:     "429 Too Many Requests",
+				Message:    "You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits.",
+			},
+			wantMsg: "gemini API error: 429 Too Many Requests — You exceeded your current quota",
 		},
 	}
 	for _, tt := range tests {
@@ -73,6 +82,36 @@ func TestParseAPIError_InvalidJSON(t *testing.T) {
 	assert.Equal(t, 500, err.StatusCode)
 	assert.Equal(t, "", err.Message)
 	assert.Equal(t, "not json", err.RawBody)
+}
+
+func TestParseAPIError_ExtractsQuotaInfo(t *testing.T) {
+	body := `{"error":{"code":429,"message":"You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits.\n\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_requests_per_model_per_day, limit: 250, model: gemini-3.1-pro\n\nPlease retry in 4h59m27.724879759s.","status":"RESOURCE_EXHAUSTED"}}`
+	err := parseAPIError(429, "429 Too Many Requests", []byte(body))
+
+	assert.Equal(t, "250 req/day for gemini-3.1-pro", err.QuotaDetail)
+	assert.Equal(t, "5h", err.RetryAfter)
+}
+
+func TestParseAPIError_NoQuotaInfo(t *testing.T) {
+	body := `{"error":{"code":429,"message":"Resource has been exhausted (e.g. check quota).","status":"RESOURCE_EXHAUSTED"}}`
+	err := parseAPIError(429, "429 Too Many Requests", []byte(body))
+
+	assert.Equal(t, "", err.QuotaDetail)
+	assert.Equal(t, "", err.RetryAfter)
+}
+
+func TestAPIError_Hint_WithQuotaDetails(t *testing.T) {
+	err := &APIError{
+		StatusCode:  429,
+		Retries:     3,
+		QuotaDetail: "250 req/day for gemini-3.1-pro",
+		RetryAfter:  "5h",
+	}
+	hint := err.Hint()
+	assert.Contains(t, hint, "Retried 3 times")
+	assert.Contains(t, hint, "250 req/day for gemini-3.1-pro")
+	assert.Contains(t, hint, "Resets in ~5h")
+	assert.Contains(t, hint, "ai.google.dev")
 }
 
 func TestAPIError_ErrorsAs(t *testing.T) {
