@@ -221,7 +221,7 @@ func TestNewClient_Success(t *testing.T) {
 	c, err := NewClient()
 	require.NoError(t, err)
 	assert.Equal(t, "test-key", c.apiKey)
-	assert.Equal(t, "gemini-3-pro-preview", c.model, "must use Gemini 3 Pro")
+	assert.Equal(t, "gemini-2.5-pro", c.model)
 	assert.NotNil(t, c.httpClient, "should have an HTTP client")
 	assert.NotNil(t, c.limiter, "should have a rate limiter")
 }
@@ -245,6 +245,45 @@ func TestIsRetryable(t *testing.T) {
 
 // gemini429Body is a real Gemini API 429 response captured from production.
 const gemini429Body = `{"error":{"code":429,"message":"You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit.\n\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_requests_per_model_per_day, limit: 250, model: gemini-3.1-pro\n\nPlease retry in 4h59m27.724879759s.","status":"RESOURCE_EXHAUSTED"}}`
+
+// geminiDoneCall is a "done" function call response reconstructed from a real
+// successful analysis of microsoft/playwright (demo-success-playwright-timeout.cast).
+var geminiDoneCall = GenerateResponse{
+	Candidates: []Candidate{{Content: Content{Parts: []Part{{
+		FunctionCall: &FunctionCall{
+			Name: "done",
+			Args: map[string]any{
+				"category":                        "diagnosis",
+				"confidence":                      float64(90),
+				"missing_information_sensitivity": "low",
+				"title":                           "Timeout waiting for crash event",
+				"failure_type":                    "timeout",
+				"file_path":                       "tests/page/page-event-crash.spec.ts",
+				"line_number":                     float64(28),
+				"symptom":                         "Test timed out after 30000ms waiting for page crash event",
+				"root_cause":                      "A likely regression in Playwright's WebKit support for macOS was introduced by a dependency update. This is causing fundamental browser operations (launching, closing, and crash event handling) to time out, leading to test failures across multiple suites.",
+				"evidence":                        []any{map[string]any{"type": "log", "content": "Error: page.on('crash') did not fire"}, map[string]any{"type": "log", "content": "Test timeout of 30000ms exceeded."}, map[string]any{"type": "log", "content": "browserType.launchPersistentContext failed: Timeout exceeded"}},
+				"remediation":                     "The dependency updates in commit f4923837 should be investigated as the likely source of this regression. The team should identify the specific dependency causing the issue and consider reverting it or upgrading to a patched version.",
+			},
+		},
+	}}}}},
+	UsageMetadata: &UsageMetadata{PromptTokenCount: 45000, TotalTokenCount: 46200},
+}
+
+func TestGeminiDoneFixture_ParsesRCA(t *testing.T) {
+	fc := geminiDoneCall.Candidates[0].Content.Parts[0].FunctionCall
+	require.Equal(t, "done", fc.Name)
+
+	rca := ParseRCAFromArgs(fc.Args)
+	require.NotNil(t, rca)
+	assert.Equal(t, "Timeout waiting for crash event", rca.Title)
+	assert.Equal(t, FailureTypeTimeout, rca.FailureType)
+	assert.Equal(t, "tests/page/page-event-crash.spec.ts", rca.Location.FilePath)
+	assert.Equal(t, 28, rca.Location.LineNumber)
+	assert.Len(t, rca.Evidence, 3)
+	assert.Contains(t, rca.RootCause, "regression")
+	assert.Contains(t, rca.Remediation, "f4923837")
+}
 
 func TestGenerate_RetriesOn429(t *testing.T) {
 	attempts := 0
