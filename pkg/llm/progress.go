@@ -137,10 +137,19 @@ func toolPhase(tool string) string {
 }
 
 // compactProgressLine builds the compact progress string (without \r prefix).
+const phaseWidth = 18 // fixed width for aligned progress output
+
 func (e *TextEmitter) compactProgressLine() string {
-	phase := toolPhase(e.lastTool)
-	counter := fmt.Sprintf("%d/%d", e.lastStep, e.lastMax)
-	return fmt.Sprintf("  %s  %s", phase, counter)
+	return e.compactProgressLineWithHint(e.lastStep, "")
+}
+
+func (e *TextEmitter) compactProgressLineWithHint(step int, hint string) string {
+	phase := fmt.Sprintf("%-*s", phaseWidth, toolPhase(e.lastTool))
+	counter := fmt.Sprintf("%d/%d", step, e.lastMax)
+	if hint != "" {
+		return fmt.Sprintf("  %s %s  (%s)", phase, counter, hint)
+	}
+	return fmt.Sprintf("  %s %s", phase, counter)
 }
 
 // compactProgress renders a single-line progress indicator using \r on TTY.
@@ -157,13 +166,13 @@ func (e *TextEmitter) compactProgress() {
 
 // startCompactSpinner starts a spinner with the compact progress as prefix.
 // This provides visual feedback while waiting for slow API calls.
-func (e *TextEmitter) startCompactSpinner() {
+func (e *TextEmitter) startCompactSpinner(step int, hint string) {
 	e.stopSpinner()
 	if !e.tty {
 		return
 	}
 	e.sp = spinner.New(spinner.CharSets[14], 80*time.Millisecond, spinner.WithWriter(e.w))
-	e.sp.Prefix = e.compactProgressLine() + "  "
+	e.sp.Prefix = e.compactProgressLineWithHint(step, hint) + "  "
 	e.sp.Start()
 }
 
@@ -207,9 +216,8 @@ func (e *TextEmitter) Emit(ev ProgressEvent) {
 		if e.verbose {
 			e.startSpinner(ev.Message)
 		} else {
-			e.lastStep = ev.Step - 1 // show progress at start of step (before tool completes)
 			e.lastMax = ev.MaxStep
-			e.startCompactSpinner()
+			e.startCompactSpinner(ev.Step, "calling model...")
 		}
 
 	case "tool":

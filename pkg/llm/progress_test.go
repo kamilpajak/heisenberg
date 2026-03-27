@@ -327,21 +327,36 @@ func TestCompactMode_ErrorStillPrints(t *testing.T) {
 func TestCompactProgressLine(t *testing.T) {
 	e, _ := newCompactTestEmitter()
 
-	// Initial state (before any tool)
+	// Initial state (before any tool) — phase padded to fixed width
 	e.lastStep = 0
 	e.lastMax = 30
 	e.lastTool = ""
-	assert.Equal(t, "  Analyzing  0/30", e.compactProgressLine())
+	assert.Equal(t, "  Analyzing          0/30", e.compactProgressLine())
 
-	// Mid-progress with known tool
+	// Mid-progress — different phase, same alignment
 	e.lastStep = 3
 	e.lastTool = "get_job_logs"
-	assert.Equal(t, "  Reading logs  3/30", e.compactProgressLine())
+	assert.Equal(t, "  Reading logs       3/30", e.compactProgressLine())
+
+	// Longer phase — still aligned
+	e.lastStep = 2
+	e.lastTool = "get_artifact"
+	assert.Equal(t, "  Fetching artifacts 2/30", e.compactProgressLine())
 
 	// Done tool
 	e.lastStep = 9
 	e.lastTool = "done"
-	assert.Equal(t, "  Finalizing  9/30", e.compactProgressLine())
+	assert.Equal(t, "  Finalizing         9/30", e.compactProgressLine())
+}
+
+func TestCompactProgressLine_WithHint(t *testing.T) {
+	e, _ := newCompactTestEmitter()
+	e.lastStep = 2
+	e.lastMax = 30
+	e.lastTool = "get_job_logs"
+
+	assert.Equal(t, "  Reading logs       3/30  (calling model...)", e.compactProgressLineWithHint(3, "calling model..."))
+	assert.Equal(t, "  Reading logs       3/30", e.compactProgressLineWithHint(3, ""))
 }
 
 func TestCompactProgressLine_ZeroMaxStep(t *testing.T) {
