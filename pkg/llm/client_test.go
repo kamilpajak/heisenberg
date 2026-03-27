@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -154,7 +155,7 @@ func TestGenerate_APIError(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	c := &Client{apiKey: "test-key", baseURL: ts.URL, model: "test-model"}
+	c := newTestClient(ts.URL)
 	_, err := c.generate(context.Background(), []Content{}, nil, nil)
 
 	require.Error(t, err)
@@ -221,6 +222,114 @@ func TestNewClient_Success(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "test-key", c.apiKey)
 	assert.Equal(t, "gemini-3-pro-preview", c.model, "must use Gemini 3 Pro")
+	assert.NotNil(t, c.httpClient, "should have an HTTP client")
+	assert.NotNil(t, c.limiter, "should have a rate limiter")
+}
+
+func TestIsRetryable(t *testing.T) {
+	tests := []struct {
+		code int
+		want bool
+	}{
+		{429, true},
+		{500, true},
+		{503, true},
+		{401, false},
+		{400, false},
+		{200, false},
+	}
+	for _, tt := range tests {
+		assert.Equal(t, tt.want, isRetryable(tt.code), "isRetryable(%d)", tt.code)
+	}
+}
+
+func TestGenerate_RetriesOn429(t *testing.T) {
+	attempts := 0
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		if attempts <= 2 {
+			w.WriteHeader(429)
+			w.Write([]byte(`{"error":{"code":429,"message":"Resource exhausted","status":"RESOURCE_EXHAUSTED"}}`))
+			return
+		}
+		resp := GenerateResponse{Candidates: []Candidate{{Content: Content{Parts: []Part{{Text: "ok"}}}}}}
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer ts.Close()
+
+	c := newTestClient(ts.URL)
+	result, err := c.generate(context.Background(), []Content{}, nil, nil)
+
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Equal(t, 3, attempts, "should have retried twice before succeeding")
+}
+
+func TestGenerate_NoRetryOn401(t *testing.T) {
+	attempts := 0
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		w.WriteHeader(401)
+		w.Write([]byte(`{"error":{"code":401,"message":"Unauthorized"}}`))
+	}))
+	defer ts.Close()
+
+	c := newTestClient(ts.URL)
+	_, err := c.generate(context.Background(), []Content{}, nil, nil)
+
+	require.Error(t, err)
+	var apiErr *APIError
+	require.ErrorAs(t, err, &apiErr)
+	assert.Equal(t, 401, apiErr.StatusCode)
+	assert.Equal(t, 1, attempts, "should not retry on 401")
+}
+
+func TestGenerate_MaxRetriesExhausted(t *testing.T) {
+	attempts := 0
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		w.WriteHeader(429)
+		w.Write([]byte(`{"error":{"code":429,"message":"Resource exhausted"}}`))
+	}))
+	defer ts.Close()
+
+	c := newTestClient(ts.URL)
+	_, err := c.generate(context.Background(), []Content{}, nil, nil)
+
+	require.Error(t, err)
+	var apiErr *APIError
+	require.ErrorAs(t, err, &apiErr)
+	assert.Equal(t, 429, apiErr.StatusCode)
+	assert.Equal(t, 3, apiErr.Retries, "should report retry count")
+	assert.Equal(t, 4, attempts, "1 initial + 3 retries")
+}
+
+func TestGenerate_RetriesRespectContext(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(429)
+		w.Write([]byte(`{"error":{"code":429,"message":"Resource exhausted"}}`))
+	}))
+	defer ts.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // Cancel immediately
+
+	c := newTestClient(ts.URL)
+	_, err := c.generate(ctx, []Content{}, nil, nil)
+
+	require.Error(t, err)
+}
+
+// newTestClient creates a Client pointing at a test server URL with no rate limiting
+// and minimal backoff delays for fast tests.
+func newTestClient(baseURL string) *Client {
+	return &Client{
+		apiKey:         "test-key",
+		baseURL:        baseURL,
+		model:          "test-model",
+		httpClient:     &http.Client{Timeout: 5 * time.Second},
+		retryBaseDelay: time.Millisecond, // fast retries in tests
+	}
 }
 
 // noopEmitter discards all progress events.
@@ -544,7 +653,7 @@ func TestRunAgentLoop_GenerateErrorMidLoop(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	c := &Client{apiKey: "test", baseURL: ts.URL, model: "m"}
+	c := newTestClient(ts.URL)
 	handler := &mockToolHandler{emitter: noopEmitter{}}
 
 	_, err := c.RunAgentLoop(context.Background(), handler, testToolDeclarations(), "context", false)

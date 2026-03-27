@@ -34,19 +34,25 @@ func TestAPIError_Error(t *testing.T) {
 
 func TestAPIError_Hint(t *testing.T) {
 	tests := []struct {
-		code int
-		want string
+		name    string
+		code    int
+		retries int
+		want    string
 	}{
-		{429, "Wait a moment and retry, or check your Gemini API quota at ai.google.dev"},
-		{401, "Check that GOOGLE_API_KEY is set and valid"},
-		{403, "Check that GOOGLE_API_KEY is set and valid"},
-		{500, "Gemini service may be experiencing issues — try again later"},
-		{503, "Gemini service may be experiencing issues — try again later"},
-		{418, "Run with --verbose for the full API response"},
+		{"429 no retries", 429, 0, "Wait a moment and retry, or check your Gemini API quota at ai.google.dev"},
+		{"429 with retries", 429, 3, "Retried 3 times. This may be a per-minute rate limit (resets in ~1 min) or an exhausted daily quota (resets in ~24h). Check usage at ai.google.dev"},
+		{"401", 401, 0, "Check that GOOGLE_API_KEY is set and valid"},
+		{"403", 403, 0, "Check that GOOGLE_API_KEY is set and valid"},
+		{"500 no retries", 500, 0, "Gemini service may be experiencing issues — try again later"},
+		{"500 with retries", 500, 2, "Retried 2 times. Gemini service may be experiencing issues — try again later"},
+		{"503 with retries", 503, 3, "Retried 3 times. Gemini service may be experiencing issues — try again later"},
+		{"418", 418, 0, "Run with --verbose for the full API response"},
 	}
 	for _, tt := range tests {
-		err := &APIError{StatusCode: tt.code}
-		assert.Equal(t, tt.want, err.Hint(), "code %d", tt.code)
+		t.Run(tt.name, func(t *testing.T) {
+			err := &APIError{StatusCode: tt.code, Retries: tt.retries}
+			assert.Equal(t, tt.want, err.Hint())
+		})
 	}
 }
 

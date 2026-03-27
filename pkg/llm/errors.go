@@ -14,6 +14,7 @@ type APIError struct {
 	Provider   string // Error status from provider (e.g. "RESOURCE_EXHAUSTED")
 	Message    string // Human-readable message from provider
 	RawBody    string // Full response body for verbose/debug
+	Retries    int    // Number of retries attempted before giving up
 }
 
 func (e *APIError) Error() string {
@@ -25,13 +26,21 @@ func (e *APIError) Error() string {
 
 // Hint returns an actionable suggestion based on the HTTP status code.
 func (e *APIError) Hint() string {
+	prefix := ""
+	if e.Retries > 0 {
+		prefix = fmt.Sprintf("Retried %d times. ", e.Retries)
+	}
+
 	switch {
 	case e.StatusCode == 429:
+		if e.Retries > 0 {
+			return prefix + "This may be a per-minute rate limit (resets in ~1 min) or an exhausted daily quota (resets in ~24h). Check usage at ai.google.dev"
+		}
 		return "Wait a moment and retry, or check your Gemini API quota at ai.google.dev"
 	case e.StatusCode == 401 || e.StatusCode == 403:
 		return "Check that GOOGLE_API_KEY is set and valid"
 	case e.StatusCode >= 500:
-		return "Gemini service may be experiencing issues — try again later"
+		return prefix + "Gemini service may be experiencing issues — try again later"
 	default:
 		return "Run with --verbose for the full API response"
 	}
