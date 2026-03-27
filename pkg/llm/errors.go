@@ -32,19 +32,21 @@ func (e *APIError) Error() string {
 }
 
 // shortMessage returns the first clause of Message, truncating at ", " or ". ".
+const shortMessageThreshold = 80
+
 func (e *APIError) shortMessage() string {
 	msg := e.Message
-	if msg == "" {
-		return ""
+	if msg == "" || len(msg) <= shortMessageThreshold {
+		return msg
 	}
-	// Truncate at first ", " or ". " — whichever comes first
-	for _, sep := range []string{", ", ". "} {
-		if idx := strings.Index(msg, sep); idx > 0 {
-			msg = msg[:idx]
-			break
-		}
+	// Truncate at first sentence boundary (". "), then fall back to comma
+	if idx := strings.Index(msg, ". "); idx > 0 && idx <= shortMessageThreshold {
+		return msg[:idx]
 	}
-	return msg
+	if idx := strings.Index(msg, ", "); idx > 0 && idx <= shortMessageThreshold {
+		return msg[:idx]
+	}
+	return msg[:shortMessageThreshold]
 }
 
 // Hint returns an actionable suggestion based on the HTTP status code.

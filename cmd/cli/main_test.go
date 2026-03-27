@@ -228,6 +228,11 @@ func TestWrapBullets(t *testing.T) {
 			input: "1. First item\n2. Second item",
 			want:  "  1. First item\n  2. Second item",
 		},
+		{
+			name:  "multi-digit numbered item",
+			input: "10. This is a long multi-digit numbered item that wraps properly",
+			want:  "  10. This is a long multi-digit numbered item\n      that wraps properly",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -421,6 +426,13 @@ func TestExitCode_GenericError(t *testing.T) {
 	assert.Contains(t, out, "something went wrong")
 	assert.Contains(t, out, "Exit code: 1  (runtime error)")
 	assert.NotContains(t, out, "Hint:")
+}
+
+func TestExitCodeLabels_AllDefined(t *testing.T) {
+	for _, code := range []int{exitGeneral, exitAPIError, exitConfigError} {
+		label := exitCodeLabel[code]
+		assert.NotEmpty(t, label, "exitCodeLabel missing for code %d", code)
+	}
 }
 
 // Integration tests — verify full output for each UX state (emitter + printError combined)

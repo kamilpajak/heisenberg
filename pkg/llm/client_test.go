@@ -221,7 +221,7 @@ func TestNewClient_Success(t *testing.T) {
 	c, err := NewClient()
 	require.NoError(t, err)
 	assert.Equal(t, "test-key", c.apiKey)
-	assert.Equal(t, "gemini-2.5-pro", c.model)
+	assert.Equal(t, "gemini-3-pro-preview", c.model)
 	assert.NotNil(t, c.httpClient, "should have an HTTP client")
 	assert.NotNil(t, c.limiter, "should have a rate limiter")
 }

@@ -25,13 +25,22 @@ func TestAPIError_Error(t *testing.T) {
 			wantMsg: "gemini API error: 500 Internal Server Error",
 		},
 		{
-			name: "long message truncated to first clause",
+			name: "long message truncated at first sentence",
 			err: &APIError{
 				StatusCode: 429,
 				Status:     "429 Too Many Requests",
 				Message:    "You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits.",
 			},
-			wantMsg: "gemini API error: 429 Too Many Requests — You exceeded your current quota",
+			wantMsg: "gemini API error: 429 Too Many Requests — You exceeded your current quota, please check your plan and billing details",
+		},
+		{
+			name: "parenthetical not cut mid-clause",
+			err: &APIError{
+				StatusCode: 429,
+				Status:     "429 Too Many Requests",
+				Message:    "Resource has been exhausted (e.g. check quota).",
+			},
+			wantMsg: "gemini API error: 429 Too Many Requests — Resource has been exhausted (e.g. check quota).",
 		},
 	}
 	for _, tt := range tests {
@@ -112,6 +121,24 @@ func TestAPIError_Hint_WithQuotaDetails(t *testing.T) {
 	assert.Contains(t, hint, "250 req/day for gemini-3.1-pro")
 	assert.Contains(t, hint, "Resets in ~5h")
 	assert.Contains(t, hint, "ai.google.dev")
+}
+
+func TestRoundHours(t *testing.T) {
+	tests := []struct {
+		hours, mins int
+		want        string
+	}{
+		{4, 59, "5h"},
+		{0, 45, "1h"},
+		{0, 20, "20m"},
+		{0, 0, "0m"},
+		{1, 0, "1h"},
+		{0, 5, "5m"},
+	}
+	for _, tt := range tests {
+		got := roundHours(tt.hours, tt.mins)
+		assert.Equal(t, tt.want, got, "roundHours(%d, %d)", tt.hours, tt.mins)
+	}
 }
 
 func TestAPIError_ErrorsAs(t *testing.T) {

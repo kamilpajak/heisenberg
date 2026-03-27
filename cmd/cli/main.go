@@ -9,9 +9,9 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"regexp"
 	"strings"
 	"time"
-	"unicode"
 
 	"github.com/fatih/color"
 	"github.com/kamilpajak/heisenberg/internal/dashboard"
@@ -270,6 +270,8 @@ func printStructuredRCA(w io.Writer, rca *llm.RootCauseAnalysis) {
 
 const maxLineWidth = 76 // 78 visible minus 2-char indent
 
+var numberedItemRe = regexp.MustCompile(`^\d+\.\s`)
+
 // wrapText wraps s to maxWidth visible characters, breaking at word boundaries.
 // Each line is prefixed with indent. The first line also gets the indent.
 func wrapText(s string, maxWidth int, indent string) string {
@@ -307,10 +309,10 @@ func wrapBullets(s string, maxWidth int, indent string) string {
 		if p == "" {
 			continue
 		}
-		// Detect numbered items like "1. " or "- "
+		// Detect numbered items like "1. ", "10. " or "- "
 		bulletIndent := indent
-		if len(p) >= 3 && unicode.IsDigit(rune(p[0])) && p[1] == '.' && p[2] == ' ' {
-			bulletIndent = indent + "   " // continuation indent for numbered items
+		if loc := numberedItemRe.FindStringIndex(p); loc != nil {
+			bulletIndent = indent + strings.Repeat(" ", loc[1]) // align past "N. "
 		} else if strings.HasPrefix(p, "- ") {
 			bulletIndent = indent + "  "
 		}
