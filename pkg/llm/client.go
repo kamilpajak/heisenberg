@@ -635,7 +635,7 @@ func (c *Client) generate(ctx context.Context, history []Content, tools []Tool, 
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("gemini API error: %s - %s", resp.Status, string(body))
+		return nil, parseAPIError(resp.StatusCode, resp.Status, body)
 	}
 
 	var result GenerateResponse

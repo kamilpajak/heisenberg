@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -35,11 +36,13 @@ var (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "heisenberg <owner/repo>",
-	Short: "AI-powered test failure analysis",
-	Long:  `Analyzes test artifacts from GitHub repos using AI to identify root causes.`,
-	Args:  cobra.ExactArgs(1),
-	RunE:  run,
+	Use:           "heisenberg <owner/repo>",
+	Short:         "AI-powered test failure analysis",
+	Long:          `Analyzes test artifacts from GitHub repos using AI to identify root causes.`,
+	Args:          cobra.ExactArgs(1),
+	RunE:          run,
+	SilenceUsage:  true,
+	SilenceErrors: true,
 }
 
 var serveCmd = &cobra.Command{
@@ -69,9 +72,31 @@ func init() {
 }
 
 func main() {
-	if rootCmd.Execute() != nil {
+	if err := rootCmd.Execute(); err != nil {
+		printError(os.Stderr, err)
 		os.Exit(1)
 	}
+}
+
+func printError(w io.Writer, err error) {
+	red := color.New(color.FgRed, color.Bold)
+	dim := color.New(color.FgHiBlack)
+
+	var apiErr *llm.APIError
+	if errors.As(err, &apiErr) {
+		fmt.Fprintln(w)
+		_, _ = red.Fprintf(w, "  Error: %s\n", apiErr)
+		fmt.Fprintln(w)
+		_, _ = dim.Fprintf(w, "  Hint: %s\n", apiErr.Hint())
+		if verbose {
+			fmt.Fprintln(w)
+			_, _ = dim.Fprintf(w, "  Raw response:\n  %s\n", apiErr.RawBody)
+		}
+		return
+	}
+
+	fmt.Fprintln(w)
+	_, _ = red.Fprintf(w, "  Error: %s\n", err)
 }
 
 func run(cmd *cobra.Command, args []string) error {
@@ -94,7 +119,7 @@ func run(cmd *cobra.Command, args []string) error {
 	})
 	if err != nil {
 		emitter.Close()
-		return fmt.Errorf("analysis failed: %w", err)
+		return err
 	}
 
 	emitter.Close()

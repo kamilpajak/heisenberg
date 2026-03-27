@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"testing"
 	"unicode/utf8"
 
@@ -376,4 +377,35 @@ func TestJSONOutput_WithRCA(t *testing.T) {
 	assert.Equal(t, "tests/login.spec.ts", decoded.RCA.Location.FilePath)
 	assert.Equal(t, 42, decoded.RCA.Location.LineNumber)
 	assert.Len(t, decoded.RCA.Evidence, 1)
+}
+
+func TestPrintError_APIError(t *testing.T) {
+	var buf bytes.Buffer
+	apiErr := &llm.APIError{
+		StatusCode: 429,
+		Status:     "429 Too Many Requests",
+		Message:    "Resource has been exhausted",
+		RawBody:    `{"error":{"code":429}}`,
+	}
+	wrapped := fmt.Errorf("step 4: %w", apiErr)
+
+	printError(&buf, wrapped)
+
+	out := buf.String()
+	assert.Contains(t, out, "Error:")
+	assert.Contains(t, out, "429 Too Many Requests")
+	assert.Contains(t, out, "Resource has been exhausted")
+	assert.Contains(t, out, "Hint:")
+	assert.Contains(t, out, "quota")
+	assert.NotContains(t, out, `"error"`, "raw JSON should not appear without --verbose")
+}
+
+func TestPrintError_GenericError(t *testing.T) {
+	var buf bytes.Buffer
+	printError(&buf, fmt.Errorf("something went wrong"))
+
+	out := buf.String()
+	assert.Contains(t, out, "Error:")
+	assert.Contains(t, out, "something went wrong")
+	assert.NotContains(t, out, "Hint:")
 }
