@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
@@ -112,13 +113,31 @@ func cleanLine(s string) string {
 	return strings.TrimSpace(ansiPattern.ReplaceAllString(s, ""))
 }
 
-// TestValidateDemoCast checks that demo.cast matches the expected UX states.
+// TestValidateDemoCast checks that all .cast files match the expected UX states.
 // Run after recording: asciinema rec -i 2 -c "./heisenberg ..." demo.cast
 func TestValidateDemoCast(t *testing.T) {
-	const castFile = "../../demo-429-quota-exhausted.cast"
-	if _, err := os.Stat(castFile); os.IsNotExist(err) {
-		t.Skip("demo.cast not found — record one first")
+	// CAST_FILE env var overrides glob — used by scripts/validate-cast.sh
+	if single := os.Getenv("CAST_FILE"); single != "" {
+		t.Run(filepath.Base(single), func(t *testing.T) {
+			validateCast(t, single)
+		})
+		return
 	}
+
+	castFiles, _ := filepath.Glob("../../*.cast")
+	if len(castFiles) == 0 {
+		t.Skip("no .cast files found — record one first")
+	}
+
+	for _, castFile := range castFiles {
+		t.Run(filepath.Base(castFile), func(t *testing.T) {
+			validateCast(t, castFile)
+		})
+	}
+}
+
+func validateCast(t *testing.T, castFile string) {
+	t.Helper()
 
 	events, err := parseCast(castFile)
 	require.NoError(t, err)
