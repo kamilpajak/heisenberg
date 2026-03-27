@@ -115,7 +115,7 @@ func cleanLine(s string) string {
 // TestValidateDemoCast checks that demo.cast matches the expected UX states.
 // Run after recording: asciinema rec -i 2 -c "./heisenberg ..." demo.cast
 func TestValidateDemoCast(t *testing.T) {
-	const castFile = "../../demo.cast"
+	const castFile = "../../demo-429-quota-exhausted.cast"
 	if _, err := os.Stat(castFile); os.IsNotExist(err) {
 		t.Skip("demo.cast not found — record one first")
 	}
