@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -139,6 +140,55 @@ func TestValidateDemoCast(t *testing.T) {
 func validateCast(t *testing.T, castFile string) {
 	t.Helper()
 
+	if strings.Contains(castFile, "verbose") {
+		validateVerboseCast(t, castFile)
+	} else {
+		validateCompactCast(t, castFile)
+	}
+}
+
+// commonCastChecks runs assertions shared by both compact and verbose casts.
+func commonCastChecks(t *testing.T, frames []string) {
+	t.Helper()
+
+	// State 1: info message
+	assert.Contains(t, frames[0], "Analyzing run")
+	assert.Contains(t, frames[0], "for")
+
+	// At least one progress frame with counter
+	hasProgress := false
+	progressPattern := regexp.MustCompile(`\d+/\d+`)
+	for _, f := range frames[1:] {
+		if progressPattern.MatchString(f) {
+			hasProgress = true
+			break
+		}
+	}
+	assert.True(t, hasProgress, "should have at least one progress frame with counter")
+
+	// No raw JSON
+	for _, f := range frames {
+		assert.NotContains(t, f, `"error":`, "raw JSON should not appear: %s", f)
+		assert.NotContains(t, f, `"code":`, "raw JSON should not appear: %s", f)
+	}
+
+	// Error lines should be readable
+	for _, f := range frames {
+		if strings.HasPrefix(f, "Error:") {
+			assert.LessOrEqual(t, len(f), 120, "error line too long: %s", f)
+		}
+	}
+
+	// RCA should be present on success
+	allOutput := strings.Join(frames, "\n")
+	if strings.Contains(allOutput, "✓") {
+		assert.Contains(t, allOutput, "Root Cause")
+	}
+}
+
+func validateCompactCast(t *testing.T, castFile string) {
+	t.Helper()
+
 	events, err := parseCast(castFile)
 	require.NoError(t, err)
 	require.NotEmpty(t, events)
@@ -146,57 +196,31 @@ func validateCast(t *testing.T, castFile string) {
 	frames := extractFrames(events)
 	require.NotEmpty(t, frames, "no frames extracted from cast")
 
-	// Log all frames for debugging
 	for i, f := range frames {
 		t.Logf("frame[%d]: %s", i, f)
 	}
 
-	// State 1: info message
-	assert.Contains(t, frames[0], "Analyzing run")
-	assert.Contains(t, frames[0], "for")
+	commonCastChecks(t, frames)
 
-	// State 2: at least one progress frame with phase + counter
-	hasProgress := false
-	progressPattern := regexp.MustCompile(`\w+\s+\d+/\d+`)
-	for _, f := range frames[1:] {
-		if progressPattern.MatchString(f) {
-			hasProgress = true
-			break
-		}
-	}
-	assert.True(t, hasProgress, "should have at least one progress frame (Phase  X/Y)")
+	allOutput := strings.Join(frames, "\n")
 
-	// Verify no raw JSON or URLs in output
+	// Compact: no URLs
 	for _, f := range frames {
-		assert.NotContains(t, f, `"error":`, "raw JSON should not appear in compact mode: %s", f)
-		assert.NotContains(t, f, `"code":`, "raw JSON should not appear in compact mode: %s", f)
 		assert.NotContains(t, f, "https://", "URLs should not appear in compact mode: %s", f)
 	}
 
-	// Error lines should be readable (≤ 120 visible chars)
-	for _, f := range frames {
-		if strings.HasPrefix(f, "Error:") {
-			assert.LessOrEqual(t, len(f), 120, "error line too long for terminal: %s", f)
-		}
-	}
-
-	// Combine all frames for full-output assertions
-	allOutput := strings.Join(frames, "\n")
-
-	// Should end with either success (✓ Used) or error (✗ Stopped at)
+	// Compact: close summary with ✓ or ✗
 	hasSuccess := strings.Contains(allOutput, "✓") && strings.Contains(allOutput, "Used")
 	hasError := strings.Contains(allOutput, "✗") && strings.Contains(allOutput, "Stopped at")
 
 	if hasError {
-		// State 4: error flow
 		assert.Contains(t, allOutput, "Error:")
 		assert.Contains(t, allOutput, "Hint:")
 		assert.Contains(t, allOutput, "Exit code:")
 	} else if hasSuccess {
-		// State 3: success flow
 		assert.Contains(t, allOutput, "iterations")
 	} else {
-		t.Errorf("output should contain either ✓ (success) or ✗ (error) close summary\nframes:\n%s", allOutput)
+		t.Errorf("compact cast should contain ✓ Used or ✗ Stopped at\nframes:\n%s", allOutput)
 	}
 
 	// Counter consistency: spinner counter should match Close counter
@@ -217,8 +241,8 @@ func validateCast(t *testing.T, castFile string) {
 		}
 	}
 
-	// No duplicate consecutive phase lines (same phase+counter without spinner)
-	counterPattern := regexp.MustCompile(`^\s*\w[\w\s]+\s+\d+/\d+$`) // "Phase  N/30" without spinner
+	// No duplicate consecutive static progress lines
+	counterPattern := regexp.MustCompile(`^\s*\w[\w\s]+\s+\d+/\d+$`)
 	var prevStatic string
 	for _, f := range frames {
 		if counterPattern.MatchString(f) {
@@ -227,5 +251,64 @@ func validateCast(t *testing.T, castFile string) {
 			}
 			prevStatic = f
 		}
+	}
+}
+
+func validateVerboseCast(t *testing.T, castFile string) {
+	t.Helper()
+
+	events, err := parseCast(castFile)
+	require.NoError(t, err)
+	require.NotEmpty(t, events)
+
+	frames := extractFrames(events)
+	require.NotEmpty(t, frames, "no frames extracted from cast")
+
+	for i, f := range frames {
+		t.Logf("frame[%d]: %s", i, f)
+	}
+
+	commonCastChecks(t, frames)
+
+	allOutput := strings.Join(frames, "\n")
+
+	// Verbose: ✓ per tool call with tool name
+	toolPattern := regexp.MustCompile(`✓ \w+`)
+	hasToolLines := false
+	for _, f := range frames {
+		if toolPattern.MatchString(f) {
+			hasToolLines = true
+			break
+		}
+	}
+	assert.True(t, hasToolLines, "verbose cast should have ✓ tool_name lines")
+
+	// Verbose: ↳ stats lines
+	assert.Contains(t, allOutput, "↳", "verbose cast should have ↳ stats lines")
+
+	// Verbose: done tool signals completion
+	assert.Contains(t, allOutput, "✓ done", "verbose cast should end with ✓ done")
+
+	// Verbose: counter alignment — all counters at similar display column
+	counterRe := regexp.MustCompile(`(\d+/\d+)\s*$`)
+	var positions []int
+	for _, f := range frames {
+		if m := counterRe.FindStringIndex(f); m != nil && strings.Contains(f, "✓") {
+			// Convert byte offset to rune (column) position
+			col := utf8.RuneCountInString(f[:m[0]])
+			positions = append(positions, col)
+		}
+	}
+	if len(positions) > 1 {
+		minPos, maxPos := positions[0], positions[0]
+		for _, p := range positions[1:] {
+			if p < minPos {
+				minPos = p
+			}
+			if p > maxPos {
+				maxPos = p
+			}
+		}
+		assert.Equal(t, 0, maxPos-minPos, "verbose counters must be exactly aligned (spread: %d)", maxPos-minPos)
 	}
 }

@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/briandowns/spinner"
 	"github.com/fatih/color"
@@ -206,9 +207,19 @@ func (e *TextEmitter) emitToolVerbose(ev ProgressEvent) {
 	}
 
 	// Right-align counter: "  ✓ " (4 visible chars) + tool + args
-	visibleLeft := 4 + len(ev.Tool) + len(argsVisible)
+	// Use rune count for display columns (multi-byte chars like "…" = 1 column)
 	counterText := fmt.Sprintf("%d/%d", ev.Step, ev.MaxStep)
-	padding := max(alignWidth-visibleLeft-len(counterText), 1)
+	minPadding := 2
+	maxArgs := alignWidth - 4 - utf8.RuneCountInString(ev.Tool) - len(counterText) - minPadding
+	if argsRunes := utf8.RuneCountInString(argsVisible); argsRunes > maxArgs && maxArgs > 3 {
+		// Truncate args to fit alignment
+		runes := []rune(argsVisible)
+		argsVisible = string(runes[:maxArgs-1]) + "…"
+		argsStr = " " + dim.Sprint(string(runes[1:maxArgs-1])+"…")
+	}
+
+	visibleLeft := 4 + utf8.RuneCountInString(ev.Tool) + utf8.RuneCountInString(argsVisible)
+	padding := max(alignWidth-visibleLeft-len(counterText), minPadding)
 
 	fmt.Fprintf(e.w, "  %s %s%s%s%s\n", check, toolName, argsStr, strings.Repeat(" ", padding), dim.Sprint(counterText))
 }
@@ -278,6 +289,8 @@ func humanizeArgs(argsJSON string) string {
 	}
 	sort.Strings(keys)
 
+	const maxValueLen = 20
+
 	var parts []string
 	for _, k := range keys {
 		v := args[k]
@@ -293,7 +306,11 @@ func humanizeArgs(argsJSON string) string {
 				parts = append(parts, fmt.Sprintf("%s: %g", display, val))
 			}
 		default:
-			parts = append(parts, fmt.Sprintf("%s: %v", display, v))
+			s := fmt.Sprintf("%v", v)
+			if len(s) > maxValueLen {
+				s = s[:maxValueLen-1] + "…"
+			}
+			parts = append(parts, fmt.Sprintf("%s: %s", display, s))
 		}
 	}
 

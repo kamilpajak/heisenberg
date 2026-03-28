@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/fatih/color"
 	"github.com/stretchr/testify/assert"
@@ -91,19 +92,37 @@ func TestEmit_Close(t *testing.T) {
 	e.Close() // should not panic
 }
 
+// runeIndex returns the rune (column) position of substr in s, or -1.
+func runeIndex(s, substr string) int {
+	byteIdx := strings.Index(s, substr)
+	if byteIdx < 0 {
+		return -1
+	}
+	return utf8.RuneCountInString(s[:byteIdx])
+}
+
 func TestEmit_ToolCounterAlignment(t *testing.T) {
 	e, buf := newTestEmitter()
+
+	// Short args
 	e.Emit(ProgressEvent{Type: "tool", Step: 1, MaxStep: 10, Tool: "get_job_logs"})
 	line1 := buf.String()
 	buf.Reset()
 
 	e.Emit(ProgressEvent{Type: "tool", Step: 2, MaxStep: 10, Tool: "done"})
 	line2 := buf.String()
+	buf.Reset()
 
-	// Both lines should have their counters at approximately the same position
-	idx1 := bytes.Index([]byte(line1), []byte("1/10"))
-	idx2 := bytes.Index([]byte(line2), []byte("2/10"))
-	assert.InDelta(t, idx1, idx2, 1, "counters should be aligned")
+	// Long args with truncation (produces "…" multi-byte char)
+	e.Emit(ProgressEvent{Type: "tool", Step: 3, MaxStep: 10, Tool: "get_artifact", Args: `{"artifact_name":"blob-report-macos-latest-node20-1"}`})
+	line3 := buf.String()
+
+	// Use rune index (display columns), not byte index
+	col1 := runeIndex(line1, "1/10")
+	col2 := runeIndex(line2, "2/10")
+	col3 := runeIndex(line3, "3/10")
+	assert.InDelta(t, col1, col2, 1, "short lines should be aligned")
+	assert.InDelta(t, col1, col3, 1, "long args line should also be aligned")
 }
 
 func TestFormatDuration(t *testing.T) {
