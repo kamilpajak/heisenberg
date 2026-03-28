@@ -484,6 +484,24 @@ func ToolDeclarations() []llm.FunctionDeclaration {
 						Type:        "number",
 						Description: "Line number in the test file where failure occurred.",
 					},
+					"bug_location": {
+						Type:        "string",
+						Description: "Where the underlying defect lives. 'test': bug in test code/fixtures/mocks. 'production': test correctly detected a regression in application code. 'infrastructure': CI environment issue. 'unknown': not enough evidence.",
+						Enum:        []string{"test", "production", "infrastructure", "unknown"},
+					},
+					"bug_location_confidence": {
+						Type:        "string",
+						Description: "Confidence in bug_location. 'high': strong evidence. 'medium': probable. 'low': mostly guessing.",
+						Enum:        []string{"high", "medium", "low"},
+					},
+					"bug_code_file_path": {
+						Type:        "string",
+						Description: "When bug_location is 'production' or 'infrastructure', the suspected defect file path (e.g., 'src/pricing.ts'). Leave empty if unclear.",
+					},
+					"bug_code_line_number": {
+						Type:        "number",
+						Description: "Line number in the suspected bug file. Leave empty if unclear.",
+					},
 					"symptom": {
 						Type:        "string",
 						Description: "What failed - the observable error message or behavior.",

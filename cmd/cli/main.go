@@ -231,7 +231,20 @@ func printStructuredRCA(w io.Writer, rca *llm.RootCauseAnalysis) {
 		}
 		header = fmt.Sprintf("%s in %s", header, loc)
 	}
+	// Append bug location tag based on confidence
+	if tag := bugLocationTag(rca.BugLocation, rca.BugLocationConfidence); tag != "" {
+		header += "  " + tag
+	}
 	_, _ = headerColor.Fprintln(w, "  "+header)
+
+	// Show suspected bug code location if available
+	if rca.BugCodeLocation != nil && rca.BugCodeLocation.FilePath != "" {
+		loc := rca.BugCodeLocation.FilePath
+		if rca.BugCodeLocation.LineNumber > 0 {
+			loc = fmt.Sprintf("%s:%d", rca.BugCodeLocation.FilePath, rca.BugCodeLocation.LineNumber)
+		}
+		_, _ = dim.Fprintf(w, "  Bug location: %s\n", loc)
+	}
 	fmt.Fprintln(w)
 
 	// Root cause
@@ -324,6 +337,23 @@ func wrapBullets(s string, maxWidth int, indent string) string {
 		out = append(out, wrapped)
 	}
 	return strings.Join(out, "\n")
+}
+
+func bugLocationTag(loc llm.BugLocation, confidence string) string {
+	switch loc {
+	case llm.BugLocationProduction:
+		if confidence == "low" {
+			return "[production bug?]"
+		}
+		return "[production bug]"
+	case llm.BugLocationInfrastructure:
+		if confidence == "low" {
+			return "[infrastructure?]"
+		}
+		return "[infrastructure]"
+	default:
+		return ""
+	}
 }
 
 func evidenceIcon(t string) string {

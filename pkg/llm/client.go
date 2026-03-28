@@ -141,14 +141,39 @@ When calling the "done" tool, classify your conclusion:
 For "diagnosis" category, provide structured Root Cause Analysis:
   - title: Short summary (e.g., "Timeout waiting for Submit Button")
   - failure_type: One of: timeout, assertion, network, infra, flake
-  - file_path: Test file where failure occurred (e.g., "tests/checkout.spec.ts")
+  - file_path: Test file where failure occurred
   - line_number: Line number in the test file (if known)
+  - bug_location: Where the underlying defect lives (REQUIRED)
+  - bug_location_confidence: How confident you are in bug_location (REQUIRED)
+  - bug_code_file_path: Suspected defect file (when bug_location is production/infrastructure)
+  - bug_code_line_number: Line in suspected defect file
   - symptom: What failed (the observable error)
   - root_cause: Why it failed (the underlying issue)
-  - evidence: Array of supporting data points, each with type (screenshot/trace/log/network/code) and content
+  - evidence: Array of supporting data points
   - remediation: How to fix it (actionable guidance)
   - confidence: 0-100 score
   - missing_information_sensitivity: high/medium/low
+
+Bug location classification:
+  Do NOT assume every assertion failure is a test bug. Determine WHERE the defect lives:
+  - "test": Bug in test code, fixtures, test data, or mocks
+  - "production": Test correctly detected a regression in application code
+  - "infrastructure": CI environment, database, network, or config issue
+  - "unknown": Not enough evidence — use this instead of guessing
+
+  Choose "test" when: stack trace is entirely in test files, expected value is outdated, assertion is brittle.
+  Choose "production" when: stack trace shows exception in app code, actual values indicate logic bug, test passes on main but fails in PR.
+  Choose "infrastructure" when: logs show ECONNREFUSED, missing tables, empty DB, failed migrations, many unrelated tests fail similarly.
+  Priority: infrastructure → production → test → unknown (smallest scope that explains the failure).
+
+  Set bug_location_confidence:
+  - "high": Clear stack trace + file evidence
+  - "medium": Probable but some ambiguity
+  - "low": Mostly guessing — prefer "unknown" over low-confidence guesses
+
+  Example A (test bug): expect(price).toBe("$10.00") fails because business logic changed but test wasn't updated → bug_location="test"
+  Example B (production bug): pricing.ts returns "$0.00" for valid inputs, stack trace in src/pricing.ts:42 → bug_location="production", bug_code_file_path="src/pricing.ts"
+  Example C (infrastructure): DB empty in CI, queries return no rows → bug_location="infrastructure"
 
 Confidence scoring (0-100):
   - 80-100: Clear root cause identified with strong evidence

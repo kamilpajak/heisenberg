@@ -264,6 +264,10 @@ var geminiDoneCall = GenerateResponse{
 				"root_cause":                      "A likely regression in Playwright's WebKit support for macOS was introduced by a dependency update. This is causing fundamental browser operations (launching, closing, and crash event handling) to time out, leading to test failures across multiple suites.",
 				"evidence":                        []any{map[string]any{"type": "log", "content": "Error: page.on('crash') did not fire"}, map[string]any{"type": "log", "content": "Test timeout of 30000ms exceeded."}, map[string]any{"type": "log", "content": "browserType.launchPersistentContext failed: Timeout exceeded"}},
 				"remediation":                     "The dependency updates in commit f4923837 should be investigated as the likely source of this regression. The team should identify the specific dependency causing the issue and consider reverting it or upgrading to a patched version.",
+				"bug_location":                    "production",
+				"bug_location_confidence":         "medium",
+				"bug_code_file_path":              "packages/playwright-core/src/server/webkit/wkBrowser.ts",
+				"bug_code_line_number":            float64(87),
 			},
 		},
 	}}}}},
@@ -283,6 +287,11 @@ func TestGeminiDoneFixture_ParsesRCA(t *testing.T) {
 	assert.Len(t, rca.Evidence, 3)
 	assert.Contains(t, rca.RootCause, "regression")
 	assert.Contains(t, rca.Remediation, "f4923837")
+	assert.Equal(t, BugLocationProduction, rca.BugLocation)
+	assert.Equal(t, "medium", rca.BugLocationConfidence)
+	require.NotNil(t, rca.BugCodeLocation)
+	assert.Contains(t, rca.BugCodeLocation.FilePath, "wkBrowser.ts")
+	assert.Equal(t, 87, rca.BugCodeLocation.LineNumber)
 }
 
 func TestGenerate_RetriesOn429(t *testing.T) {

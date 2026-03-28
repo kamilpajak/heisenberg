@@ -181,6 +181,53 @@ func TestAnalysisResult_WithoutRCA_LegacyText(t *testing.T) {
 	assert.Nil(t, decoded.RCA)
 }
 
+func TestBugLocation_Constants(t *testing.T) {
+	assert.Equal(t, BugLocation("test"), BugLocationTest)
+	assert.Equal(t, BugLocation("production"), BugLocationProduction)
+	assert.Equal(t, BugLocation("infrastructure"), BugLocationInfrastructure)
+	assert.Equal(t, BugLocation("unknown"), BugLocationUnknown)
+}
+
+func TestParseRCAFromArgs_WithBugLocation(t *testing.T) {
+	args := map[string]any{
+		"title":                   "Price calculation broken",
+		"failure_type":            "assertion",
+		"file_path":               "tests/checkout.spec.ts",
+		"line_number":             float64(45),
+		"bug_location":            "production",
+		"bug_location_confidence": "high",
+		"bug_code_file_path":      "src/pricing.ts",
+		"bug_code_line_number":    float64(42),
+		"symptom":                 "Expected $10.00, got $0.00",
+		"root_cause":              "Pricing function returns zero",
+		"remediation":             "Fix calculatePrice() in pricing.ts",
+	}
+
+	rca := ParseRCAFromArgs(args)
+
+	assert.Equal(t, BugLocationProduction, rca.BugLocation)
+	assert.Equal(t, "high", rca.BugLocationConfidence)
+	require.NotNil(t, rca.BugCodeLocation)
+	assert.Equal(t, "src/pricing.ts", rca.BugCodeLocation.FilePath)
+	assert.Equal(t, 42, rca.BugCodeLocation.LineNumber)
+}
+
+func TestParseRCAFromArgs_DefaultBugLocation(t *testing.T) {
+	args := map[string]any{
+		"title":        "Error",
+		"failure_type": "timeout",
+		"symptom":      "Timed out",
+		"root_cause":   "Slow",
+		"remediation":  "Fix",
+	}
+
+	rca := ParseRCAFromArgs(args)
+
+	assert.Equal(t, BugLocation(""), rca.BugLocation)
+	assert.Equal(t, "", rca.BugLocationConfidence)
+	assert.Nil(t, rca.BugCodeLocation)
+}
+
 func TestFailureType_Constants(t *testing.T) {
 	// Verify all failure type constants are defined
 	assert.Equal(t, "timeout", FailureTypeTimeout)
