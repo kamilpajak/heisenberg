@@ -120,6 +120,99 @@ func TestJSONOutput(t *testing.T) {
 	assert.Equal(t, r.Sensitivity, decoded.Sensitivity)
 }
 
+func TestPrintStructuredRCA_ProductionBug_HighConfidence(t *testing.T) {
+	var buf bytes.Buffer
+	rca := &llm.RootCauseAnalysis{
+		Title:                 "Price calculation broken",
+		FailureType:           llm.FailureTypeAssertion,
+		Location:              &llm.CodeLocation{FilePath: "tests/checkout.spec.ts", LineNumber: 45},
+		BugLocation:           llm.BugLocationProduction,
+		BugLocationConfidence: "high",
+		BugCodeLocation:       &llm.CodeLocation{FilePath: "src/pricing.ts", LineNumber: 42},
+		RootCause:             "Pricing returns zero",
+		Remediation:           "Fix calculatePrice()",
+	}
+
+	printStructuredRCA(&buf, rca)
+	out := buf.String()
+
+	assert.Contains(t, out, "ASSERTION")
+	assert.Contains(t, out, "tests/checkout.spec.ts:45")
+	assert.Contains(t, out, "[production bug]")
+	assert.Contains(t, out, "src/pricing.ts:42")
+}
+
+func TestPrintStructuredRCA_ProductionBug_LowConfidence(t *testing.T) {
+	var buf bytes.Buffer
+	rca := &llm.RootCauseAnalysis{
+		Title:                 "Possible regression",
+		FailureType:           llm.FailureTypeAssertion,
+		Location:              &llm.CodeLocation{FilePath: "tests/checkout.spec.ts", LineNumber: 45},
+		BugLocation:           llm.BugLocationProduction,
+		BugLocationConfidence: "low",
+		RootCause:             "Maybe a regression",
+		Remediation:           "Investigate",
+	}
+
+	printStructuredRCA(&buf, rca)
+	out := buf.String()
+
+	assert.Contains(t, out, "[production bug?]")
+	assert.NotContains(t, out, "[production bug]  ") // no exact match without ?
+}
+
+func TestPrintStructuredRCA_TestBug_NoTag(t *testing.T) {
+	var buf bytes.Buffer
+	rca := &llm.RootCauseAnalysis{
+		Title:       "Wrong assertion",
+		FailureType: llm.FailureTypeAssertion,
+		BugLocation: llm.BugLocationTest,
+		RootCause:   "Test has wrong expected value",
+		Remediation: "Update test",
+	}
+
+	printStructuredRCA(&buf, rca)
+	out := buf.String()
+
+	assert.NotContains(t, out, "[production")
+	assert.NotContains(t, out, "[infrastructure")
+	assert.NotContains(t, out, "[test") // test is default — no tag
+}
+
+func TestPrintStructuredRCA_InfraBug(t *testing.T) {
+	var buf bytes.Buffer
+	rca := &llm.RootCauseAnalysis{
+		Title:                 "DB not seeded",
+		FailureType:           llm.FailureTypeInfra,
+		BugLocation:           llm.BugLocationInfrastructure,
+		BugLocationConfidence: "high",
+		RootCause:             "CI database empty",
+		Remediation:           "Fix seed step",
+	}
+
+	printStructuredRCA(&buf, rca)
+	out := buf.String()
+
+	assert.Contains(t, out, "[infrastructure]")
+}
+
+func TestPrintStructuredRCA_UnknownBugLocation_NoTag(t *testing.T) {
+	var buf bytes.Buffer
+	rca := &llm.RootCauseAnalysis{
+		Title:       "Unclear failure",
+		FailureType: llm.FailureTypeAssertion,
+		BugLocation: llm.BugLocationUnknown,
+		RootCause:   "Not enough evidence",
+		Remediation: "Investigate",
+	}
+
+	printStructuredRCA(&buf, rca)
+	out := buf.String()
+
+	assert.NotContains(t, out, "[production")
+	assert.NotContains(t, out, "[infrastructure")
+}
+
 func TestPrintResult_WithStructuredRCA(t *testing.T) {
 	var stderr, stdout bytes.Buffer
 	r := &llm.AnalysisResult{

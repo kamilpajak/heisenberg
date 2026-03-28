@@ -209,15 +209,11 @@ func printResult(stderr, stdout io.Writer, r *llm.AnalysisResult) {
 	}
 }
 
-func printStructuredRCA(w io.Writer, rca *llm.RootCauseAnalysis) {
-	bold := color.New(color.Bold)
-	dim := color.New(color.FgHiBlack)
+// renderRCAHeader prints the failure type, location, bug location tag, and suspected bug file.
+func renderRCAHeader(w io.Writer, rca *llm.RootCauseAnalysis) {
 	headerColor := color.New(color.Bold, color.FgRed)
-	sectionColor := color.New(color.Bold, color.FgWhite)
-	fixColor := color.New(color.Bold, color.FgGreen)
-	separator := "  " + strings.Repeat("─", 40)
+	dim := color.New(color.FgHiBlack)
 
-	// Header with failure type and location
 	failureType := strings.ToUpper(rca.FailureType)
 	if failureType == "" {
 		failureType = "ERROR"
@@ -225,14 +221,35 @@ func printStructuredRCA(w io.Writer, rca *llm.RootCauseAnalysis) {
 
 	header := failureType
 	if rca.Location != nil && rca.Location.FilePath != "" {
-		loc := rca.Location.FilePath
-		if rca.Location.LineNumber > 0 {
-			loc = fmt.Sprintf("%s:%d", rca.Location.FilePath, rca.Location.LineNumber)
-		}
+		loc := formatCodeLocation(rca.Location)
 		header = fmt.Sprintf("%s in %s", header, loc)
 	}
+	if tag := bugLocationTag(rca.BugLocation, rca.BugLocationConfidence); tag != "" {
+		header += "  " + tag
+	}
 	_, _ = headerColor.Fprintln(w, "  "+header)
+
+	if rca.BugCodeLocation != nil && rca.BugCodeLocation.FilePath != "" {
+		_, _ = dim.Fprintf(w, "  Bug location: %s\n", formatCodeLocation(rca.BugCodeLocation))
+	}
 	fmt.Fprintln(w)
+}
+
+func formatCodeLocation(loc *llm.CodeLocation) string {
+	if loc.LineNumber > 0 {
+		return fmt.Sprintf("%s:%d", loc.FilePath, loc.LineNumber)
+	}
+	return loc.FilePath
+}
+
+func printStructuredRCA(w io.Writer, rca *llm.RootCauseAnalysis) {
+	bold := color.New(color.Bold)
+	dim := color.New(color.FgHiBlack)
+	sectionColor := color.New(color.Bold, color.FgWhite)
+	fixColor := color.New(color.Bold, color.FgGreen)
+	separator := "  " + strings.Repeat("─", 40)
+
+	renderRCAHeader(w, rca)
 
 	// Root cause
 	_, _ = sectionColor.Fprintln(w, "  Root Cause")
@@ -324,6 +341,23 @@ func wrapBullets(s string, maxWidth int, indent string) string {
 		out = append(out, wrapped)
 	}
 	return strings.Join(out, "\n")
+}
+
+func bugLocationTag(loc llm.BugLocation, confidence string) string {
+	switch loc {
+	case llm.BugLocationProduction:
+		if confidence == "low" {
+			return "[production bug?]"
+		}
+		return "[production bug]"
+	case llm.BugLocationInfrastructure:
+		if confidence == "low" {
+			return "[infrastructure?]"
+		}
+		return "[infrastructure]"
+	default:
+		return ""
+	}
 }
 
 func evidenceIcon(t string) string {

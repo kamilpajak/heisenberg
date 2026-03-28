@@ -76,14 +76,22 @@ func Run(ctx context.Context, p Params) (*llm.AnalysisResult, error) {
 
 	initialContext := buildInitialContext(wfRun, jobs, artifacts)
 
+	// Detect PR number from workflow run metadata
+	var prNumber int
+	if len(wfRun.PullRequests) > 0 {
+		prNumber = wfRun.PullRequests[0].Number
+	}
+
 	handler := &ToolHandler{
 		GitHub:       ghClient,
 		Owner:        p.Owner,
 		Repo:         p.Repo,
 		RunID:        resolvedRunID,
+		PRNumber:     prNumber,
+		HeadSHA:      wfRun.HeadSHA,
 		SnapshotHTML: p.SnapshotHTML,
 		Emitter:      p.Emitter,
-		artifacts:    artifacts, // pre-populate so HasTestArtifacts() works immediately
+		artifacts:    artifacts,
 	}
 
 	llmClient, err := llm.NewClient()

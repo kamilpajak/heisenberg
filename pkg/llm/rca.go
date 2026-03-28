@@ -14,6 +14,16 @@ const (
 	FailureTypeFlake     = "flake"
 )
 
+// BugLocation indicates where the underlying defect lives.
+type BugLocation string
+
+const (
+	BugLocationTest           BugLocation = "test"
+	BugLocationProduction     BugLocation = "production"
+	BugLocationInfrastructure BugLocation = "infrastructure"
+	BugLocationUnknown        BugLocation = "unknown"
+)
+
 // Evidence type constants for categorizing supporting data.
 const (
 	EvidenceScreenshot = "screenshot"
@@ -25,13 +35,16 @@ const (
 
 // RootCauseAnalysis holds structured diagnosis information.
 type RootCauseAnalysis struct {
-	Title       string        `json:"title"`              // Short summary, e.g. "Timeout waiting for Submit Button"
-	FailureType string        `json:"failure_type"`       // timeout, assertion, network, infra, flake
-	Location    *CodeLocation `json:"location,omitempty"` // Where the failure occurred
-	Symptom     string        `json:"symptom"`            // What failed
-	RootCause   string        `json:"root_cause"`         // Why it failed
-	Evidence    []Evidence    `json:"evidence"`           // Supporting data points
-	Remediation string        `json:"remediation"`        // How to fix it
+	Title                 string        `json:"title"`                             // Short summary
+	FailureType           string        `json:"failure_type"`                      // timeout, assertion, network, infra, flake
+	Location              *CodeLocation `json:"location,omitempty"`                // Where the test failed
+	BugLocation           BugLocation   `json:"bug_location,omitempty"`            // Where the defect lives: test, production, infrastructure, unknown
+	BugLocationConfidence string        `json:"bug_location_confidence,omitempty"` // high, medium, low
+	BugCodeLocation       *CodeLocation `json:"bug_code_location,omitempty"`       // Suspected defect location (production/infra code)
+	Symptom               string        `json:"symptom"`                           // What failed
+	RootCause             string        `json:"root_cause"`                        // Why it failed
+	Evidence              []Evidence    `json:"evidence"`                          // Supporting data points
+	Remediation           string        `json:"remediation"`                       // How to fix it
 }
 
 // CodeLocation identifies a specific location in source code.
@@ -54,19 +67,29 @@ func ParseRCAFromArgs(args map[string]any) *RootCauseAnalysis {
 	}
 
 	rca := &RootCauseAnalysis{
-		Title:       stringArg(args, "title"),
-		FailureType: stringArg(args, "failure_type"),
-		Symptom:     stringArg(args, "symptom"),
-		RootCause:   stringArg(args, "root_cause"),
-		Remediation: stringArg(args, "remediation"),
+		Title:                 stringArg(args, "title"),
+		FailureType:           stringArg(args, "failure_type"),
+		BugLocation:           BugLocation(stringArg(args, "bug_location")),
+		BugLocationConfidence: stringArg(args, "bug_location_confidence"),
+		Symptom:               stringArg(args, "symptom"),
+		RootCause:             stringArg(args, "root_cause"),
+		Remediation:           stringArg(args, "remediation"),
 	}
 
-	// Parse location if file_path is present
+	// Parse test failure location
 	if filePath := stringArg(args, "file_path"); filePath != "" {
 		rca.Location = &CodeLocation{
 			FilePath:     filePath,
 			LineNumber:   intArgValue(args, "line_number"),
 			FunctionName: stringArg(args, "function_name"),
+		}
+	}
+
+	// Parse suspected bug code location (flat args, same pattern)
+	if filePath := stringArg(args, "bug_code_file_path"); filePath != "" {
+		rca.BugCodeLocation = &CodeLocation{
+			FilePath:   filePath,
+			LineNumber: intArgValue(args, "bug_code_line_number"),
 		}
 	}
 

@@ -351,3 +351,70 @@ func TestListDirectory_NotFound(t *testing.T) {
 	_, err := c.ListDirectory(context.Background(), "owner", "repo", "nonexistent")
 	assert.Error(t, err)
 }
+
+func TestGetPRFiles(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/repos/owner/repo/pulls/42/files", r.URL.Path)
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`[
+			{"filename": "src/pricing.ts", "status": "modified", "additions": 20, "deletions": 5, "patch": "@@ -40,6 +40,7 @@\n+  return 0"},
+			{"filename": "tests/checkout.spec.ts", "status": "modified", "additions": 3, "deletions": 1, "patch": "@@ -10,3 +10,5 @@"}
+		]`))
+	}))
+	defer srv.Close()
+
+	c := NewTestClient(srv.URL, srv.Client())
+	files, err := c.GetPRFiles(context.Background(), "owner", "repo", 42)
+
+	require.NoError(t, err)
+	require.Len(t, files, 2)
+	assert.Equal(t, "src/pricing.ts", files[0].Path)
+	assert.Equal(t, "modified", files[0].Status)
+	assert.Equal(t, 20, files[0].Additions)
+	assert.Equal(t, 5, files[0].Deletions)
+	assert.Contains(t, files[0].Patch, "return 0")
+	assert.Equal(t, "tests/checkout.spec.ts", files[1].Path)
+}
+
+func TestCompareCommits(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/repos/owner/repo/compare/main...abc123", r.URL.Path)
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{
+			"files": [
+				{"filename": "src/app.ts", "status": "added", "additions": 50, "deletions": 0, "patch": "@@ -0,0 +1,50 @@"}
+			]
+		}`))
+	}))
+	defer srv.Close()
+
+	c := NewTestClient(srv.URL, srv.Client())
+	files, err := c.CompareCommits(context.Background(), "owner", "repo", "main", "abc123")
+
+	require.NoError(t, err)
+	require.Len(t, files, 1)
+	assert.Equal(t, "src/app.ts", files[0].Path)
+	assert.Equal(t, "added", files[0].Status)
+	assert.Equal(t, 50, files[0].Additions)
+}
+
+func TestWorkflowRun_PullRequests(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{
+			"id": 123,
+			"head_branch": "feature/test",
+			"head_sha": "abc",
+			"event": "pull_request",
+			"pull_requests": [{"number": 42}]
+		}`))
+	}))
+	defer srv.Close()
+
+	c := NewTestClient(srv.URL, srv.Client())
+	run, err := c.GetWorkflowRun(context.Background(), "owner", "repo", 123)
+
+	require.NoError(t, err)
+	require.Len(t, run.PullRequests, 1)
+	assert.Equal(t, 42, run.PullRequests[0].Number)
+}

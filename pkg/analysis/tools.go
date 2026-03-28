@@ -17,6 +17,8 @@ type ToolHandler struct {
 	Owner        string
 	Repo         string
 	RunID        int64
+	PRNumber     int    // detected PR number (0 = none)
+	HeadSHA      string // commit SHA for compare fallback
 	SnapshotHTML func([]byte) ([]byte, error)
 	Emitter      llm.ProgressEmitter
 
@@ -45,6 +47,8 @@ func (h *ToolHandler) Execute(ctx context.Context, call llm.FunctionCall) (strin
 		return h.getRepoFile(ctx, call.Args)
 	case "get_test_traces":
 		return h.getTestTraces(ctx, call.Args)
+	case "get_pr_diff":
+		return h.getPRDiff(ctx, call.Args)
 	case "done":
 		return h.handleDone(call.Args)
 	default:
@@ -395,6 +399,125 @@ func stringArgOrDefault(args map[string]any, key string, def string) string {
 	return s
 }
 
+// classifyFilePath categorizes a file path as test, production, config, or other.
+func classifyFilePath(path string) string {
+	lower := strings.ToLower(path)
+
+	// Ignored files → other
+	for _, pattern := range []string{"lock.json", "lock.yaml", "lock.yml", ".md", ".png", ".svg", ".jpg", ".gif", "assets/", "docs/"} {
+		if strings.Contains(lower, pattern) {
+			return "other"
+		}
+	}
+
+	// Config
+	for _, pattern := range []string{".github/", "dockerfile", ".yml", ".yaml", "makefile", "docker-compose"} {
+		if strings.Contains(lower, pattern) {
+			return "config"
+		}
+	}
+
+	// Test
+	for _, pattern := range []string{"test", ".spec.", "_test.go", "fixture"} {
+		if strings.Contains(lower, pattern) {
+			return "test"
+		}
+	}
+
+	// Production code
+	for _, pattern := range []string{"src/", "app/", "pkg/", "lib/", "internal/", "cmd/", ".go", ".ts", ".js", ".py", ".rb", ".rs"} {
+		if strings.Contains(lower, pattern) {
+			return "production"
+		}
+	}
+
+	return "other"
+}
+
+type prDiffResponse struct {
+	Kind       string     `json:"kind"`
+	PRNumber   int        `json:"pr_number,omitempty"`
+	TotalFiles int        `json:"total_files"`
+	Files      []diffFile `json:"files"`
+}
+
+type diffFile struct {
+	Path      string `json:"path"`
+	Status    string `json:"status"`
+	Additions int    `json:"additions"`
+	Deletions int    `json:"deletions"`
+	Category  string `json:"category"`
+	Patch     string `json:"patch,omitempty"`
+}
+
+func (h *ToolHandler) getPRDiff(ctx context.Context, args map[string]any) (string, bool, error) {
+	files, kind := h.fetchDiffFiles(ctx)
+
+	resp := prDiffResponse{Kind: kind, PRNumber: h.PRNumber}
+	suspectedFiles := parseSuspectedFiles(args)
+	resp.Files = buildDiffFiles(files, suspectedFiles)
+	resp.TotalFiles = len(resp.Files)
+
+	data, _ := json.Marshal(resp)
+	return string(data), false, nil
+}
+
+func (h *ToolHandler) fetchDiffFiles(ctx context.Context) ([]gh.PRFile, string) {
+	if h.PRNumber > 0 {
+		files, err := h.GitHub.GetPRFiles(ctx, h.Owner, h.Repo, h.PRNumber)
+		if err == nil {
+			return files, "pull_request"
+		}
+	}
+	if h.HeadSHA != "" {
+		files, err := h.GitHub.CompareCommits(ctx, h.Owner, h.Repo, "main", h.HeadSHA)
+		if err == nil {
+			return files, "commit_range"
+		}
+	}
+	return nil, "none"
+}
+
+func parseSuspectedFiles(args map[string]any) map[string]bool {
+	result := map[string]bool{}
+	if raw, ok := args["suspected_files"].([]any); ok {
+		for _, f := range raw {
+			if s, ok := f.(string); ok {
+				result[s] = true
+			}
+		}
+	}
+	return result
+}
+
+func buildDiffFiles(files []gh.PRFile, suspected map[string]bool) []diffFile {
+	const maxPatchTokens = 4000
+	budget := maxPatchTokens
+	var result []diffFile
+
+	for _, f := range files {
+		cat := classifyFilePath(f.Path)
+		if cat == "other" {
+			continue
+		}
+
+		df := diffFile{
+			Path: f.Path, Status: f.Status,
+			Additions: f.Additions, Deletions: f.Deletions,
+			Category: cat,
+		}
+
+		patchLen := len(f.Patch) / 4
+		if f.Patch != "" && budget > 0 && (suspected[f.Path] || patchLen < 500) && patchLen <= budget {
+			df.Patch = f.Patch
+			budget -= patchLen
+		}
+
+		result = append(result, df)
+	}
+	return result
+}
+
 // ToolDeclarations returns the function declarations for all available tools.
 func ToolDeclarations() []llm.FunctionDeclaration {
 	return []llm.FunctionDeclaration{
@@ -457,6 +580,20 @@ func ToolDeclarations() []llm.FunctionDeclaration {
 			},
 		},
 		{
+			Name:        "get_pr_diff",
+			Description: "Get the diff of changed files for this PR/commit. Returns file list with categories (test/production/config) and optional patch hunks. Use this before determining bug_location. Pass suspected_files from stack traces to prioritize their patches.",
+			Parameters: &llm.Schema{
+				Type: "object",
+				Properties: map[string]llm.Schema{
+					"suspected_files": {
+						Type:        "array",
+						Description: "File paths from stack traces or logs to prioritize in the diff.",
+						Items:       &llm.Schema{Type: "string"},
+					},
+				},
+			},
+		},
+		{
 			Name:        "done",
 			Description: "Signal that you have gathered enough information and provide structured Root Cause Analysis. After calling this, provide your final analysis as text.",
 			Parameters: &llm.Schema{
@@ -483,6 +620,24 @@ func ToolDeclarations() []llm.FunctionDeclaration {
 					"line_number": {
 						Type:        "number",
 						Description: "Line number in the test file where failure occurred.",
+					},
+					"bug_location": {
+						Type:        "string",
+						Description: "Where the underlying defect lives. 'test': bug in test code/fixtures/mocks. 'production': test correctly detected a regression in application code. 'infrastructure': CI environment issue. 'unknown': not enough evidence.",
+						Enum:        []string{"test", "production", "infrastructure", "unknown"},
+					},
+					"bug_location_confidence": {
+						Type:        "string",
+						Description: "Confidence in bug_location. 'high': strong evidence. 'medium': probable. 'low': mostly guessing.",
+						Enum:        []string{"high", "medium", "low"},
+					},
+					"bug_code_file_path": {
+						Type:        "string",
+						Description: "When bug_location is 'production' or 'infrastructure', the suspected defect file path (e.g., 'src/pricing.ts'). Leave empty if unclear.",
+					},
+					"bug_code_line_number": {
+						Type:        "number",
+						Description: "Line number in the suspected bug file. Leave empty if unclear.",
 					},
 					"symptom": {
 						Type:        "string",
