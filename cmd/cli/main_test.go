@@ -441,8 +441,7 @@ func TestIntegration_State4_ErrorFlow(t *testing.T) {
 	var stderr bytes.Buffer
 
 	// Simulate: emitter shows progress, then error occurs
-	emitter := &llm.TextEmitter{}
-	emitter.InitForTest(&stderr)
+	emitter := llm.NewTextEmitter(&stderr, false)
 	emitter.Emit(llm.ProgressEvent{Type: "info", Message: "Analyzing run 123 for owner/repo..."})
 	emitter.Emit(llm.ProgressEvent{Type: "tool", Step: 2, MaxStep: 30, Tool: "get_job_logs"})
 	emitter.MarkFailed()
@@ -483,8 +482,7 @@ func TestIntegration_State4_ErrorFlow(t *testing.T) {
 func TestIntegration_State1And2_ProgressFlow(t *testing.T) {
 	var stderr bytes.Buffer
 
-	emitter := &llm.TextEmitter{}
-	emitter.InitForTest(&stderr)
+	emitter := llm.NewTextEmitter(&stderr, false)
 
 	// State 1: initial
 	emitter.Emit(llm.ProgressEvent{Type: "info", Message: "Analyzing run 123 for owner/repo..."})
@@ -512,8 +510,7 @@ func TestIntegration_State3_SuccessFlow(t *testing.T) {
 
 	var stderr, stdout bytes.Buffer
 
-	emitter := &llm.TextEmitter{}
-	emitter.InitForTest(&stderr)
+	emitter := llm.NewTextEmitter(&stderr, false)
 	emitter.Emit(llm.ProgressEvent{Type: "info", Message: "Analyzing run 123 for owner/repo..."})
 	emitter.Emit(llm.ProgressEvent{Type: "tool", Step: 9, MaxStep: 30, Tool: "done"})
 	emitter.Close()
