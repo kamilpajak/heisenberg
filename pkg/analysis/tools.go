@@ -17,6 +17,8 @@ type ToolHandler struct {
 	Owner        string
 	Repo         string
 	RunID        int64
+	PRNumber     int    // detected PR number (0 = none)
+	HeadSHA      string // commit SHA for compare fallback
 	SnapshotHTML func([]byte) ([]byte, error)
 	Emitter      llm.ProgressEmitter
 
@@ -45,6 +47,8 @@ func (h *ToolHandler) Execute(ctx context.Context, call llm.FunctionCall) (strin
 		return h.getRepoFile(ctx, call.Args)
 	case "get_test_traces":
 		return h.getTestTraces(ctx, call.Args)
+	case "get_pr_diff":
+		return h.getPRDiff(ctx, call.Args)
 	case "done":
 		return h.handleDone(call.Args)
 	default:
@@ -395,6 +399,130 @@ func stringArgOrDefault(args map[string]any, key string, def string) string {
 	return s
 }
 
+// classifyFilePath categorizes a file path as test, production, config, or other.
+func classifyFilePath(path string) string {
+	lower := strings.ToLower(path)
+
+	// Ignored files → other
+	for _, pattern := range []string{"lock.json", "lock.yaml", "lock.yml", ".md", ".png", ".svg", ".jpg", ".gif", "assets/", "docs/"} {
+		if strings.Contains(lower, pattern) {
+			return "other"
+		}
+	}
+
+	// Config
+	for _, pattern := range []string{".github/", "dockerfile", ".yml", ".yaml", "makefile", "docker-compose"} {
+		if strings.Contains(lower, pattern) {
+			return "config"
+		}
+	}
+
+	// Test
+	for _, pattern := range []string{"test", ".spec.", "_test.go", "fixture"} {
+		if strings.Contains(lower, pattern) {
+			return "test"
+		}
+	}
+
+	// Production code
+	for _, pattern := range []string{"src/", "app/", "pkg/", "lib/", "internal/", "cmd/", ".go", ".ts", ".js", ".py", ".rb", ".rs"} {
+		if strings.Contains(lower, pattern) {
+			return "production"
+		}
+	}
+
+	return "other"
+}
+
+type prDiffResponse struct {
+	Kind       string     `json:"kind"`
+	PRNumber   int        `json:"pr_number,omitempty"`
+	TotalFiles int        `json:"total_files"`
+	Files      []diffFile `json:"files"`
+}
+
+type diffFile struct {
+	Path      string `json:"path"`
+	Status    string `json:"status"`
+	Additions int    `json:"additions"`
+	Deletions int    `json:"deletions"`
+	Category  string `json:"category"`
+	Patch     string `json:"patch,omitempty"`
+}
+
+func (h *ToolHandler) getPRDiff(ctx context.Context, args map[string]any) (string, bool, error) {
+	var files []gh.PRFile
+	kind := "none"
+
+	if h.PRNumber > 0 {
+		kind = "pull_request"
+		var err error
+		files, err = h.GitHub.GetPRFiles(ctx, h.Owner, h.Repo, h.PRNumber)
+		if err != nil {
+			return errorResult(err), false, nil
+		}
+	} else if h.HeadSHA != "" {
+		// Fallback: compare against default branch (assume "main")
+		kind = "commit_range"
+		var err error
+		files, err = h.GitHub.CompareCommits(ctx, h.Owner, h.Repo, "main", h.HeadSHA)
+		if err != nil {
+			// If compare fails, return kind: "none"
+			kind = "none"
+			files = nil
+		}
+	}
+
+	// Build structured response
+	resp := prDiffResponse{
+		Kind:     kind,
+		PRNumber: h.PRNumber,
+	}
+
+	// Parse suspected_files for prioritization
+	suspectedFiles := map[string]bool{}
+	if raw, ok := args["suspected_files"].([]any); ok {
+		for _, f := range raw {
+			if s, ok := f.(string); ok {
+				suspectedFiles[s] = true
+			}
+		}
+	}
+
+	const maxPatchTokens = 4000
+	patchBudget := maxPatchTokens
+
+	for _, f := range files {
+		cat := classifyFilePath(f.Path)
+		if cat == "other" {
+			continue // skip lockfiles, docs, assets
+		}
+
+		df := diffFile{
+			Path:      f.Path,
+			Status:    f.Status,
+			Additions: f.Additions,
+			Deletions: f.Deletions,
+			Category:  cat,
+		}
+
+		// Include patch for suspected files and within budget
+		patchLen := len(f.Patch) / 4 // rough token estimate
+		if f.Patch != "" && patchBudget > 0 && (suspectedFiles[f.Path] || patchLen < 500) {
+			if patchLen <= patchBudget {
+				df.Patch = f.Patch
+				patchBudget -= patchLen
+			}
+		}
+
+		resp.Files = append(resp.Files, df)
+	}
+	resp.TotalFiles = len(resp.Files)
+
+	data, _ := json.Marshal(resp)
+	return string(data), false, nil
+}
+
 // ToolDeclarations returns the function declarations for all available tools.
 func ToolDeclarations() []llm.FunctionDeclaration {
 	return []llm.FunctionDeclaration{
@@ -453,6 +581,20 @@ func ToolDeclarations() []llm.FunctionDeclaration {
 				Type: "object",
 				Properties: map[string]llm.Schema{
 					"artifact_name": {Type: "string"},
+				},
+			},
+		},
+		{
+			Name:        "get_pr_diff",
+			Description: "Get the diff of changed files for this PR/commit. Returns file list with categories (test/production/config) and optional patch hunks. Use this before determining bug_location. Pass suspected_files from stack traces to prioritize their patches.",
+			Parameters: &llm.Schema{
+				Type: "object",
+				Properties: map[string]llm.Schema{
+					"suspected_files": {
+						Type:        "array",
+						Description: "File paths from stack traces or logs to prioritize in the diff.",
+						Items:       &llm.Schema{Type: "string"},
+					},
 				},
 			},
 		},

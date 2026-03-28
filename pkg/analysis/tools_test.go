@@ -1078,8 +1078,9 @@ func TestToolDeclarations(t *testing.T) {
 	assert.Contains(t, names, "get_workflow_file")
 	assert.Contains(t, names, "get_repo_file")
 	assert.Contains(t, names, "get_test_traces")
+	assert.Contains(t, names, "get_pr_diff")
 	assert.Contains(t, names, "done")
-	assert.Len(t, decls, 7)
+	assert.Len(t, decls, 8)
 }
 
 func TestToolDeclarations_DoneEvidenceArrayHasItems(t *testing.T) {
@@ -1304,4 +1305,104 @@ func TestSmartNotFound_RootDirectory(t *testing.T) {
 
 	assert.Contains(t, result, "file not found")
 	assert.Contains(t, result, "package.json")
+}
+
+func TestClassifyFilePath(t *testing.T) {
+	tests := []struct {
+		path string
+		want string
+	}{
+		{"tests/checkout.spec.ts", "test"},
+		{"src/components/Button.test.tsx", "test"},
+		{"pkg/analysis/tools_test.go", "test"},
+		{"test/fixtures/data.json", "test"},
+		{"src/pricing.ts", "production"},
+		{"app/models/user.rb", "production"},
+		{"pkg/llm/client.go", "production"},
+		{"lib/utils.js", "production"},
+		{".github/workflows/ci.yml", "config"},
+		{"Dockerfile", "config"},
+		{"docker-compose.yml", "config"},
+		{"Makefile", "config"},
+		{"README.md", "other"},
+		{"docs/guide.md", "other"},
+		{"package-lock.json", "other"},
+		{"pnpm-lock.yaml", "other"},
+		{"assets/logo.png", "other"},
+	}
+	for _, tt := range tests {
+		assert.Equal(t, tt.want, classifyFilePath(tt.path), "classifyFilePath(%q)", tt.path)
+	}
+}
+
+func TestGetPRDiff_WithPR(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "/pulls/42/files") {
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte(`[
+				{"filename": "src/pricing.ts", "status": "modified", "additions": 20, "deletions": 5, "patch": "@@ -40,6 +40,7 @@\n+return 0"},
+				{"filename": "tests/checkout.spec.ts", "status": "modified", "additions": 3, "deletions": 1, "patch": "@@ -10 @@"},
+				{"filename": "package-lock.json", "status": "modified", "additions": 500, "deletions": 400, "patch": ""}
+			]`))
+			return
+		}
+		w.WriteHeader(404)
+	}))
+	defer srv.Close()
+
+	h := &ToolHandler{
+		GitHub:   gh.NewTestClient(srv.URL, srv.Client()),
+		Owner:    "owner",
+		Repo:     "repo",
+		PRNumber: 42,
+	}
+
+	result, isDone, err := h.Execute(context.Background(), llm.FunctionCall{
+		Name: "get_pr_diff",
+		Args: map[string]any{},
+	})
+
+	require.NoError(t, err)
+	assert.False(t, isDone)
+
+	// Parse structured response
+	var diff struct {
+		Kind       string `json:"kind"`
+		PRNumber   int    `json:"pr_number"`
+		TotalFiles int    `json:"total_files"`
+		Files      []struct {
+			Path     string `json:"path"`
+			Category string `json:"category"`
+			Patch    string `json:"patch"`
+		} `json:"files"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(result), &diff))
+
+	assert.Equal(t, "pull_request", diff.Kind)
+	assert.Equal(t, 42, diff.PRNumber)
+	// package-lock.json should be filtered
+	assert.Equal(t, 2, diff.TotalFiles)
+	assert.Equal(t, "production", diff.Files[0].Category)
+	assert.Equal(t, "test", diff.Files[1].Category)
+}
+
+func TestGetPRDiff_NoPR(t *testing.T) {
+	h := &ToolHandler{
+		Owner:    "owner",
+		Repo:     "repo",
+		PRNumber: 0,
+	}
+
+	result, _, err := h.Execute(context.Background(), llm.FunctionCall{
+		Name: "get_pr_diff",
+		Args: map[string]any{},
+	})
+
+	require.NoError(t, err)
+
+	var diff struct {
+		Kind string `json:"kind"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(result), &diff))
+	assert.Equal(t, "none", diff.Kind)
 }

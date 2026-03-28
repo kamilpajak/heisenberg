@@ -103,6 +103,18 @@ type WorkflowRun struct {
 	Path         string `json:"path"`
 	DisplayTitle string `json:"display_title"`
 	CreatedAt    string `json:"created_at"`
+	PullRequests []struct {
+		Number int `json:"number"`
+	} `json:"pull_requests"`
+}
+
+// PRFile represents a file changed in a pull request or commit comparison.
+type PRFile struct {
+	Path      string `json:"filename"`
+	Status    string `json:"status"`
+	Additions int    `json:"additions"`
+	Deletions int    `json:"deletions"`
+	Patch     string `json:"patch"`
 }
 
 // Job represents a GitHub Actions job within a workflow run
@@ -497,6 +509,28 @@ func (c *Client) ListDirectory(ctx context.Context, owner, repo, path string) ([
 		}
 	}
 	return names, nil
+}
+
+// GetPRFiles returns the list of files changed in a pull request.
+func (c *Client) GetPRFiles(ctx context.Context, owner, repo string, prNumber int) ([]PRFile, error) {
+	url := fmt.Sprintf("%s/repos/%s/%s/pulls/%d/files", c.baseURL, owner, repo, prNumber)
+	var files []PRFile
+	if err := c.doRequest(ctx, url, &files); err != nil {
+		return nil, err
+	}
+	return files, nil
+}
+
+// CompareCommits returns files changed between two refs (branches, tags, or SHAs).
+func (c *Client) CompareCommits(ctx context.Context, owner, repo, base, head string) ([]PRFile, error) {
+	url := fmt.Sprintf("%s/repos/%s/%s/compare/%s...%s", c.baseURL, owner, repo, base, head)
+	var result struct {
+		Files []PRFile `json:"files"`
+	}
+	if err := c.doRequest(ctx, url, &result); err != nil {
+		return nil, err
+	}
+	return result.Files, nil
 }
 
 func base64Decode(s string) ([]byte, error) {

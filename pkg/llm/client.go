@@ -161,8 +161,15 @@ Bug location classification:
   - "infrastructure": CI environment, database, network, or config issue
   - "unknown": Not enough evidence — use this instead of guessing
 
+  IMPORTANT: Before determining bug_location, call get_pr_diff with suspected file paths from logs.
+  Key diff signals:
+  - Only test files changed → bug_location="test"
+  - Production code changed + test fails on those paths → bug_location="production"
+  - Only CI config changed → bug_location="infrastructure"
+  - No diff available → rely on logs and stack traces alone
+
   Choose "test" when: stack trace is entirely in test files, expected value is outdated, assertion is brittle.
-  Choose "production" when: stack trace shows exception in app code, actual values indicate logic bug, test passes on main but fails in PR.
+  Choose "production" when: stack trace shows exception in app code, actual values indicate logic bug, PR changed production files.
   Choose "infrastructure" when: logs show ECONNREFUSED, missing tables, empty DB, failed migrations, many unrelated tests fail similarly.
   Priority: infrastructure → production → test → unknown (smallest scope that explains the failure).
 
