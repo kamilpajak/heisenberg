@@ -451,76 +451,71 @@ type diffFile struct {
 }
 
 func (h *ToolHandler) getPRDiff(ctx context.Context, args map[string]any) (string, bool, error) {
-	var files []gh.PRFile
-	kind := "none"
+	files, kind := h.fetchDiffFiles(ctx)
 
-	if h.PRNumber > 0 {
-		kind = "pull_request"
-		var err error
-		files, err = h.GitHub.GetPRFiles(ctx, h.Owner, h.Repo, h.PRNumber)
-		if err != nil {
-			return errorResult(err), false, nil
-		}
-	} else if h.HeadSHA != "" {
-		// Fallback: compare against default branch (assume "main")
-		kind = "commit_range"
-		var err error
-		files, err = h.GitHub.CompareCommits(ctx, h.Owner, h.Repo, "main", h.HeadSHA)
-		if err != nil {
-			// If compare fails, return kind: "none"
-			kind = "none"
-			files = nil
-		}
-	}
-
-	// Build structured response
-	resp := prDiffResponse{
-		Kind:     kind,
-		PRNumber: h.PRNumber,
-	}
-
-	// Parse suspected_files for prioritization
-	suspectedFiles := map[string]bool{}
-	if raw, ok := args["suspected_files"].([]any); ok {
-		for _, f := range raw {
-			if s, ok := f.(string); ok {
-				suspectedFiles[s] = true
-			}
-		}
-	}
-
-	const maxPatchTokens = 4000
-	patchBudget := maxPatchTokens
-
-	for _, f := range files {
-		cat := classifyFilePath(f.Path)
-		if cat == "other" {
-			continue // skip lockfiles, docs, assets
-		}
-
-		df := diffFile{
-			Path:      f.Path,
-			Status:    f.Status,
-			Additions: f.Additions,
-			Deletions: f.Deletions,
-			Category:  cat,
-		}
-
-		// Include patch for suspected files and within budget
-		patchLen := len(f.Patch) / 4 // rough token estimate
-		if f.Patch != "" && patchBudget > 0 && (suspectedFiles[f.Path] || patchLen < 500) {
-			if patchLen <= patchBudget {
-				df.Patch = f.Patch
-				patchBudget -= patchLen
-			}
-		}
-
-		resp.Files = append(resp.Files, df)
-	}
+	resp := prDiffResponse{Kind: kind, PRNumber: h.PRNumber}
+	suspectedFiles := parseSuspectedFiles(args)
+	resp.Files = buildDiffFiles(files, suspectedFiles)
 	resp.TotalFiles = len(resp.Files)
 
 	data, _ := json.Marshal(resp)
 	return string(data), false, nil
+}
+
+func (h *ToolHandler) fetchDiffFiles(ctx context.Context) ([]gh.PRFile, string) {
+	if h.PRNumber > 0 {
+		files, err := h.GitHub.GetPRFiles(ctx, h.Owner, h.Repo, h.PRNumber)
+		if err == nil {
+			return files, "pull_request"
+		}
+	}
+	if h.HeadSHA != "" {
+		files, err := h.GitHub.CompareCommits(ctx, h.Owner, h.Repo, "main", h.HeadSHA)
+		if err == nil {
+			return files, "commit_range"
+		}
+	}
+	return nil, "none"
+}
+
+func parseSuspectedFiles(args map[string]any) map[string]bool {
+	result := map[string]bool{}
+	if raw, ok := args["suspected_files"].([]any); ok {
+		for _, f := range raw {
+			if s, ok := f.(string); ok {
+				result[s] = true
+			}
+		}
+	}
+	return result
+}
+
+func buildDiffFiles(files []gh.PRFile, suspected map[string]bool) []diffFile {
+	const maxPatchTokens = 4000
+	budget := maxPatchTokens
+	var result []diffFile
+
+	for _, f := range files {
+		cat := classifyFilePath(f.Path)
+		if cat == "other" {
+			continue
+		}
+
+		df := diffFile{
+			Path: f.Path, Status: f.Status,
+			Additions: f.Additions, Deletions: f.Deletions,
+			Category: cat,
+		}
+
+		patchLen := len(f.Patch) / 4
+		if f.Patch != "" && budget > 0 && (suspected[f.Path] || patchLen < 500) && patchLen <= budget {
+			df.Patch = f.Patch
+			budget -= patchLen
+		}
+
+		result = append(result, df)
+	}
+	return result
 }
 
 // ToolDeclarations returns the function declarations for all available tools.
