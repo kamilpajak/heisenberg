@@ -640,56 +640,76 @@ func (c *Client) generate(ctx context.Context, history []Content, tools []Tool, 
 
 	url := fmt.Sprintf("%s/models/%s:generateContent?key=%s", c.baseURL, c.model, c.apiKey)
 
+	var lastAPIErr *APIError
+	for attempt := range apiRetries + 1 {
+		result, apiErr, err := c.doRequest(ctx, url, jsonBody)
+		if err != nil {
+			return nil, err
+		}
+		if result != nil {
+			return result, nil
+		}
+
+		lastAPIErr = apiErr
+		if !isRetryable(apiErr.StatusCode) || attempt >= apiRetries {
+			apiErr.Retries = attempt
+			return nil, apiErr
+		}
+
+		if err := c.backoff(ctx, attempt); err != nil {
+			return nil, err
+		}
+	}
+
+	return nil, lastAPIErr
+}
+
+// doRequest makes a single HTTP request and returns either a successful response or an API error.
+func (c *Client) doRequest(ctx context.Context, url string, jsonBody []byte) (*GenerateResponse, *APIError, error) {
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(jsonBody))
+	if err != nil {
+		return nil, nil, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
 	httpClient := c.httpClient
 	if httpClient == nil {
 		httpClient = http.DefaultClient
 	}
 
-	var lastAPIErr *APIError
-	for attempt := range apiRetries + 1 {
-		httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(jsonBody))
-		if err != nil {
-			return nil, err
-		}
-		httpReq.Header.Set("Content-Type", "application/json")
-
-		resp, err := httpClient.Do(httpReq)
-		if err != nil {
-			return nil, err
-		}
-
-		body, err := io.ReadAll(resp.Body)
-		resp.Body.Close()
-		if err != nil {
-			return nil, err
-		}
-
-		if resp.StatusCode == http.StatusOK {
-			var result GenerateResponse
-			if err := json.Unmarshal(body, &result); err != nil {
-				return nil, fmt.Errorf("failed to parse response: %w", err)
-			}
-			return &result, nil
-		}
-
-		lastAPIErr = parseAPIError(resp.StatusCode, resp.Status, body)
-		if !isRetryable(lastAPIErr.StatusCode) || attempt >= apiRetries {
-			lastAPIErr.Retries = attempt
-			return nil, lastAPIErr
-		}
-
-		base := c.retryBaseDelay
-		if base == 0 {
-			base = apiRetryBaseDelay
-		}
-		delay := base * (1 << attempt)
-		select {
-		case <-time.After(delay):
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		}
+	resp, err := httpClient.Do(httpReq)
+	if err != nil {
+		return nil, nil, err
 	}
 
-	// Unreachable, but satisfies the compiler.
-	return nil, lastAPIErr
+	body, err := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if resp.StatusCode == http.StatusOK {
+		var result GenerateResponse
+		if err := json.Unmarshal(body, &result); err != nil {
+			return nil, nil, fmt.Errorf("failed to parse response: %w", err)
+		}
+		return &result, nil, nil
+	}
+
+	return nil, parseAPIError(resp.StatusCode, resp.Status, body), nil
+}
+
+// backoff waits for an exponential delay, cancellable via context.
+func (c *Client) backoff(ctx context.Context, attempt int) error {
+	base := c.retryBaseDelay
+	if base == 0 {
+		base = apiRetryBaseDelay
+	}
+	delay := base * (1 << attempt)
+	select {
+	case <-time.After(delay):
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }

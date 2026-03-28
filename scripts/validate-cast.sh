@@ -5,7 +5,7 @@ set -euo pipefail
 
 CAST_FILE="${1:?Usage: $0 <file.cast>}"
 
-if [ ! -f "$CAST_FILE" ]; then
+if [[ ! -f "$CAST_FILE" ]]; then
   echo "Error: $CAST_FILE not found" >&2
   exit 1
 fi

@@ -57,32 +57,34 @@ func (e *APIError) Hint() string {
 	}
 
 	switch {
+	case e.StatusCode == 429 && e.Retries > 0:
+		return e.hint429WithRetries(prefix)
 	case e.StatusCode == 429:
-		if e.Retries > 0 {
-			parts := []string{prefix}
-			if e.QuotaDetail != "" {
-				parts = append(parts, "Daily quota: "+e.QuotaDetail+".")
-			}
-			if e.RetryAfter != "" {
-				parts = append(parts, "Resets in ~"+e.RetryAfter+".")
-			}
-			if e.QuotaDetail == "" && e.RetryAfter == "" {
-				parts = append(parts, "This may be a per-minute rate limit (resets in ~1 min) or an exhausted daily quota (resets in ~24h).")
-			}
-			parts = append(parts, "Check usage at ai.google.dev")
-			return strings.Join(parts, " ")
-		}
 		return "Wait a moment and retry, or check your Gemini API quota at ai.google.dev"
 	case e.StatusCode == 401 || e.StatusCode == 403:
 		return "Check that GOOGLE_API_KEY is set and valid"
+	case e.StatusCode >= 500 && prefix != "":
+		return prefix + " Gemini service may be experiencing issues — try again later"
 	case e.StatusCode >= 500:
-		if prefix != "" {
-			return prefix + " Gemini service may be experiencing issues — try again later"
-		}
 		return "Gemini service may be experiencing issues — try again later"
 	default:
 		return "Run with --verbose for the full API response"
 	}
+}
+
+func (e *APIError) hint429WithRetries(prefix string) string {
+	parts := []string{prefix}
+	if e.QuotaDetail != "" {
+		parts = append(parts, "Daily quota: "+e.QuotaDetail+".")
+	}
+	if e.RetryAfter != "" {
+		parts = append(parts, "Resets in ~"+e.RetryAfter+".")
+	}
+	if e.QuotaDetail == "" && e.RetryAfter == "" {
+		parts = append(parts, "This may be a per-minute rate limit (resets in ~1 min) or an exhausted daily quota (resets in ~24h).")
+	}
+	parts = append(parts, "Check usage at ai.google.dev")
+	return strings.Join(parts, " ")
 }
 
 // ConfigError represents a configuration problem (e.g. missing API key).

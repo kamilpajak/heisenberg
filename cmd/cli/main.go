@@ -86,6 +86,8 @@ func main() {
 	}
 }
 
+const errorFmt = "  Error: %s\n"
+
 // exitCodeLabel maps exit codes to human-readable descriptions.
 var exitCodeLabel = map[int]string{
 	exitGeneral:     "runtime error",
@@ -106,7 +108,7 @@ func printError(w io.Writer, err error) int {
 	case errors.As(err, &apiErr):
 		code = exitAPIError
 		fmt.Fprintln(w)
-		_, _ = red.Fprintf(w, "  Error: %s\n", apiErr)
+		_, _ = red.Fprintf(w, errorFmt, apiErr)
 		fmt.Fprintln(w)
 		_, _ = dim.Fprintf(w, "  Hint: %s\n", apiErr.Hint())
 		if verbose {
@@ -117,13 +119,13 @@ func printError(w io.Writer, err error) int {
 	case errors.As(err, &cfgErr):
 		code = exitConfigError
 		fmt.Fprintln(w)
-		_, _ = red.Fprintf(w, "  Error: %s\n", cfgErr)
+		_, _ = red.Fprintf(w, errorFmt, cfgErr)
 		fmt.Fprintln(w)
 		_, _ = dim.Fprintln(w, "  Hint: Check your environment variables and configuration")
 
 	default:
 		fmt.Fprintln(w)
-		_, _ = red.Fprintf(w, "  Error: %s\n", err)
+		_, _ = red.Fprintf(w, errorFmt, err)
 	}
 
 	fmt.Fprintln(w)
