@@ -11,6 +11,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"golang.org/x/time/rate"
 )
 
 // emit sends a progress event via the executor's emitter, if set.
@@ -51,11 +53,24 @@ func previewExcerpt(s string, maxLen int) string {
 	return "..." + string(runes[len(runes)-maxLen:])
 }
 
+const (
+	apiRetries        = 3
+	apiRetryBaseDelay = 2 * time.Second
+)
+
 // Client handles Gemini API calls with function calling support.
 type Client struct {
-	apiKey  string
-	baseURL string
-	model   string
+	apiKey         string
+	baseURL        string
+	model          string
+	httpClient     *http.Client
+	limiter        *rate.Limiter
+	retryBaseDelay time.Duration // zero means use apiRetryBaseDelay
+}
+
+// isRetryable returns true for HTTP status codes that warrant a retry.
+func isRetryable(statusCode int) bool {
+	return statusCode == 429 || statusCode >= 500
 }
 
 // isEmptyResponse checks if the model returned neither text nor function calls.
@@ -92,13 +107,15 @@ func describeEmptyResponse(c *Candidate) string {
 func NewClient() (*Client, error) {
 	apiKey := os.Getenv("GOOGLE_API_KEY")
 	if apiKey == "" {
-		return nil, fmt.Errorf("GOOGLE_API_KEY environment variable required")
+		return nil, &ConfigError{Message: "GOOGLE_API_KEY environment variable required"}
 	}
 
 	return &Client{
-		apiKey:  apiKey,
-		baseURL: "https://generativelanguage.googleapis.com/v1beta",
-		model:   "gemini-3-pro-preview",
+		apiKey:     apiKey,
+		baseURL:    "https://generativelanguage.googleapis.com/v1beta",
+		model:      "gemini-3-pro-preview",
+		httpClient: &http.Client{Timeout: 120 * time.Second},
+		limiter:    rate.NewLimiter(rate.Every(6*time.Second), 1), // ~10 RPM
 	}, nil
 }
 
@@ -600,6 +617,12 @@ func (c *Client) forceTraces(ctx context.Context, handler ToolExecutor, step, ma
 }
 
 func (c *Client) generate(ctx context.Context, history []Content, tools []Tool, system *Content) (*GenerateResponse, error) {
+	if c.limiter != nil {
+		if err := c.limiter.Wait(ctx); err != nil {
+			return nil, err
+		}
+	}
+
 	req := GenerateRequest{
 		Contents:          history,
 		Tools:             tools,
@@ -617,31 +640,76 @@ func (c *Client) generate(ctx context.Context, history []Content, tools []Tool, 
 
 	url := fmt.Sprintf("%s/models/%s:generateContent?key=%s", c.baseURL, c.model, c.apiKey)
 
+	var lastAPIErr *APIError
+	for attempt := range apiRetries + 1 {
+		result, apiErr, err := c.doRequest(ctx, url, jsonBody)
+		if err != nil {
+			return nil, err
+		}
+		if result != nil {
+			return result, nil
+		}
+
+		lastAPIErr = apiErr
+		if !isRetryable(apiErr.StatusCode) || attempt >= apiRetries {
+			apiErr.Retries = attempt
+			return nil, apiErr
+		}
+
+		if err := c.backoff(ctx, attempt); err != nil {
+			return nil, err
+		}
+	}
+
+	return nil, lastAPIErr
+}
+
+// doRequest makes a single HTTP request and returns either a successful response or an API error.
+func (c *Client) doRequest(ctx context.Context, url string, jsonBody []byte) (*GenerateResponse, *APIError, error) {
 	httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(jsonBody))
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 
-	resp, err := http.DefaultClient.Do(httpReq)
-	if err != nil {
-		return nil, err
+	httpClient := c.httpClient
+	if httpClient == nil {
+		httpClient = http.DefaultClient
 	}
-	defer resp.Body.Close()
+
+	resp, err := httpClient.Do(httpReq)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	body, err := io.ReadAll(resp.Body)
+	resp.Body.Close()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("gemini API error: %s - %s", resp.Status, string(body))
+	if resp.StatusCode == http.StatusOK {
+		var result GenerateResponse
+		if err := json.Unmarshal(body, &result); err != nil {
+			return nil, nil, fmt.Errorf("failed to parse response: %w", err)
+		}
+		return &result, nil, nil
 	}
 
-	var result GenerateResponse
-	if err := json.Unmarshal(body, &result); err != nil {
-		return nil, fmt.Errorf("failed to parse response: %w", err)
-	}
+	return nil, parseAPIError(resp.StatusCode, resp.Status, body), nil
+}
 
-	return &result, nil
+// backoff waits for an exponential delay, cancellable via context.
+func (c *Client) backoff(ctx context.Context, attempt int) error {
+	base := c.retryBaseDelay
+	if base == 0 {
+		base = apiRetryBaseDelay
+	}
+	delay := base * (1 << attempt)
+	select {
+	case <-time.After(delay):
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }

@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -150,11 +151,11 @@ func TestGenerate_Success(t *testing.T) {
 func TestGenerate_APIError(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusTooManyRequests)
-		w.Write([]byte(`{"error": "rate limited"}`))
+		w.Write([]byte(gemini429Body))
 	}))
 	defer ts.Close()
 
-	c := &Client{apiKey: "test-key", baseURL: ts.URL, model: "test-model"}
+	c := newTestClient(ts.URL)
 	_, err := c.generate(context.Background(), []Content{}, nil, nil)
 
 	require.Error(t, err)
@@ -220,7 +221,159 @@ func TestNewClient_Success(t *testing.T) {
 	c, err := NewClient()
 	require.NoError(t, err)
 	assert.Equal(t, "test-key", c.apiKey)
-	assert.Equal(t, "gemini-3-pro-preview", c.model, "must use Gemini 3 Pro")
+	assert.Equal(t, "gemini-3-pro-preview", c.model)
+	assert.NotNil(t, c.httpClient, "should have an HTTP client")
+	assert.NotNil(t, c.limiter, "should have a rate limiter")
+}
+
+func TestIsRetryable(t *testing.T) {
+	tests := []struct {
+		code int
+		want bool
+	}{
+		{429, true},
+		{500, true},
+		{503, true},
+		{401, false},
+		{400, false},
+		{200, false},
+	}
+	for _, tt := range tests {
+		assert.Equal(t, tt.want, isRetryable(tt.code), "isRetryable(%d)", tt.code)
+	}
+}
+
+// gemini429Body is a real Gemini API 429 response captured from production.
+const gemini429Body = `{"error":{"code":429,"message":"You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit.\n\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_requests_per_model_per_day, limit: 250, model: gemini-3.1-pro\n\nPlease retry in 4h59m27.724879759s.","status":"RESOURCE_EXHAUSTED"}}`
+
+// geminiDoneCall is a "done" function call response reconstructed from a real
+// successful analysis of microsoft/playwright (demo-success-playwright-timeout.cast).
+var geminiDoneCall = GenerateResponse{
+	Candidates: []Candidate{{Content: Content{Parts: []Part{{
+		FunctionCall: &FunctionCall{
+			Name: "done",
+			Args: map[string]any{
+				"category":                        "diagnosis",
+				"confidence":                      float64(90),
+				"missing_information_sensitivity": "low",
+				"title":                           "Timeout waiting for crash event",
+				"failure_type":                    "timeout",
+				"file_path":                       "tests/page/page-event-crash.spec.ts",
+				"line_number":                     float64(28),
+				"symptom":                         "Test timed out after 30000ms waiting for page crash event",
+				"root_cause":                      "A likely regression in Playwright's WebKit support for macOS was introduced by a dependency update. This is causing fundamental browser operations (launching, closing, and crash event handling) to time out, leading to test failures across multiple suites.",
+				"evidence":                        []any{map[string]any{"type": "log", "content": "Error: page.on('crash') did not fire"}, map[string]any{"type": "log", "content": "Test timeout of 30000ms exceeded."}, map[string]any{"type": "log", "content": "browserType.launchPersistentContext failed: Timeout exceeded"}},
+				"remediation":                     "The dependency updates in commit f4923837 should be investigated as the likely source of this regression. The team should identify the specific dependency causing the issue and consider reverting it or upgrading to a patched version.",
+			},
+		},
+	}}}}},
+	UsageMetadata: &UsageMetadata{PromptTokenCount: 45000, TotalTokenCount: 46200},
+}
+
+func TestGeminiDoneFixture_ParsesRCA(t *testing.T) {
+	fc := geminiDoneCall.Candidates[0].Content.Parts[0].FunctionCall
+	require.Equal(t, "done", fc.Name)
+
+	rca := ParseRCAFromArgs(fc.Args)
+	require.NotNil(t, rca)
+	assert.Equal(t, "Timeout waiting for crash event", rca.Title)
+	assert.Equal(t, FailureTypeTimeout, rca.FailureType)
+	assert.Equal(t, "tests/page/page-event-crash.spec.ts", rca.Location.FilePath)
+	assert.Equal(t, 28, rca.Location.LineNumber)
+	assert.Len(t, rca.Evidence, 3)
+	assert.Contains(t, rca.RootCause, "regression")
+	assert.Contains(t, rca.Remediation, "f4923837")
+}
+
+func TestGenerate_RetriesOn429(t *testing.T) {
+	attempts := 0
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		if attempts <= 2 {
+			w.WriteHeader(429)
+			w.Write([]byte(gemini429Body))
+			return
+		}
+		resp := GenerateResponse{Candidates: []Candidate{{Content: Content{Parts: []Part{{Text: "ok"}}}}}}
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer ts.Close()
+
+	c := newTestClient(ts.URL)
+	result, err := c.generate(context.Background(), []Content{}, nil, nil)
+
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Equal(t, 3, attempts, "should have retried twice before succeeding")
+}
+
+func TestGenerate_NoRetryOn401(t *testing.T) {
+	attempts := 0
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		w.WriteHeader(401)
+		w.Write([]byte(`{"error":{"code":401,"message":"Unauthorized"}}`))
+	}))
+	defer ts.Close()
+
+	c := newTestClient(ts.URL)
+	_, err := c.generate(context.Background(), []Content{}, nil, nil)
+
+	require.Error(t, err)
+	var apiErr *APIError
+	require.ErrorAs(t, err, &apiErr)
+	assert.Equal(t, 401, apiErr.StatusCode)
+	assert.Equal(t, 1, attempts, "should not retry on 401")
+}
+
+func TestGenerate_MaxRetriesExhausted(t *testing.T) {
+	attempts := 0
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		w.WriteHeader(429)
+		w.Write([]byte(gemini429Body))
+	}))
+	defer ts.Close()
+
+	c := newTestClient(ts.URL)
+	_, err := c.generate(context.Background(), []Content{}, nil, nil)
+
+	require.Error(t, err)
+	var apiErr *APIError
+	require.ErrorAs(t, err, &apiErr)
+	assert.Equal(t, 429, apiErr.StatusCode)
+	assert.Equal(t, 3, apiErr.Retries, "should report retry count")
+	assert.Equal(t, 4, attempts, "1 initial + 3 retries")
+	assert.Equal(t, "250 req/day for gemini-3.1-pro", apiErr.QuotaDetail)
+	assert.Equal(t, "5h", apiErr.RetryAfter)
+}
+
+func TestGenerate_RetriesRespectContext(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(429)
+		w.Write([]byte(gemini429Body))
+	}))
+	defer ts.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // Cancel immediately
+
+	c := newTestClient(ts.URL)
+	_, err := c.generate(ctx, []Content{}, nil, nil)
+
+	require.Error(t, err)
+}
+
+// newTestClient creates a Client pointing at a test server URL with no rate limiting
+// and minimal backoff delays for fast tests.
+func newTestClient(baseURL string) *Client {
+	return &Client{
+		apiKey:         "test-key",
+		baseURL:        baseURL,
+		model:          "test-model",
+		httpClient:     &http.Client{Timeout: 5 * time.Second},
+		retryBaseDelay: time.Millisecond, // fast retries in tests
+	}
 }
 
 // noopEmitter discards all progress events.
@@ -544,7 +697,7 @@ func TestRunAgentLoop_GenerateErrorMidLoop(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	c := &Client{apiKey: "test", baseURL: ts.URL, model: "m"}
+	c := newTestClient(ts.URL)
 	handler := &mockToolHandler{emitter: noopEmitter{}}
 
 	_, err := c.RunAgentLoop(context.Background(), handler, testToolDeclarations(), "context", false)

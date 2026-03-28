@@ -3,11 +3,13 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"os/signal"
+	"regexp"
 	"strings"
 	"time"
 
@@ -26,6 +28,14 @@ var (
 	date    = "unknown"
 )
 
+// Exit codes for scriptability and CI integration.
+const (
+	exitGeneral     = 1 // runtime error
+	exitUsage       = 2 // bad arguments (reserved, handled by cobra)
+	exitAPIError    = 3 // external AI/API error
+	exitConfigError = 4 // missing or invalid configuration
+)
+
 var (
 	verbose    bool
 	jsonOutput bool
@@ -34,11 +44,13 @@ var (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "heisenberg <owner/repo>",
-	Short: "AI-powered test failure analysis",
-	Long:  `Analyzes test artifacts from GitHub repos using AI to identify root causes.`,
-	Args:  cobra.ExactArgs(1),
-	RunE:  run,
+	Use:           "heisenberg <owner/repo>",
+	Short:         "AI-powered test failure analysis",
+	Long:          `Analyzes test artifacts from GitHub repos using AI to identify root causes.`,
+	Args:          cobra.ExactArgs(1),
+	RunE:          run,
+	SilenceUsage:  true,
+	SilenceErrors: true,
 }
 
 var serveCmd = &cobra.Command{
@@ -68,9 +80,57 @@ func init() {
 }
 
 func main() {
-	if rootCmd.Execute() != nil {
-		os.Exit(1)
+	if err := rootCmd.Execute(); err != nil {
+		code := printError(os.Stderr, err)
+		os.Exit(code)
 	}
+}
+
+const errorFmt = "  Error: %s\n"
+
+// exitCodeLabel maps exit codes to human-readable descriptions.
+var exitCodeLabel = map[int]string{
+	exitGeneral:     "runtime error",
+	exitAPIError:    "external API error",
+	exitConfigError: "configuration error",
+}
+
+func printError(w io.Writer, err error) int {
+	red := color.New(color.FgRed, color.Bold)
+	dim := color.New(color.FgHiBlack)
+
+	code := exitGeneral
+
+	var apiErr *llm.APIError
+	var cfgErr *llm.ConfigError
+
+	switch {
+	case errors.As(err, &apiErr):
+		code = exitAPIError
+		fmt.Fprintln(w)
+		_, _ = red.Fprintf(w, errorFmt, apiErr)
+		fmt.Fprintln(w)
+		_, _ = dim.Fprintf(w, "  Hint: %s\n", apiErr.Hint())
+		if verbose {
+			fmt.Fprintln(w)
+			_, _ = dim.Fprintf(w, "  Raw response:\n  %s\n", apiErr.RawBody)
+		}
+
+	case errors.As(err, &cfgErr):
+		code = exitConfigError
+		fmt.Fprintln(w)
+		_, _ = red.Fprintf(w, errorFmt, cfgErr)
+		fmt.Fprintln(w)
+		_, _ = dim.Fprintln(w, "  Hint: Check your environment variables and configuration")
+
+	default:
+		fmt.Fprintln(w)
+		_, _ = red.Fprintf(w, errorFmt, err)
+	}
+
+	fmt.Fprintln(w)
+	_, _ = dim.Fprintf(w, "  Exit code: %d  (%s)\n", code, exitCodeLabel[code])
+	return code
 }
 
 func run(cmd *cobra.Command, args []string) error {
@@ -81,7 +141,7 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 	owner, repoName := parts[0], parts[1]
 
-	emitter := llm.NewTextEmitter(os.Stderr)
+	emitter := llm.NewTextEmitter(os.Stderr, verbose)
 
 	result, err := analysis.Run(context.Background(), analysis.Params{
 		Owner:        owner,
@@ -92,8 +152,9 @@ func run(cmd *cobra.Command, args []string) error {
 		SnapshotHTML: trace.SnapshotHTML,
 	})
 	if err != nil {
+		emitter.MarkFailed()
 		emitter.Close()
-		return fmt.Errorf("analysis failed: %w", err)
+		return err
 	}
 
 	emitter.Close()
@@ -151,6 +212,10 @@ func printResult(stderr, stdout io.Writer, r *llm.AnalysisResult) {
 func printStructuredRCA(w io.Writer, rca *llm.RootCauseAnalysis) {
 	bold := color.New(color.Bold)
 	dim := color.New(color.FgHiBlack)
+	headerColor := color.New(color.Bold, color.FgRed)
+	sectionColor := color.New(color.Bold, color.FgWhite)
+	fixColor := color.New(color.Bold, color.FgGreen)
+	separator := "  " + strings.Repeat("─", 40)
 
 	// Header with failure type and location
 	failureType := strings.ToUpper(rca.FailureType)
@@ -166,28 +231,99 @@ func printStructuredRCA(w io.Writer, rca *llm.RootCauseAnalysis) {
 		}
 		header = fmt.Sprintf("%s in %s", header, loc)
 	}
-	_, _ = bold.Fprintln(w, header)
+	_, _ = headerColor.Fprintln(w, "  "+header)
 	fmt.Fprintln(w)
 
 	// Root cause
-	_, _ = bold.Fprintln(w, "ROOT CAUSE")
-	fmt.Fprintln(w, rca.RootCause)
+	_, _ = sectionColor.Fprintln(w, "  Root Cause")
+	_, _ = dim.Fprintln(w, separator)
+	fmt.Fprintln(w, wrapBullets(rca.RootCause, maxLineWidth, "  "))
 	fmt.Fprintln(w)
 
 	// Evidence (if any)
 	if len(rca.Evidence) > 0 {
-		_, _ = bold.Fprintln(w, "EVIDENCE")
+		_, _ = sectionColor.Fprintln(w, "  Evidence")
+		_, _ = dim.Fprintln(w, separator)
+		// Find max icon width for alignment
+		maxIcon := 0
+		for _, ev := range rca.Evidence {
+			if l := len(evidenceIcon(ev.Type)); l > maxIcon {
+				maxIcon = l
+			}
+		}
+		evidenceIndent := "  " + strings.Repeat(" ", maxIcon+1) // align continuation lines
 		for _, ev := range rca.Evidence {
 			icon := evidenceIcon(ev.Type)
-			_, _ = dim.Fprintf(w, "%s ", icon)
-			fmt.Fprintln(w, ev.Content)
+			padding := strings.Repeat(" ", maxIcon-len(icon))
+			prefix := fmt.Sprintf("  %s%s ", icon, padding)
+			wrapped := wrapText(ev.Content, maxLineWidth, evidenceIndent)
+			// Replace first line's indent with the icon prefix
+			wrapped = prefix + strings.TrimLeft(wrapped, " ")
+			_, _ = bold.Fprintln(w, wrapped)
 		}
 		fmt.Fprintln(w)
 	}
 
 	// Remediation
-	_, _ = bold.Fprintln(w, "FIX")
-	fmt.Fprintln(w, rca.Remediation)
+	_, _ = fixColor.Fprintln(w, "  Fix")
+	_, _ = dim.Fprintln(w, separator)
+	fmt.Fprintln(w, wrapBullets(rca.Remediation, maxLineWidth, "  "))
+}
+
+const maxLineWidth = 76 // 78 visible minus 2-char indent
+
+var numberedItemRe = regexp.MustCompile(`^\d+\.\s`)
+
+// wrapText wraps s to maxWidth visible characters, breaking at word boundaries.
+// Each line is prefixed with indent. The first line also gets the indent.
+func wrapText(s string, maxWidth int, indent string) string {
+	words := strings.Fields(s)
+	if len(words) == 0 {
+		return ""
+	}
+
+	var lines []string
+	line := indent + words[0]
+	lineLen := len(indent) + len(words[0])
+
+	for _, w := range words[1:] {
+		if lineLen+1+len(w) > maxWidth {
+			lines = append(lines, line)
+			line = indent + w
+			lineLen = len(indent) + len(w)
+		} else {
+			line += " " + w
+			lineLen += 1 + len(w)
+		}
+	}
+	lines = append(lines, line)
+	return strings.Join(lines, "\n")
+}
+
+// wrapBullets wraps text that may contain numbered items (1. foo 2. bar)
+// or newline-separated paragraphs from the LLM.
+func wrapBullets(s string, maxWidth int, indent string) string {
+	// Split on \n first (LLM may use literal newlines)
+	paragraphs := strings.Split(s, "\n")
+	var out []string
+	for _, p := range paragraphs {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		// Detect numbered items like "1. ", "10. " or "- "
+		bulletIndent := indent
+		if loc := numberedItemRe.FindStringIndex(p); loc != nil {
+			bulletIndent = indent + strings.Repeat(" ", loc[1]) // align past "N. "
+		} else if strings.HasPrefix(p, "- ") {
+			bulletIndent = indent + "  "
+		}
+		wrapped := wrapText(p, maxWidth, bulletIndent)
+		// Replace first line's wider indent with base indent so bullet marker is visible
+		wrapped = indent + strings.TrimPrefix(wrapped, bulletIndent)
+		out = append(out, wrapped)
+	}
+	return strings.Join(out, "\n")
 }
 
 func evidenceIcon(t string) string {
@@ -209,10 +345,7 @@ func evidenceIcon(t string) string {
 
 func printConfidenceBar(w io.Writer, confidence int, sensitivity string) {
 	const barWidth = 24
-	filled := confidence * barWidth / 100
-	if filled > barWidth {
-		filled = barWidth
-	}
+	filled := min(confidence*barWidth/100, barWidth)
 
 	var barColor *color.Color
 	switch {

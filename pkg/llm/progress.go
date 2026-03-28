@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/briandowns/spinner"
 	"github.com/fatih/color"
@@ -43,22 +44,58 @@ type TextEmitter struct {
 	sp      *spinner.Spinner
 	tty     bool
 	noColor bool
+	verbose bool
+
+	// Compact mode state (non-verbose TTY)
+	lastStep int
+	lastMax  int
+	lastTool string
+	failed   bool
+}
+
+// MarkFailed signals that the analysis ended with an error.
+// This changes the Close() summary from ✓ to ✗.
+func (e *TextEmitter) MarkFailed() {
+	e.failed = true
 }
 
 // NewTextEmitter creates a TextEmitter that writes to w.
 // It detects TTY capability for color and spinner support.
-func NewTextEmitter(w io.Writer) *TextEmitter {
+// When verbose is false and output is a TTY, progress is shown as a single
+// updating line instead of one line per tool call.
+func NewTextEmitter(w io.Writer, verbose bool) *TextEmitter {
 	tty := false
 	if f, ok := w.(*os.File); ok {
 		tty = isatty.IsTerminal(f.Fd()) || isatty.IsCygwinTerminal(f.Fd())
 	}
 	noColor := !tty || os.Getenv("NO_COLOR") != "" || os.Getenv("TERM") == "dumb"
-	return &TextEmitter{w: w, tty: tty, noColor: noColor}
+	return &TextEmitter{w: w, tty: tty, noColor: noColor, verbose: verbose}
 }
 
-// Close stops any running spinner. Call before printing final results.
+// Close stops any running spinner and prints a compact summary line
+// when in non-verbose mode. Call before printing final results.
 func (e *TextEmitter) Close() {
 	e.stopSpinner()
+	if !e.verbose && e.lastStep > 0 {
+		dim := color.New(color.FgHiBlack)
+		green := color.New(color.FgGreen)
+		red := color.New(color.FgRed)
+		if e.noColor {
+			dim.DisableColor()
+			green.DisableColor()
+			red.DisableColor()
+		}
+		if e.tty {
+			fmt.Fprintf(e.w, "\r\033[K")
+		}
+		if e.failed {
+			_, _ = red.Fprint(e.w, "  ✗  ")
+			_, _ = dim.Fprintf(e.w, "Stopped at %d/%d iterations\n", e.lastStep, e.lastMax)
+		} else {
+			_, _ = green.Fprint(e.w, "  ✓  ")
+			_, _ = dim.Fprintf(e.w, "Used %d/%d iterations\n", e.lastStep, e.lastMax)
+		}
+	}
 }
 
 func (e *TextEmitter) stopSpinner() {
@@ -80,50 +117,138 @@ func (e *TextEmitter) startSpinner(msg string) {
 	e.sp.Start()
 }
 
-// Emit writes a formatted progress event.
-func (e *TextEmitter) Emit(ev ProgressEvent) {
+// toolPhase maps a tool name to a human-friendly phase description.
+func toolPhase(tool string) string {
+	switch tool {
+	case "list_jobs":
+		return "Listing jobs"
+	case "get_job_logs":
+		return "Reading logs"
+	case "get_artifact":
+		return "Fetching artifacts"
+	case "get_test_traces":
+		return "Analyzing traces"
+	case "get_repo_file", "get_workflow_file":
+		return "Reading source"
+	case "done":
+		return "Finalizing"
+	default:
+		return "Analyzing"
+	}
+}
+
+// compactProgressLine builds the compact progress string (without \r prefix).
+const phaseWidth = 18 // fixed width for aligned progress output
+
+func (e *TextEmitter) compactProgressLine() string {
+	return e.compactProgressLineWithHint(e.lastStep, "")
+}
+
+func (e *TextEmitter) compactProgressLineWithHint(step int, hint string) string {
+	phase := fmt.Sprintf("%-*s", phaseWidth, toolPhase(e.lastTool))
+	counter := fmt.Sprintf("%d/%d", step, e.lastMax)
+	if hint != "" {
+		return fmt.Sprintf("  %s %s  (%s)", phase, counter, hint)
+	}
+	return fmt.Sprintf("  %s %s", phase, counter)
+}
+
+// compactProgress renders a single-line progress indicator using \r on TTY.
+// Format: "  Analyzing  7/30"
+func (e *TextEmitter) compactProgress() {
+	if e.tty {
+		fmt.Fprintf(e.w, "\r\033[K%s", e.compactProgressLine())
+	} else {
+		fmt.Fprintf(e.w, "%s\n", e.compactProgressLine())
+	}
+}
+
+// startCompactSpinner starts a spinner with the compact progress as prefix.
+// This provides visual feedback while waiting for slow API calls.
+func (e *TextEmitter) startCompactSpinner(step int, hint string) {
+	e.stopSpinner()
+	if !e.tty {
+		return
+	}
+	e.sp = spinner.New(spinner.CharSets[14], 80*time.Millisecond, spinner.WithWriter(e.w))
+	e.sp.Prefix = e.compactProgressLineWithHint(step, hint) + "  "
+	e.sp.Start()
+}
+
+// emitToolVerbose prints a detailed tool call line with aligned counter.
+func (e *TextEmitter) emitToolVerbose(ev ProgressEvent) {
 	dim := color.New(color.FgHiBlack)
 	green := color.New(color.FgGreen)
 	cyan := color.New(color.FgCyan)
-
 	if e.noColor {
 		dim.DisableColor()
 		green.DisableColor()
 		cyan.DisableColor()
 	}
 
+	e.stopSpinner()
+
+	check := green.Sprint("✓")
+	toolName := cyan.Sprint(ev.Tool)
+
+	argsStr := ""
+	argsVisible := ""
+	if ev.Args != "" && ev.Tool != "done" {
+		if h := humanizeArgs(ev.Args); h != "" {
+			argsVisible = " " + h
+			argsStr = " " + dim.Sprint(h)
+		}
+	}
+
+	// Right-align counter: "  ✓ " (4 visible chars) + tool + args
+	// Use rune count for display columns (multi-byte chars like "…" = 1 column)
+	counterText := fmt.Sprintf("%d/%d", ev.Step, ev.MaxStep)
+	minPadding := 2
+	maxArgs := alignWidth - 4 - utf8.RuneCountInString(ev.Tool) - len(counterText) - minPadding
+	if argsRunes := utf8.RuneCountInString(argsVisible); argsRunes > maxArgs && maxArgs > 3 {
+		// Truncate args to fit alignment
+		runes := []rune(argsVisible)
+		argsVisible = string(runes[:maxArgs-1]) + "…"
+		argsStr = " " + dim.Sprint(string(runes[1:maxArgs-1])+"…")
+	}
+
+	visibleLeft := 4 + utf8.RuneCountInString(ev.Tool) + utf8.RuneCountInString(argsVisible)
+	padding := max(alignWidth-visibleLeft-len(counterText), minPadding)
+
+	fmt.Fprintf(e.w, "  %s %s%s%s%s\n", check, toolName, argsStr, strings.Repeat(" ", padding), dim.Sprint(counterText))
+}
+
+// Emit writes a formatted progress event.
+func (e *TextEmitter) Emit(ev ProgressEvent) {
 	switch ev.Type {
 	case "step":
-		e.startSpinner(ev.Message)
+		if e.verbose {
+			e.startSpinner(ev.Message)
+		} else {
+			e.lastStep = ev.Step
+			e.lastMax = ev.MaxStep
+			e.startCompactSpinner(ev.Step, "calling model...")
+		}
 
 	case "tool":
-		e.stopSpinner()
-
-		check := green.Sprint("✓")
-		toolName := cyan.Sprint(ev.Tool)
-		counter := dim.Sprintf("%d/%d", ev.Step, ev.MaxStep)
-
-		argsStr := ""
-		argsVisible := ""
-		if ev.Args != "" && ev.Tool != "done" {
-			if h := humanizeArgs(ev.Args); h != "" {
-				argsVisible = " " + h
-				argsStr = " " + dim.Sprint(h)
-			}
+		e.lastStep = ev.Step
+		e.lastMax = ev.MaxStep
+		e.lastTool = ev.Tool
+		if e.verbose {
+			e.emitToolVerbose(ev)
+		} else {
+			e.stopSpinner()
+			e.compactProgress()
 		}
-
-		// Right-align counter: "  ✓ " (4 visible chars) + tool + args
-		visibleLeft := 4 + len(ev.Tool) + len(argsVisible)
-		counterText := fmt.Sprintf("%d/%d", ev.Step, ev.MaxStep)
-		padding := alignWidth - visibleLeft - len(counterText)
-		if padding < 1 {
-			padding = 1
-		}
-
-		fmt.Fprintf(e.w, "  %s %s%s%s%s\n", check, toolName, argsStr, strings.Repeat(" ", padding), counter)
 
 	case "result":
-		_, _ = dim.Fprintf(e.w, "    ↳ %s\n", formatStats(ev))
+		if e.verbose {
+			dim := color.New(color.FgHiBlack)
+			if e.noColor {
+				dim.DisableColor()
+			}
+			_, _ = dim.Fprintf(e.w, "    ↳ %s\n", formatStats(ev))
+		}
 
 	case "info":
 		e.stopSpinner()
@@ -158,6 +283,8 @@ func humanizeArgs(argsJSON string) string {
 	}
 	sort.Strings(keys)
 
+	const maxValueLen = 20
+
 	var parts []string
 	for _, k := range keys {
 		v := args[k]
@@ -173,7 +300,11 @@ func humanizeArgs(argsJSON string) string {
 				parts = append(parts, fmt.Sprintf("%s: %g", display, val))
 			}
 		default:
-			parts = append(parts, fmt.Sprintf("%s: %v", display, v))
+			s := fmt.Sprintf("%v", v)
+			if len(s) > maxValueLen {
+				s = s[:maxValueLen-1] + "…"
+			}
+			parts = append(parts, fmt.Sprintf("%s: %s", display, s))
 		}
 	}
 

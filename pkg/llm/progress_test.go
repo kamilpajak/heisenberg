@@ -2,7 +2,9 @@ package llm
 
 import (
 	"bytes"
+	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/fatih/color"
 	"github.com/stretchr/testify/assert"
@@ -15,7 +17,12 @@ func init() {
 
 func newTestEmitter() (*TextEmitter, *bytes.Buffer) {
 	var buf bytes.Buffer
-	return &TextEmitter{w: &buf, tty: false}, &buf
+	return &TextEmitter{w: &buf, tty: false, noColor: true, verbose: true}, &buf
+}
+
+func newCompactTestEmitter() (*TextEmitter, *bytes.Buffer) {
+	var buf bytes.Buffer
+	return &TextEmitter{w: &buf, tty: false, noColor: true, verbose: false}, &buf
 }
 
 func TestEmit_Step(t *testing.T) {
@@ -85,19 +92,37 @@ func TestEmit_Close(t *testing.T) {
 	e.Close() // should not panic
 }
 
+// runeIndex returns the rune (column) position of substr in s, or -1.
+func runeIndex(s, substr string) int {
+	byteIdx := strings.Index(s, substr)
+	if byteIdx < 0 {
+		return -1
+	}
+	return utf8.RuneCountInString(s[:byteIdx])
+}
+
 func TestEmit_ToolCounterAlignment(t *testing.T) {
 	e, buf := newTestEmitter()
+
+	// Short args
 	e.Emit(ProgressEvent{Type: "tool", Step: 1, MaxStep: 10, Tool: "get_job_logs"})
 	line1 := buf.String()
 	buf.Reset()
 
 	e.Emit(ProgressEvent{Type: "tool", Step: 2, MaxStep: 10, Tool: "done"})
 	line2 := buf.String()
+	buf.Reset()
 
-	// Both lines should have their counters at approximately the same position
-	idx1 := bytes.Index([]byte(line1), []byte("1/10"))
-	idx2 := bytes.Index([]byte(line2), []byte("2/10"))
-	assert.InDelta(t, idx1, idx2, 1, "counters should be aligned")
+	// Long args with truncation (produces "…" multi-byte char)
+	e.Emit(ProgressEvent{Type: "tool", Step: 3, MaxStep: 10, Tool: "get_artifact", Args: `{"artifact_name":"blob-report-macos-latest-node20-1"}`})
+	line3 := buf.String()
+
+	// Use rune index (display columns), not byte index
+	col1 := runeIndex(line1, "1/10")
+	col2 := runeIndex(line2, "2/10")
+	col3 := runeIndex(line3, "3/10")
+	assert.InDelta(t, col1, col2, 1, "short lines should be aligned")
+	assert.InDelta(t, col1, col3, 1, "long args line should also be aligned")
 }
 
 func TestFormatDuration(t *testing.T) {
@@ -239,7 +264,152 @@ func TestHumanizeArgs_DeterministicOrder(t *testing.T) {
 
 func TestNewTextEmitter_NoColor(t *testing.T) {
 	var buf bytes.Buffer
-	e := NewTextEmitter(&buf)
+	e := NewTextEmitter(&buf, false)
 	// Non-TTY writer should have noColor=true
 	assert.True(t, e.noColor, "non-TTY should have noColor=true")
+}
+
+func TestToolPhase(t *testing.T) {
+	tests := []struct {
+		tool string
+		want string
+	}{
+		{"list_jobs", "Listing jobs"},
+		{"get_job_logs", "Reading logs"},
+		{"get_artifact", "Fetching artifacts"},
+		{"get_test_traces", "Analyzing traces"},
+		{"get_repo_file", "Reading source"},
+		{"get_workflow_file", "Reading source"},
+		{"done", "Finalizing"},
+		{"unknown_tool", "Analyzing"},
+	}
+	for _, tt := range tests {
+		assert.Equal(t, tt.want, toolPhase(tt.tool), "toolPhase(%q)", tt.tool)
+	}
+}
+
+func TestCompactMode_ToolShowsPhaseAndCounter(t *testing.T) {
+	e, buf := newCompactTestEmitter()
+	e.Emit(ProgressEvent{Type: "tool", Step: 3, MaxStep: 30, Tool: "get_repo_file"})
+	assert.Equal(t, "  Reading source     3/30\n", buf.String())
+}
+
+func TestCompactMode_StepIsQuietOnNonTTY(t *testing.T) {
+	e, buf := newCompactTestEmitter()
+	e.Emit(ProgressEvent{Type: "step", Step: 1, MaxStep: 30, Message: "Calling model..."})
+	assert.Empty(t, buf.String(), "compact spinner is a no-op on non-TTY")
+}
+
+func TestCompactMode_ResultSuppressed(t *testing.T) {
+	e, buf := newCompactTestEmitter()
+	e.Emit(ProgressEvent{Type: "result", ModelMs: 3200, Tokens: 12847})
+	assert.Empty(t, buf.String(), "compact mode should suppress result events")
+}
+
+func TestCompactMode_CloseSuccess(t *testing.T) {
+	e, buf := newCompactTestEmitter()
+	e.Emit(ProgressEvent{Type: "tool", Step: 9, MaxStep: 30, Tool: "done"})
+	buf.Reset()
+	e.Close()
+	assert.Equal(t, "  ✓  Used 9/30 iterations\n", buf.String())
+}
+
+func TestCompactMode_CloseError(t *testing.T) {
+	e, buf := newCompactTestEmitter()
+	e.Emit(ProgressEvent{Type: "tool", Step: 2, MaxStep: 30, Tool: "get_job_logs"})
+	e.MarkFailed()
+	buf.Reset()
+	e.Close()
+	assert.Equal(t, "  ✗  Stopped at 2/30 iterations\n", buf.String())
+}
+
+func TestCompactMode_CloseError_AfterStepWithoutTool(t *testing.T) {
+	e, buf := newCompactTestEmitter()
+	// Step 1 + tool 1 complete
+	e.Emit(ProgressEvent{Type: "step", Step: 1, MaxStep: 30, Message: "Calling model..."})
+	e.Emit(ProgressEvent{Type: "tool", Step: 1, MaxStep: 30, Tool: "get_artifact"})
+	// Step 2 + tool 2 complete
+	e.Emit(ProgressEvent{Type: "step", Step: 2, MaxStep: 30, Message: "Calling model..."})
+	e.Emit(ProgressEvent{Type: "tool", Step: 2, MaxStep: 30, Tool: "get_job_logs"})
+	// Step 3 starts but model returns error — no tool event
+	e.Emit(ProgressEvent{Type: "step", Step: 3, MaxStep: 30, Message: "Calling model..."})
+	e.MarkFailed()
+	buf.Reset()
+	e.Close()
+	assert.Equal(t, "  ✗  Stopped at 3/30 iterations\n", buf.String())
+}
+
+func TestCompactMode_InfoStillPrints(t *testing.T) {
+	e, buf := newCompactTestEmitter()
+	e.Emit(ProgressEvent{Type: "info", Message: "Analyzing run 123..."})
+	assert.Contains(t, buf.String(), "Analyzing run 123...")
+}
+
+func TestCompactMode_ErrorStillPrints(t *testing.T) {
+	e, buf := newCompactTestEmitter()
+	e.Emit(ProgressEvent{Type: "error", Message: "something failed"})
+	assert.Contains(t, buf.String(), "Error: something failed")
+}
+
+func TestCompactProgressLine(t *testing.T) {
+	e, _ := newCompactTestEmitter()
+
+	// Initial state (before any tool) — phase padded to fixed width
+	e.lastStep = 0
+	e.lastMax = 30
+	e.lastTool = ""
+	assert.Equal(t, "  Analyzing          0/30", e.compactProgressLine())
+
+	// Mid-progress — different phase, same alignment
+	e.lastStep = 3
+	e.lastTool = "get_job_logs"
+	assert.Equal(t, "  Reading logs       3/30", e.compactProgressLine())
+
+	// Longer phase — still aligned
+	e.lastStep = 2
+	e.lastTool = "get_artifact"
+	assert.Equal(t, "  Fetching artifacts 2/30", e.compactProgressLine())
+
+	// Done tool
+	e.lastStep = 9
+	e.lastTool = "done"
+	assert.Equal(t, "  Finalizing         9/30", e.compactProgressLine())
+}
+
+func TestCompactProgressLine_WithHint(t *testing.T) {
+	e, _ := newCompactTestEmitter()
+	e.lastStep = 2
+	e.lastMax = 30
+	e.lastTool = "get_job_logs"
+
+	assert.Equal(t, "  Reading logs       3/30  (calling model...)", e.compactProgressLineWithHint(3, "calling model..."))
+	assert.Equal(t, "  Reading logs       3/30", e.compactProgressLineWithHint(3, ""))
+}
+
+func TestCompactProgressLine_ZeroMaxStep(t *testing.T) {
+	e, _ := newCompactTestEmitter()
+	e.lastStep = 0
+	e.lastMax = 0
+
+	// Should not panic on division by zero
+	assert.NotPanics(t, func() {
+		line := e.compactProgressLine()
+		assert.Contains(t, line, "0/0")
+	})
+}
+
+func TestVerboseClose_WithProgress_IsNoOp(t *testing.T) {
+	e, buf := newTestEmitter()
+	e.Emit(ProgressEvent{Type: "tool", Step: 5, MaxStep: 30, Tool: "get_job_logs"})
+	buf.Reset()
+	e.Close()
+	assert.Empty(t, buf.String(), "verbose Close should not print iteration summary")
+}
+
+func TestCompactMode_ToolNonTTY_HasNewline(t *testing.T) {
+	e, buf := newCompactTestEmitter()
+	e.Emit(ProgressEvent{Type: "tool", Step: 1, MaxStep: 10, Tool: "get_job_logs"})
+	out := buf.String()
+	assert.True(t, strings.HasSuffix(out, "\n"), "non-TTY compact tool output should end with newline")
+	assert.NotContains(t, out, "\033", "non-TTY output should not contain ANSI escapes")
 }
