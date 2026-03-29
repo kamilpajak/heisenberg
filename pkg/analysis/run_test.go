@@ -9,6 +9,7 @@ import (
 
 	"github.com/kamilpajak/heisenberg/pkg/cluster"
 	gh "github.com/kamilpajak/heisenberg/pkg/github"
+	"github.com/kamilpajak/heisenberg/pkg/llm"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -221,6 +222,47 @@ func TestBuildClusterContext_NoArtifacts(t *testing.T) {
 func TestEmitInfo_NilEmitter(t *testing.T) {
 	// Should not panic
 	emitInfo(nil, "test message")
+}
+
+type recordingEmitter struct {
+	events []llm.ProgressEvent
+}
+
+func (r *recordingEmitter) Emit(ev llm.ProgressEvent) { r.events = append(r.events, ev) }
+
+func TestEmitInfo_WithEmitter(t *testing.T) {
+	e := &recordingEmitter{}
+	emitInfo(e, "clustering 6 jobs")
+
+	require.Len(t, e.events, 1)
+	assert.Equal(t, "info", e.events[0].Type)
+	assert.Equal(t, "clustering 6 jobs", e.events[0].Message)
+}
+
+func TestBuildClusterContext_ExpiredArtifactsSkipped(t *testing.T) {
+	run := &gh.WorkflowRun{ID: 1, Conclusion: "failure"}
+	c := cluster.Cluster{
+		Failures:       []cluster.FailureInfo{{JobID: 1, JobName: "Test"}},
+		Representative: cluster.FailureInfo{JobName: "Test", LogTail: "error"},
+	}
+	artifacts := []gh.Artifact{
+		{Name: "html-report", SizeBytes: 5000, Expired: true},
+		{Name: "blob-report", SizeBytes: 3000, Expired: false},
+	}
+
+	ctx := buildClusterContext(run, c, 1, 1, nil, artifacts)
+
+	assert.NotContains(t, ctx, "html-report", "expired artifacts should be skipped")
+	assert.Contains(t, ctx, "blob-report")
+}
+
+func TestIsTestArtifact(t *testing.T) {
+	assert.True(t, isTestArtifact("html-report"))
+	assert.True(t, isTestArtifact("playwright-report"))
+	assert.True(t, isTestArtifact("test-results"))
+	assert.True(t, isTestArtifact("blob-report-1"))
+	assert.False(t, isTestArtifact("build-cache"))
+	assert.False(t, isTestArtifact("coverage.out"))
 }
 
 func TestFetchFailureLogs(t *testing.T) {
