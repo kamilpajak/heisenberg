@@ -38,7 +38,9 @@ Thumbs.db
 # Ad-hoc e2e test artifacts (baselines are in testdata/e2e/snapshots/)
 result*.json
 e2e-stderr*.log
+e2e-integration.log
 *.cast
+testdata/e2e/eval.jsonl
 
 # Web frontend (SvelteKit)
 web/node_modules/
