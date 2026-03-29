@@ -3,21 +3,25 @@ package main
 import (
 	"bytes"
 	"context"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func alwaysOK(_ context.Context) checkResult {
-	return checkResult{status: statusOK, name: "test", message: "everything is fine"}
+	return checkResult{status: statusOK, message: "everything is fine"}
 }
 
 func alwaysFail(_ context.Context) checkResult {
-	return checkResult{status: statusFail, name: "test", message: "something broke", detail: "fix it"}
+	return checkResult{status: statusFail, message: "something broke", detail: "fix it"}
 }
 
 func alwaysInfo(_ context.Context) checkResult {
-	return checkResult{status: statusInfo, name: "test", message: "heisenberg v0.0.0-test"}
+	return checkResult{status: statusInfo, message: "heisenberg v0.0.0-test"}
 }
 
 func TestDoctor_AllPass(t *testing.T) {
@@ -71,17 +75,69 @@ func TestDoctor_AllFail(t *testing.T) {
 }
 
 func TestCheckGitHubToken_Missing(t *testing.T) {
-	t.Setenv("GITHUB_TOKEN", "")
-	result := checkGitHubToken(context.Background())
+	check := checkGitHubTokenWith("")
+	result := check(context.Background())
 	assert.Equal(t, statusFail, result.status)
 	assert.Contains(t, result.message, "not set")
 }
 
+func TestCheckGitHubToken_Valid(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "Bearer test-gh-token", r.Header.Get("Authorization"))
+		fmt.Fprintln(w, `{"login":"testuser"}`)
+	}))
+	defer srv.Close()
+
+	check := checkGitHubTokenWithURL("test-gh-token", srv.URL+"/user")
+	result := check(context.Background())
+	assert.Equal(t, statusOK, result.status)
+	assert.Contains(t, result.message, "@testuser")
+}
+
+func TestCheckGitHubToken_Invalid(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	defer srv.Close()
+
+	check := checkGitHubTokenWithURL("bad-token", srv.URL+"/user")
+	result := check(context.Background())
+	assert.Equal(t, statusFail, result.status)
+	assert.Contains(t, result.message, "invalid")
+}
+
 func TestCheckGoogleAPIKey_Missing(t *testing.T) {
-	t.Setenv("GOOGLE_API_KEY", "")
-	result := checkGoogleAPIKey(context.Background())
+	check := checkGoogleAPIKeyWith("")
+	result := check(context.Background())
 	assert.Equal(t, statusFail, result.status)
 	assert.Contains(t, result.message, "not set")
+}
+
+func TestCheckGoogleAPIKey_UsesHeader(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Verify key is in header, not in URL
+		assert.Equal(t, "test-google-key", r.Header.Get("x-goog-api-key"))
+		assert.Empty(t, r.URL.Query().Get("key"), "API key should not be in URL query params")
+		fmt.Fprintln(w, `{"models":[]}`)
+	}))
+	defer srv.Close()
+
+	check := checkGoogleAPIKeyWithURL("test-google-key", srv.URL+"/v1beta/models")
+	result := check(context.Background())
+	assert.Equal(t, statusOK, result.status)
+	assert.Contains(t, result.message, "validated")
+}
+
+func TestCheckGoogleAPIKey_Invalid(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+	}))
+	defer srv.Close()
+
+	check := checkGoogleAPIKeyWithURL("bad-key", srv.URL+"/v1beta/models")
+	result := check(context.Background())
+	assert.Equal(t, statusFail, result.status)
+	assert.Contains(t, result.message, "invalid")
 }
 
 func TestCheckVersion(t *testing.T) {
@@ -91,8 +147,16 @@ func TestCheckVersion(t *testing.T) {
 }
 
 func TestCheckConfigFile_NoFile(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
 	result := checkConfigFile(context.Background())
-	// Will be either OK (file exists) or INFO (not found) depending on environment
-	assert.NotEqual(t, statusFail, result.status)
-	assert.Contains(t, result.message, "Config file")
+	assert.Equal(t, statusInfo, result.status)
+	assert.Contains(t, result.message, "not found")
+}
+
+func TestDefaultChecks_ConfigFallback(t *testing.T) {
+	// Verify defaultChecks returns the expected number of checks
+	checks := defaultChecks()
+	require.Len(t, checks, 7)
+	assert.Equal(t, "GITHUB_TOKEN", checks[0].name)
+	assert.Equal(t, "GOOGLE_API_KEY", checks[1].name)
 }

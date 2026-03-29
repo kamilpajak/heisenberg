@@ -26,15 +26,14 @@ var doctorCmd = &cobra.Command{
 type checkStatus int
 
 const (
-	statusOK   checkStatus = iota
-	statusFail checkStatus = iota
-	statusInfo checkStatus = iota
+	statusOK checkStatus = iota
+	statusFail
+	statusInfo
 )
 
 // checkResult holds the outcome of a single doctor check.
 type checkResult struct {
 	status  checkStatus
-	name    string
 	message string
 	detail  string // optional hint shown on failure
 }
@@ -45,11 +44,29 @@ type doctorCheck struct {
 	run  func(ctx context.Context) checkResult
 }
 
+const (
+	githubAPIURL = "https://api.github.com/user"
+	googleAPIURL = "https://generativelanguage.googleapis.com/v1beta/models?pageSize=1"
+)
+
 // defaultChecks returns the standard set of doctor checks.
+// Tokens are resolved from env vars with config file fallback.
 func defaultChecks() []doctorCheck {
+	cfg, _ := config.Load()
+
+	ghToken := os.Getenv("GITHUB_TOKEN")
+	if ghToken == "" && cfg != nil {
+		ghToken = cfg.GitHubToken
+	}
+
+	googleKey := os.Getenv("GOOGLE_API_KEY")
+	if googleKey == "" && cfg != nil {
+		googleKey = cfg.GoogleAPIKey
+	}
+
 	return []doctorCheck{
-		{"GITHUB_TOKEN", checkGitHubToken},
-		{"GOOGLE_API_KEY", checkGoogleAPIKey},
+		{"GITHUB_TOKEN", checkGitHubTokenWith(ghToken)},
+		{"GOOGLE_API_KEY", checkGoogleAPIKeyWith(googleKey)},
 		{"Network: api.github.com", checkNetworkFunc("api.github.com:443")},
 		{"Network: generativelanguage.googleapis.com", checkNetworkFunc("generativelanguage.googleapis.com:443")},
 		{"Playwright browser", checkPlaywright},
@@ -112,84 +129,92 @@ func runDoctorWith(w io.Writer, checks []doctorCheck) error {
 	return nil
 }
 
-func checkGitHubToken(ctx context.Context) checkResult {
-	token := os.Getenv("GITHUB_TOKEN")
-	if token == "" {
-		return checkResult{
-			status:  statusFail,
-			name:    "GITHUB_TOKEN",
-			message: "GITHUB_TOKEN is not set",
-			detail:  "Set GITHUB_TOKEN environment variable with a GitHub personal access token",
-		}
-	}
-
-	// Validate by calling GitHub API
-	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.github.com/user", nil)
-	if err != nil {
-		return checkResult{status: statusOK, name: "GITHUB_TOKEN", message: "GITHUB_TOKEN is set (not validated)"}
-	}
-	req.Header.Set("Authorization", "Bearer "+token)
-
-	client := &http.Client{Timeout: 5 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		return checkResult{status: statusOK, name: "GITHUB_TOKEN", message: "GITHUB_TOKEN is set (validation failed: network error)"}
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return checkResult{
-			status:  statusFail,
-			name:    "GITHUB_TOKEN",
-			message: fmt.Sprintf("GITHUB_TOKEN is set but invalid (HTTP %d)", resp.StatusCode),
-			detail:  "Check that your token is valid and has not expired",
-		}
-	}
-
-	var user struct {
-		Login string `json:"login"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&user); err == nil && user.Login != "" {
-		return checkResult{status: statusOK, name: "GITHUB_TOKEN", message: fmt.Sprintf("GITHUB_TOKEN is set (authenticated as @%s)", user.Login)}
-	}
-	return checkResult{status: statusOK, name: "GITHUB_TOKEN", message: "GITHUB_TOKEN is set (validated)"}
+// checkGitHubTokenWith returns a check that validates the given GitHub token.
+func checkGitHubTokenWith(token string) func(ctx context.Context) checkResult {
+	return checkGitHubTokenWithURL(token, githubAPIURL)
 }
 
-func checkGoogleAPIKey(ctx context.Context) checkResult {
-	key := os.Getenv("GOOGLE_API_KEY")
-	if key == "" {
-		return checkResult{
-			status:  statusFail,
-			name:    "GOOGLE_API_KEY",
-			message: "GOOGLE_API_KEY is not set",
-			detail:  "Set GOOGLE_API_KEY environment variable with a Google AI API key",
+// checkGitHubTokenWithURL is the testable core — accepts a custom API URL.
+func checkGitHubTokenWithURL(token, apiURL string) func(ctx context.Context) checkResult {
+	return func(ctx context.Context) checkResult {
+		if token == "" {
+			return checkResult{
+				status:  statusFail,
+				message: "GITHUB_TOKEN is not set",
+				detail:  "Set GITHUB_TOKEN environment variable or github_token in config file",
+			}
 		}
-	}
 
-	// Validate by listing models
-	url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models?key=%s&pageSize=1", key)
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-	if err != nil {
-		return checkResult{status: statusOK, name: "GOOGLE_API_KEY", message: "GOOGLE_API_KEY is set (not validated)"}
-	}
-
-	client := &http.Client{Timeout: 5 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		return checkResult{status: statusOK, name: "GOOGLE_API_KEY", message: "GOOGLE_API_KEY is set (validation failed: network error)"}
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return checkResult{
-			status:  statusFail,
-			name:    "GOOGLE_API_KEY",
-			message: fmt.Sprintf("GOOGLE_API_KEY is set but invalid (HTTP %d)", resp.StatusCode),
-			detail:  "Check that your API key is valid at https://aistudio.google.com/apikey",
+		req, err := http.NewRequestWithContext(ctx, "GET", apiURL, nil)
+		if err != nil {
+			return checkResult{status: statusOK, message: "GITHUB_TOKEN is set (not validated)"}
 		}
-	}
+		req.Header.Set("Authorization", "Bearer "+token)
 
-	return checkResult{status: statusOK, name: "GOOGLE_API_KEY", message: "GOOGLE_API_KEY is set (validated)"}
+		client := &http.Client{Timeout: 5 * time.Second}
+		resp, err := client.Do(req)
+		if err != nil {
+			return checkResult{status: statusOK, message: "GITHUB_TOKEN is set (validation failed: network error)"}
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			return checkResult{
+				status:  statusFail,
+				message: fmt.Sprintf("GITHUB_TOKEN is set but invalid (HTTP %d)", resp.StatusCode),
+				detail:  "Check that your token is valid and has not expired",
+			}
+		}
+
+		var user struct {
+			Login string `json:"login"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&user); err == nil && user.Login != "" {
+			return checkResult{status: statusOK, message: fmt.Sprintf("GITHUB_TOKEN is set (authenticated as @%s)", user.Login)}
+		}
+		return checkResult{status: statusOK, message: "GITHUB_TOKEN is set (validated)"}
+	}
+}
+
+// checkGoogleAPIKeyWith returns a check that validates the given Google API key.
+func checkGoogleAPIKeyWith(key string) func(ctx context.Context) checkResult {
+	return checkGoogleAPIKeyWithURL(key, googleAPIURL)
+}
+
+// checkGoogleAPIKeyWithURL is the testable core — accepts a custom API URL.
+func checkGoogleAPIKeyWithURL(key, apiURL string) func(ctx context.Context) checkResult {
+	return func(ctx context.Context) checkResult {
+		if key == "" {
+			return checkResult{
+				status:  statusFail,
+				message: "GOOGLE_API_KEY is not set",
+				detail:  "Set GOOGLE_API_KEY environment variable or google_api_key in config file",
+			}
+		}
+
+		req, err := http.NewRequestWithContext(ctx, "GET", apiURL, nil)
+		if err != nil {
+			return checkResult{status: statusOK, message: "GOOGLE_API_KEY is set (not validated)"}
+		}
+		req.Header.Set("x-goog-api-key", key)
+
+		client := &http.Client{Timeout: 5 * time.Second}
+		resp, err := client.Do(req)
+		if err != nil {
+			return checkResult{status: statusOK, message: "GOOGLE_API_KEY is set (validation failed: network error)"}
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			return checkResult{
+				status:  statusFail,
+				message: fmt.Sprintf("GOOGLE_API_KEY is set but invalid (HTTP %d)", resp.StatusCode),
+				detail:  "Check that your API key is valid at https://aistudio.google.com/apikey",
+			}
+		}
+
+		return checkResult{status: statusOK, message: "GOOGLE_API_KEY is set (validated)"}
+	}
 }
 
 func checkNetworkFunc(addr string) func(ctx context.Context) checkResult {
@@ -200,23 +225,21 @@ func checkNetworkFunc(addr string) func(ctx context.Context) checkResult {
 		if err != nil {
 			return checkResult{
 				status:  statusFail,
-				name:    "Network: " + host,
 				message: fmt.Sprintf("Network: %s unreachable", host),
 				detail:  fmt.Sprintf("Could not connect: %v", err),
 			}
 		}
 		_ = conn.Close()
-		return checkResult{status: statusOK, name: "Network: " + host, message: fmt.Sprintf("Network: %s reachable", host)}
+		return checkResult{status: statusOK, message: fmt.Sprintf("Network: %s reachable", host)}
 	}
 }
 
 func checkPlaywright(_ context.Context) checkResult {
 	if trace.IsPlaywrightAvailable() {
-		return checkResult{status: statusOK, name: "Playwright", message: "Playwright browser installed"}
+		return checkResult{status: statusOK, message: "Playwright browser installed"}
 	}
 	return checkResult{
 		status:  statusFail,
-		name:    "Playwright",
 		message: "Playwright browser not installed",
 		detail:  "Run: go run github.com/playwright-community/playwright-go/cmd/playwright install chromium",
 	}
@@ -228,25 +251,23 @@ func checkConfigFile(_ context.Context) checkResult {
 	if err != nil {
 		return checkResult{
 			status:  statusFail,
-			name:    "Config file",
 			message: fmt.Sprintf("Config file: %s (invalid)", path),
 			detail:  err.Error(),
 		}
 	}
 
 	if cfg.Model == "" && cfg.GitHubToken == "" && cfg.GoogleAPIKey == "" {
-		// File doesn't exist or is empty
 		if _, err := os.Stat(path); os.IsNotExist(err) {
-			return checkResult{status: statusInfo, name: "Config file", message: fmt.Sprintf("Config file: %s (not found, using defaults)", path)}
+			return checkResult{status: statusInfo, message: fmt.Sprintf("Config file: %s (not found, using defaults)", path)}
 		}
-		return checkResult{status: statusOK, name: "Config file", message: fmt.Sprintf("Config file: %s (empty)", path)}
+		return checkResult{status: statusOK, message: fmt.Sprintf("Config file: %s (empty)", path)}
 	}
 
 	msg := fmt.Sprintf("Config file: %s", path)
 	if cfg.Model != "" {
 		msg += fmt.Sprintf(" (model: %s)", cfg.Model)
 	}
-	return checkResult{status: statusOK, name: "Config file", message: msg}
+	return checkResult{status: statusOK, message: msg}
 }
 
 func checkVersion(_ context.Context) checkResult {
@@ -254,5 +275,5 @@ func checkVersion(_ context.Context) checkResult {
 	if commit != "none" {
 		msg += fmt.Sprintf(" (commit: %s)", commit)
 	}
-	return checkResult{status: statusInfo, name: "Version", message: msg}
+	return checkResult{status: statusInfo, message: msg}
 }
