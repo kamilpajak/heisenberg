@@ -107,9 +107,6 @@ var exitCodeLabel = map[int]string{
 }
 
 func printError(w io.Writer, err error) int {
-	red := color.New(color.FgRed, color.Bold)
-	dim := color.New(color.FgHiBlack)
-
 	code := exitGeneral
 
 	var apiErr *llm.APIError
@@ -118,6 +115,24 @@ func printError(w io.Writer, err error) int {
 	switch {
 	case errors.As(err, &apiErr):
 		code = exitAPIError
+	case errors.As(err, &cfgErr):
+		code = exitConfigError
+	}
+
+	if format == "json" {
+		_ = json.NewEncoder(os.Stdout).Encode(struct {
+			SchemaVersion string `json:"schema_version"`
+			Error         string `json:"error"`
+			ExitCode      int    `json:"exit_code"`
+		}{SchemaVersion: llm.SchemaV1, Error: err.Error(), ExitCode: code})
+		return code
+	}
+
+	red := color.New(color.FgRed, color.Bold)
+	dim := color.New(color.FgHiBlack)
+
+	switch {
+	case apiErr != nil:
 		fmt.Fprintln(w)
 		_, _ = red.Fprintf(w, errorFmt, apiErr)
 		fmt.Fprintln(w)
@@ -127,8 +142,7 @@ func printError(w io.Writer, err error) int {
 			_, _ = dim.Fprintf(w, "  Raw response:\n  %s\n", apiErr.RawBody)
 		}
 
-	case errors.As(err, &cfgErr):
-		code = exitConfigError
+	case cfgErr != nil:
 		fmt.Fprintln(w)
 		_, _ = red.Fprintf(w, errorFmt, cfgErr)
 		fmt.Fprintln(w)
@@ -191,7 +205,10 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	if format == "json" {
-		return json.NewEncoder(os.Stdout).Encode(result)
+		return json.NewEncoder(os.Stdout).Encode(struct {
+			SchemaVersion string `json:"schema_version"`
+			*llm.AnalysisResult
+		}{SchemaVersion: llm.SchemaV1, AnalysisResult: result})
 	}
 
 	printResult(os.Stderr, os.Stdout, result)
