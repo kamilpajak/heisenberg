@@ -66,14 +66,16 @@ func ExtractSignature(logText string) ErrorSignature {
 	// Strip GitHub Actions timestamps from every line
 	text = stripTimestamps(text)
 
-	// Try extractors in order of specificity
-	if sig := tryExitCode(text); sig.Category != "" {
-		return sig
-	}
+	// Try extractors in order of specificity.
+	// Stack traces and error messages before exit codes — "exit code 1" is
+	// generic and appears on almost every failing GitHub Actions job.
 	if sig := tryStackTrace(text); sig.Category != "" {
 		return sig
 	}
 	if sig := tryErrorMessage(text); sig.Category != "" {
+		return sig
+	}
+	if sig := tryExitCode(text); sig.Category != "" {
 		return sig
 	}
 	return tryFallback(text)

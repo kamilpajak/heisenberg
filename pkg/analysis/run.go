@@ -29,8 +29,7 @@ func Run(ctx context.Context, p Params) (*llm.AnalysisResult, error) {
 	ghClient := gh.NewClient()
 
 	// Resolve run ID
-	resolvedRunID := p.RunID
-	if resolvedRunID == 0 {
+	if p.RunID == 0 {
 		emitInfo(p.Emitter, fmt.Sprintf("Finding run to analyze for %s/%s...", p.Owner, p.Repo))
 		runs, err := ghClient.ListWorkflowRuns(ctx, p.Owner, p.Repo)
 		if err != nil {
@@ -38,7 +37,7 @@ func Run(ctx context.Context, p Params) (*llm.AnalysisResult, error) {
 		}
 
 		var shouldSkip bool
-		resolvedRunID, shouldSkip = findRunToAnalyze(runs)
+		p.RunID, shouldSkip = findRunToAnalyze(runs)
 
 		if shouldSkip {
 			return &llm.AnalysisResult{
@@ -47,25 +46,25 @@ func Run(ctx context.Context, p Params) (*llm.AnalysisResult, error) {
 			}, nil
 		}
 
-		if resolvedRunID == 0 {
+		if p.RunID == 0 {
 			return nil, fmt.Errorf("no failed workflow runs found for %s/%s", p.Owner, p.Repo)
 		}
 	}
 
-	emitInfo(p.Emitter, fmt.Sprintf("Analyzing run %d for %s/%s...", resolvedRunID, p.Owner, p.Repo))
+	emitInfo(p.Emitter, fmt.Sprintf("Analyzing run %d for %s/%s...", p.RunID, p.Owner, p.Repo))
 
 	// Fetch run metadata, jobs, and artifacts
-	wfRun, err := ghClient.GetWorkflowRun(ctx, p.Owner, p.Repo, resolvedRunID)
+	wfRun, err := ghClient.GetWorkflowRun(ctx, p.Owner, p.Repo, p.RunID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch run: %w", err)
 	}
 
-	jobs, err := ghClient.ListJobs(ctx, p.Owner, p.Repo, resolvedRunID)
+	jobs, err := ghClient.ListJobs(ctx, p.Owner, p.Repo, p.RunID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list jobs: %w", err)
 	}
 
-	artifacts, err := ghClient.ListArtifacts(ctx, p.Owner, p.Repo, resolvedRunID)
+	artifacts, err := ghClient.ListArtifacts(ctx, p.Owner, p.Repo, p.RunID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list artifacts: %w", err)
 	}
@@ -74,7 +73,7 @@ func Run(ctx context.Context, p Params) (*llm.AnalysisResult, error) {
 	artifactStatus := gh.CheckArtifacts(artifacts)
 	if artifactStatus.AllExpired {
 		runDate := formatRunDate(wfRun.CreatedAt)
-		return nil, fmt.Errorf("all artifacts have expired for run %d (created %s)\n\nArtifacts expire after 90 days. Try analyzing a more recent run, or omit --run-id to use the latest failed run", resolvedRunID, runDate)
+		return nil, fmt.Errorf("all artifacts have expired for run %d (created %s)\n\nArtifacts expire after 90 days. Try analyzing a more recent run, or omit --run-id to use the latest failed run", p.RunID, runDate)
 	}
 
 	// Clustering gate: if many failed jobs, use per-cluster analysis
@@ -82,24 +81,14 @@ func Run(ctx context.Context, p Params) (*llm.AnalysisResult, error) {
 	failedJobs := filterFailed(jobs)
 	if len(failedJobs) > clusterThreshold {
 		result, err := runClustered(ctx, p, ghClient, wfRun, jobs, failedJobs, artifacts)
-		if err != nil {
-			return nil, err
-		}
-		result.RunID = resolvedRunID
-		result.Branch = wfRun.HeadBranch
-		result.CommitSHA = wfRun.HeadSHA
-		return result, nil
+		stampRunMeta(result, p.RunID, wfRun)
+		return result, err
 	}
 
 	// Standard single-loop path (unchanged for <= threshold failures)
 	result, err := runSingle(ctx, p, ghClient, wfRun, jobs, artifacts)
-	if err != nil {
-		return nil, err
-	}
-	result.RunID = resolvedRunID
-	result.Branch = wfRun.HeadBranch
-	result.CommitSHA = wfRun.HeadSHA
-	return result, nil
+	stampRunMeta(result, p.RunID, wfRun)
+	return result, err
 }
 
 // runSingle is the original single-agent-loop analysis path.
@@ -191,10 +180,32 @@ func runClustered(ctx context.Context, p Params, ghClient *gh.Client,
 		results = append(results, clusterAnalysis{Cluster: c, Result: result})
 	}
 
-	// Handle unclustered failures
+	// Handle unclustered failures — create a synthetic cluster and analyze
 	if len(cr.Unclustered) > 0 {
 		emitInfo(p.Emitter, fmt.Sprintf("[Other] Analyzing %d unclustered jobs...", len(cr.Unclustered)))
-		// Fall back to single-loop for unclustered failures (they go through normal path)
+
+		uc := cluster.Cluster{
+			ID:       len(cr.Clusters) + 1,
+			Failures: cr.Unclustered,
+		}
+		// Pick representative with longest log
+		uc.Representative = cr.Unclustered[0]
+		for _, f := range cr.Unclustered[1:] {
+			if len(f.LogTail) > len(uc.Representative.LogTail) {
+				uc.Representative = f
+			}
+		}
+
+		clusterCtx := buildClusterContext(wfRun, uc, uc.ID, len(cr.Clusters)+1, allJobs, artifacts)
+		ucHandler := &ToolHandler{
+			GitHub: ghClient, Owner: p.Owner, Repo: p.Repo,
+			RunID: p.RunID, PRNumber: prNumber, HeadSHA: wfRun.HeadSHA,
+			SnapshotHTML: p.SnapshotHTML, Emitter: p.Emitter, artifacts: artifacts,
+		}
+		ucResult, ucErr := llmClient.RunAgentLoop(ctx, ucHandler, ToolDeclarations(), clusterCtx, p.Verbose)
+		if ucErr == nil && ucResult != nil {
+			results = append(results, clusterAnalysis{Cluster: uc, Result: ucResult})
+		}
 	}
 
 	merged := mergeClusterResults(results)
@@ -213,7 +224,6 @@ func fetchFailureLogs(ctx context.Context, ghClient *gh.Client, p Params, failed
 	const maxConcurrent = 5
 	sem := make(chan struct{}, maxConcurrent)
 
-	var mu sync.Mutex
 	failures := make([]cluster.FailureInfo, len(failedJobs))
 
 	var wg sync.WaitGroup
@@ -237,7 +247,7 @@ func fetchFailureLogs(ctx context.Context, ghClient *gh.Client, p Params, failed
 				logTail = logTail[len(logTail)-10000:]
 			}
 
-			mu.Lock()
+			// Each goroutine writes to its own pre-allocated index — no mutex needed
 			failures[idx] = cluster.FailureInfo{
 				JobID:      j.ID,
 				JobName:    j.Name,
@@ -245,7 +255,6 @@ func fetchFailureLogs(ctx context.Context, ghClient *gh.Client, p Params, failed
 				Signature:  sig,
 				LogTail:    logTail,
 			}
-			mu.Unlock()
 		}(i, job)
 	}
 	wg.Wait()
@@ -320,6 +329,15 @@ func truncate(s string, maxLen int) string {
 		return s
 	}
 	return s[:maxLen-3] + "..."
+}
+
+func stampRunMeta(result *llm.AnalysisResult, runID int64, wfRun *gh.WorkflowRun) {
+	if result == nil {
+		return
+	}
+	result.RunID = runID
+	result.Branch = wfRun.HeadBranch
+	result.CommitSHA = wfRun.HeadSHA
 }
 
 func emitInfo(e llm.ProgressEmitter, msg string) {

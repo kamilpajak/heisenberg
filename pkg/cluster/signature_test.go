@@ -150,6 +150,28 @@ func TestExtractSignature_RustPanic(t *testing.T) {
 	assert.Contains(t, sig.RawExcerpt, "parser.rs:42")
 }
 
+func TestExtractSignature_StackTracePrioritizedOverExitCode(t *testing.T) {
+	// GitHub Actions appends "exit code 1" to almost every failing job.
+	// Stack trace is more informative and should win.
+	log := `2026-03-29T10:00:00.1234567Z goroutine 1 [running]:
+2026-03-29T10:00:00.1234567Z main.handler()
+2026-03-29T10:00:00.1234567Z 	/app/server.go:42 +0x1a4
+2026-03-29T10:00:01.1234567Z Process completed with exit code 1.`
+
+	sig := ExtractSignature(log)
+	assert.Equal(t, "stack_trace", sig.Category, "stack trace should be prioritized over generic exit code")
+	assert.Contains(t, sig.RawExcerpt, "server.go:42")
+}
+
+func TestExtractSignature_ExitCodeOnlyWhenNoStackTrace(t *testing.T) {
+	// When there's no stack trace or error message, exit code is fine
+	log := `2026-03-29T10:00:00.1234567Z Running build...
+2026-03-29T10:00:01.1234567Z Process completed with exit code 2.`
+
+	sig := ExtractSignature(log)
+	assert.Equal(t, "exit_code", sig.Category)
+}
+
 func TestExtractSignature_LongLog_UsesLastPortion(t *testing.T) {
 	// Signature extraction should focus on the end of the log
 	// (where errors typically appear)
