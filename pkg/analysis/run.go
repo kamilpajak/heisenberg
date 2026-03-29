@@ -21,12 +21,14 @@ type Params struct {
 	Emitter      llm.ProgressEmitter
 	SnapshotHTML func([]byte) ([]byte, error)
 	Model        string // Gemini model override (empty = default)
+	GitHubToken  string // GitHub token override (empty = env var)
+	GoogleAPIKey string // Google API key override (empty = env var)
 }
 
 // Run executes the full analysis pipeline: resolve run ID, fetch metadata, and
 // run the LLM agent loop. It returns the analysis result or an error.
 func Run(ctx context.Context, p Params) (*llm.AnalysisResult, error) {
-	ghClient := gh.NewClient()
+	ghClient := gh.NewClient(p.GitHubToken)
 
 	// Resolve run ID
 	if p.RunID == 0 {
@@ -114,7 +116,7 @@ func runSingle(ctx context.Context, p Params, ghClient *gh.Client,
 		artifacts:    artifacts,
 	}
 
-	llmClient, err := llm.NewClient(p.Model)
+	llmClient, err := llm.NewClient(p.Model, p.GoogleAPIKey)
 	if err != nil {
 		return nil, err
 	}
@@ -144,7 +146,7 @@ func runClustered(ctx context.Context, p Params, ghClient *gh.Client,
 
 	// Run LLM agent loop per cluster
 	var results []clusterAnalysis
-	llmClient, err := llm.NewClient(p.Model)
+	llmClient, err := llm.NewClient(p.Model, p.GoogleAPIKey)
 	if err != nil {
 		return nil, err
 	}

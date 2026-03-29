@@ -107,6 +107,9 @@ type ToolExecutor interface {
 	HasTestArtifacts() bool
 }
 
+// SchemaV1 is the current JSON output schema version.
+const SchemaV1 = "1"
+
 // AnalysisResult holds the final output from the agent loop.
 type AnalysisResult struct {
 	Text        string              `json:"text"`

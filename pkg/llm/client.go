@@ -109,8 +109,11 @@ const DefaultModel = "gemini-3-pro-preview"
 
 // NewClient creates a new LLM client (Google Gemini).
 // If model is empty, DefaultModel is used.
-func NewClient(model string) (*Client, error) {
-	apiKey := os.Getenv("GOOGLE_API_KEY")
+// If apiKey is empty, falls back to the GOOGLE_API_KEY environment variable.
+func NewClient(model, apiKey string) (*Client, error) {
+	if apiKey == "" {
+		apiKey = os.Getenv("GOOGLE_API_KEY")
+	}
 	if apiKey == "" {
 		return nil, &ConfigError{Message: "GOOGLE_API_KEY environment variable required"}
 	}

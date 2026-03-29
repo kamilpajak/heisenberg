@@ -852,12 +852,15 @@ func TestResolveFormat(t *testing.T) {
 }
 
 func TestResolveModel(t *testing.T) {
-	assert.Equal(t, "gemini-2.5-pro", resolveModel("gemini-2.5-pro"))
-	assert.Equal(t, "", resolveModel(""))
+	// flag > env > config > empty
+	assert.Equal(t, "gemini-2.5-pro", resolveModel("gemini-2.5-pro", ""))
+	assert.Equal(t, "", resolveModel("", ""))
+	assert.Equal(t, "from-config", resolveModel("", "from-config"))
 
 	t.Setenv("HEISENBERG_MODEL", "gemini-3-pro")
-	assert.Equal(t, "gemini-3-pro", resolveModel(""))
-	assert.Equal(t, "override", resolveModel("override"))
+	assert.Equal(t, "gemini-3-pro", resolveModel("", ""))
+	assert.Equal(t, "gemini-3-pro", resolveModel("", "from-config"))     // env beats config
+	assert.Equal(t, "override", resolveModel("override", "from-config")) // flag beats all
 }
 
 func TestExitCode_APIError(t *testing.T) {
@@ -904,10 +907,63 @@ func TestExitCode_GenericError(t *testing.T) {
 }
 
 func TestExitCodeLabels_AllDefined(t *testing.T) {
-	for _, code := range []int{exitGeneral, exitAPIError, exitConfigError} {
+	for _, code := range []int{exitGeneral, exitUsage, exitAPIError, exitConfigError} {
 		label := exitCodeLabel[code]
 		assert.NotEmpty(t, label, "exitCodeLabel missing for code %d", code)
 	}
+}
+
+func TestJSONOutput_SchemaVersion(t *testing.T) {
+	r := &llm.AnalysisResult{
+		Text:       "Root cause: timeout",
+		Category:   llm.CategoryDiagnosis,
+		Confidence: 85,
+	}
+
+	var buf bytes.Buffer
+	err := json.NewEncoder(&buf).Encode(struct {
+		SchemaVersion string `json:"schema_version"`
+		*llm.AnalysisResult
+	}{SchemaVersion: llm.SchemaV1, AnalysisResult: r})
+	require.NoError(t, err)
+
+	var decoded map[string]interface{}
+	err = json.Unmarshal(buf.Bytes(), &decoded)
+	require.NoError(t, err)
+
+	assert.Equal(t, "1", decoded["schema_version"])
+	assert.Equal(t, "Root cause: timeout", decoded["text"])
+	assert.Equal(t, "diagnosis", decoded["category"])
+}
+
+func TestPrintError_JSONFormat(t *testing.T) {
+	oldFormat := format
+	format = "json"
+	defer func() { format = oldFormat }()
+
+	// Capture stdout
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	cfgErr := &llm.ConfigError{Message: "GOOGLE_API_KEY environment variable required"}
+	code := printError(os.Stderr, cfgErr)
+
+	w.Close()
+	os.Stdout = oldStdout
+
+	var buf bytes.Buffer
+	_, _ = buf.ReadFrom(r)
+
+	assert.Equal(t, exitConfigError, code)
+
+	var decoded map[string]interface{}
+	err := json.Unmarshal(buf.Bytes(), &decoded)
+	require.NoError(t, err)
+
+	assert.Equal(t, "1", decoded["schema_version"])
+	assert.Contains(t, decoded["error"], "GOOGLE_API_KEY")
+	assert.Equal(t, float64(exitConfigError), decoded["exit_code"])
 }
 
 // Integration tests — verify full output for each UX state (emitter + printError combined)

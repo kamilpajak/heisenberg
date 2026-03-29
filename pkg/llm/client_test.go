@@ -211,14 +211,14 @@ func TestGenerate_SendsRequestBody(t *testing.T) {
 
 func TestNewClient_MissingAPIKey(t *testing.T) {
 	t.Setenv("GOOGLE_API_KEY", "")
-	_, err := NewClient("")
+	_, err := NewClient("", "")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "GOOGLE_API_KEY")
 }
 
 func TestNewClient_Success(t *testing.T) {
 	t.Setenv("GOOGLE_API_KEY", "test-key")
-	c, err := NewClient("")
+	c, err := NewClient("", "")
 	require.NoError(t, err)
 	assert.Equal(t, "test-key", c.apiKey)
 	assert.Equal(t, DefaultModel, c.model)
@@ -228,9 +228,16 @@ func TestNewClient_Success(t *testing.T) {
 
 func TestNewClient_CustomModel(t *testing.T) {
 	t.Setenv("GOOGLE_API_KEY", "test-key")
-	c, err := NewClient("gemini-2.5-pro")
+	c, err := NewClient("gemini-2.5-pro", "")
 	require.NoError(t, err)
 	assert.Equal(t, "gemini-2.5-pro", c.model)
+}
+
+func TestNewClient_ExplicitAPIKey(t *testing.T) {
+	t.Setenv("GOOGLE_API_KEY", "env-key")
+	c, err := NewClient("", "explicit-key")
+	require.NoError(t, err)
+	assert.Equal(t, "explicit-key", c.apiKey, "explicit key should override env var")
 }
 
 func TestIsRetryable(t *testing.T) {
