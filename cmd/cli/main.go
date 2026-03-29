@@ -40,6 +40,7 @@ var (
 	verbose    bool
 	jsonOutput bool
 	runID      int64
+	modelName  string
 	port       int
 )
 
@@ -73,6 +74,7 @@ func init() {
 	rootCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Show detailed tool call info")
 	rootCmd.Flags().BoolVar(&jsonOutput, "json", false, "Output result as JSON")
 	rootCmd.Flags().Int64Var(&runID, "run-id", 0, "Specific workflow run ID to analyze")
+	rootCmd.Flags().StringVar(&modelName, "model", "", "Gemini model name (env: HEISENBERG_MODEL, default: "+llm.DefaultModel+")")
 
 	serveCmd.Flags().IntVarP(&port, "port", "p", 8080, "Port to listen on")
 	rootCmd.AddCommand(serveCmd)
@@ -141,6 +143,10 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 	owner, repoName := parts[0], parts[1]
 
+	if modelName == "" {
+		modelName = os.Getenv("HEISENBERG_MODEL")
+	}
+
 	emitter := llm.NewTextEmitter(os.Stderr, verbose)
 
 	result, err := analysis.Run(context.Background(), analysis.Params{
@@ -150,6 +156,7 @@ func run(cmd *cobra.Command, args []string) error {
 		Verbose:      verbose,
 		Emitter:      emitter,
 		SnapshotHTML: trace.SnapshotHTML,
+		Model:        modelName,
 	})
 	if err != nil {
 		emitter.MarkFailed()

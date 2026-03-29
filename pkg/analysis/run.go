@@ -18,6 +18,7 @@ type Params struct {
 	Verbose      bool
 	Emitter      llm.ProgressEmitter
 	SnapshotHTML func([]byte) ([]byte, error)
+	Model        string // Gemini model override (empty = default)
 }
 
 // Run executes the full analysis pipeline: resolve run ID, fetch metadata, and
@@ -94,7 +95,7 @@ func Run(ctx context.Context, p Params) (*llm.AnalysisResult, error) {
 		artifacts:    artifacts,
 	}
 
-	llmClient, err := llm.NewClient()
+	llmClient, err := llm.NewClient(p.Model)
 	if err != nil {
 		return nil, err
 	}

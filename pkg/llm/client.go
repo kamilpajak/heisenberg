@@ -103,17 +103,25 @@ func describeEmptyResponse(c *Candidate) string {
 	return msg
 }
 
+// DefaultModel is the Gemini model used when no override is specified.
+const DefaultModel = "gemini-3-pro-preview"
+
 // NewClient creates a new LLM client (Google Gemini).
-func NewClient() (*Client, error) {
+// If model is empty, DefaultModel is used.
+func NewClient(model string) (*Client, error) {
 	apiKey := os.Getenv("GOOGLE_API_KEY")
 	if apiKey == "" {
 		return nil, &ConfigError{Message: "GOOGLE_API_KEY environment variable required"}
 	}
 
+	if model == "" {
+		model = DefaultModel
+	}
+
 	return &Client{
 		apiKey:     apiKey,
 		baseURL:    "https://generativelanguage.googleapis.com/v1beta",
-		model:      "gemini-3-pro-preview",
+		model:      model,
 		httpClient: &http.Client{Timeout: 120 * time.Second},
 		limiter:    rate.NewLimiter(rate.Every(6*time.Second), 1), // ~10 RPM
 	}, nil
