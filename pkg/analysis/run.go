@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/kamilpajak/heisenberg/pkg/cluster"
 	gh "github.com/kamilpajak/heisenberg/pkg/github"
 	"github.com/kamilpajak/heisenberg/pkg/llm"
 )
@@ -75,9 +77,37 @@ func Run(ctx context.Context, p Params) (*llm.AnalysisResult, error) {
 		return nil, fmt.Errorf("all artifacts have expired for run %d (created %s)\n\nArtifacts expire after 90 days. Try analyzing a more recent run, or omit --run-id to use the latest failed run", resolvedRunID, runDate)
 	}
 
+	// Clustering gate: if many failed jobs, use per-cluster analysis
+	const clusterThreshold = 6
+	failedJobs := filterFailed(jobs)
+	if len(failedJobs) > clusterThreshold {
+		result, err := runClustered(ctx, p, ghClient, wfRun, jobs, failedJobs, artifacts)
+		if err != nil {
+			return nil, err
+		}
+		result.RunID = resolvedRunID
+		result.Branch = wfRun.HeadBranch
+		result.CommitSHA = wfRun.HeadSHA
+		return result, nil
+	}
+
+	// Standard single-loop path (unchanged for <= threshold failures)
+	result, err := runSingle(ctx, p, ghClient, wfRun, jobs, artifacts)
+	if err != nil {
+		return nil, err
+	}
+	result.RunID = resolvedRunID
+	result.Branch = wfRun.HeadBranch
+	result.CommitSHA = wfRun.HeadSHA
+	return result, nil
+}
+
+// runSingle is the original single-agent-loop analysis path.
+func runSingle(ctx context.Context, p Params, ghClient *gh.Client,
+	wfRun *gh.WorkflowRun, jobs []gh.Job, artifacts []gh.Artifact) (*llm.AnalysisResult, error) {
+
 	initialContext := buildInitialContext(wfRun, jobs, artifacts)
 
-	// Detect PR number from workflow run metadata
 	var prNumber int
 	if len(wfRun.PullRequests) > 0 {
 		prNumber = wfRun.PullRequests[0].Number
@@ -87,7 +117,7 @@ func Run(ctx context.Context, p Params) (*llm.AnalysisResult, error) {
 		GitHub:       ghClient,
 		Owner:        p.Owner,
 		Repo:         p.Repo,
-		RunID:        resolvedRunID,
+		RunID:        p.RunID,
 		PRNumber:     prNumber,
 		HeadSHA:      wfRun.HeadSHA,
 		SnapshotHTML: p.SnapshotHTML,
@@ -100,16 +130,196 @@ func Run(ctx context.Context, p Params) (*llm.AnalysisResult, error) {
 		return nil, err
 	}
 
-	result, err := llmClient.RunAgentLoop(ctx, handler, ToolDeclarations(), initialContext, p.Verbose)
+	return llmClient.RunAgentLoop(ctx, handler, ToolDeclarations(), initialContext, p.Verbose)
+}
+
+// runClustered pre-clusters failures by error signature, then runs one LLM
+// agent loop per cluster with focused context.
+func runClustered(ctx context.Context, p Params, ghClient *gh.Client,
+	wfRun *gh.WorkflowRun, allJobs []gh.Job, failedJobs []gh.Job, artifacts []gh.Artifact) (*llm.AnalysisResult, error) {
+
+	emitInfo(p.Emitter, fmt.Sprintf("Clustering %d failed jobs...", len(failedJobs)))
+
+	// Fetch logs for all failed jobs in parallel
+	failures := fetchFailureLogs(ctx, ghClient, p, failedJobs)
+
+	// Cluster by error signature
+	cr := cluster.ClusterFailures(failures)
+
+	// If clustering produced 1 cluster or failed, fall back to single path
+	if len(cr.Clusters) <= 1 {
+		return runSingle(ctx, p, ghClient, wfRun, allJobs, artifacts)
+	}
+
+	emitInfo(p.Emitter, fmt.Sprintf("Found %d failure clusters (%s)", len(cr.Clusters), cr.Method))
+
+	// Run LLM agent loop per cluster
+	var results []clusterAnalysis
+	llmClient, err := llm.NewClient(p.Model)
 	if err != nil {
 		return nil, err
 	}
 
-	result.RunID = resolvedRunID
-	result.Branch = wfRun.HeadBranch
-	result.CommitSHA = wfRun.HeadSHA
+	var prNumber int
+	if len(wfRun.PullRequests) > 0 {
+		prNumber = wfRun.PullRequests[0].Number
+	}
 
-	return result, nil
+	for i, c := range cr.Clusters {
+		emitInfo(p.Emitter, fmt.Sprintf("[Cluster %d/%d] Analyzing %d jobs (%s)...",
+			i+1, len(cr.Clusters), len(c.Failures), truncate(c.Signature.RawExcerpt, 60)))
+
+		clusterCtx := buildClusterContext(wfRun, c, i+1, len(cr.Clusters), allJobs, artifacts)
+
+		handler := &ToolHandler{
+			GitHub:       ghClient,
+			Owner:        p.Owner,
+			Repo:         p.Repo,
+			RunID:        p.RunID,
+			PRNumber:     prNumber,
+			HeadSHA:      wfRun.HeadSHA,
+			SnapshotHTML: p.SnapshotHTML,
+			Emitter:      p.Emitter,
+			artifacts:    artifacts,
+		}
+
+		result, err := llmClient.RunAgentLoop(ctx, handler, ToolDeclarations(), clusterCtx, p.Verbose)
+		if err != nil {
+			return nil, fmt.Errorf("cluster %d: %w", i+1, err)
+		}
+
+		results = append(results, clusterAnalysis{Cluster: c, Result: result})
+	}
+
+	// Handle unclustered failures
+	if len(cr.Unclustered) > 0 {
+		emitInfo(p.Emitter, fmt.Sprintf("[Other] Analyzing %d unclustered jobs...", len(cr.Unclustered)))
+		// Fall back to single-loop for unclustered failures (they go through normal path)
+	}
+
+	merged := mergeClusterResults(results)
+	if merged.Eval == nil {
+		merged.Eval = &llm.EvalMeta{}
+	}
+	merged.Eval.Clustered = true
+	merged.Eval.ClusterCount = len(cr.Clusters)
+	merged.Eval.ClusterMethod = cr.Method
+
+	return merged, nil
+}
+
+// fetchFailureLogs fetches logs for failed jobs in parallel with a concurrency limit.
+func fetchFailureLogs(ctx context.Context, ghClient *gh.Client, p Params, failedJobs []gh.Job) []cluster.FailureInfo {
+	const maxConcurrent = 5
+	sem := make(chan struct{}, maxConcurrent)
+
+	var mu sync.Mutex
+	failures := make([]cluster.FailureInfo, len(failedJobs))
+
+	var wg sync.WaitGroup
+	for i, job := range failedJobs {
+		wg.Add(1)
+		go func(idx int, j gh.Job) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			logText, err := ghClient.GetJobLogs(ctx, p.Owner, p.Repo, j.ID)
+			if err != nil {
+				logText = fmt.Sprintf("(failed to fetch logs: %s)", err)
+			}
+
+			sig := cluster.ExtractSignature(logText)
+
+			// Keep last 10KB for LLM context
+			logTail := logText
+			if len(logTail) > 10000 {
+				logTail = logTail[len(logTail)-10000:]
+			}
+
+			mu.Lock()
+			failures[idx] = cluster.FailureInfo{
+				JobID:      j.ID,
+				JobName:    j.Name,
+				Conclusion: j.Conclusion,
+				Signature:  sig,
+				LogTail:    logTail,
+			}
+			mu.Unlock()
+		}(i, job)
+	}
+	wg.Wait()
+	return failures
+}
+
+// filterFailed returns jobs with conclusion "failure".
+func filterFailed(jobs []gh.Job) []gh.Job {
+	var failed []gh.Job
+	for _, j := range jobs {
+		if j.Conclusion == "failure" {
+			failed = append(failed, j)
+		}
+	}
+	return failed
+}
+
+// buildClusterContext creates a focused initial context for one cluster.
+func buildClusterContext(run *gh.WorkflowRun, c cluster.Cluster,
+	clusterNum, totalClusters int, allJobs []gh.Job, artifacts []gh.Artifact) string {
+
+	var b strings.Builder
+
+	b.WriteString("## Workflow Run\n")
+	fmt.Fprintf(&b, "- Run ID: %d\n", run.ID)
+	fmt.Fprintf(&b, "- Name: %s\n", run.Name)
+	fmt.Fprintf(&b, "- Branch: %s\n", run.HeadBranch)
+	fmt.Fprintf(&b, "- Commit: %s\n", run.HeadSHA)
+	fmt.Fprintf(&b, "- Conclusion: %s\n", run.Conclusion)
+
+	fmt.Fprintf(&b, "\n## Cluster %d of %d — %d jobs\n", clusterNum, totalClusters, len(c.Failures))
+	fmt.Fprintf(&b, "Error pattern: %s\n", c.Signature.RawExcerpt)
+	b.WriteString("\nYou are analyzing a specific cluster of related failures. ")
+	b.WriteString("Do not assume these are the only failures in this run. ")
+	b.WriteString("Focus on the root cause shared by this cluster.\n")
+
+	b.WriteString("\n### Affected Jobs\n")
+	for _, f := range c.Failures {
+		fmt.Fprintf(&b, "- %s (id=%d, %s)\n", f.JobName, f.JobID, f.Conclusion)
+	}
+
+	b.WriteString("\n### Representative Error\n")
+	fmt.Fprintf(&b, "From: %s\n```\n%s\n```\n", c.Representative.JobName, c.Representative.LogTail)
+
+	b.WriteString("\n### Artifacts\n")
+	hasTestArtifacts := false
+	for _, a := range artifacts {
+		if a.Expired {
+			continue
+		}
+		label := ""
+		if isTestArtifact(a.Name) {
+			label = " [TEST REPORT]"
+			hasTestArtifacts = true
+		}
+		fmt.Fprintf(&b, "- %s (%d bytes)%s\n", a.Name, a.SizeBytes, label)
+	}
+
+	b.WriteString("\n### Instructions\n")
+	b.WriteString("Analyze this cluster of related failures to determine their shared root cause.\n")
+	if hasTestArtifacts {
+		b.WriteString("Test report artifacts are available. Fetch them first.\n")
+	}
+	b.WriteString("When done, call the 'done' tool with your analysis.\n")
+
+	return b.String()
+}
+
+// truncate returns s truncated to maxLen with "..." suffix.
+func truncate(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen-3] + "..."
 }
 
 func emitInfo(e llm.ProgressEmitter, msg string) {
