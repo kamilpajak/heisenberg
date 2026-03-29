@@ -184,18 +184,7 @@ func runClustered(ctx context.Context, p Params, ghClient *gh.Client,
 	if len(cr.Unclustered) > 0 {
 		emitInfo(p.Emitter, fmt.Sprintf("[Other] Analyzing %d unclustered jobs...", len(cr.Unclustered)))
 
-		uc := cluster.Cluster{
-			ID:       len(cr.Clusters) + 1,
-			Failures: cr.Unclustered,
-		}
-		// Pick representative with longest log
-		uc.Representative = cr.Unclustered[0]
-		for _, f := range cr.Unclustered[1:] {
-			if len(f.LogTail) > len(uc.Representative.LogTail) {
-				uc.Representative = f
-			}
-		}
-
+		uc := buildUnclusteredCluster(cr.Unclustered, len(cr.Clusters)+1)
 		clusterCtx := buildClusterContext(wfRun, uc, uc.ID, len(cr.Clusters)+1, allJobs, artifacts)
 		ucHandler := &ToolHandler{
 			GitHub: ghClient, Owner: p.Owner, Repo: p.Repo,
@@ -321,6 +310,22 @@ func buildClusterContext(run *gh.WorkflowRun, c cluster.Cluster,
 	b.WriteString("When done, call the 'done' tool with your analysis.\n")
 
 	return b.String()
+}
+
+// buildUnclusteredCluster creates a synthetic cluster from failures that
+// couldn't be fingerprinted, picking the longest log as representative.
+func buildUnclusteredCluster(failures []cluster.FailureInfo, id int) cluster.Cluster {
+	c := cluster.Cluster{
+		ID:             id,
+		Failures:       failures,
+		Representative: failures[0],
+	}
+	for _, f := range failures[1:] {
+		if len(f.LogTail) > len(c.Representative.LogTail) {
+			c.Representative = f
+		}
+	}
+	return c
 }
 
 // truncate returns s truncated to maxLen with "..." suffix.

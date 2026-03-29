@@ -219,6 +219,44 @@ func TestBuildClusterContext_NoArtifacts(t *testing.T) {
 	assert.NotContains(t, ctx, "TEST REPORT")
 }
 
+func TestBuildUnclusteredCluster(t *testing.T) {
+	failures := []cluster.FailureInfo{
+		{JobID: 1, JobName: "Short", LogTail: "short"},
+		{JobID: 2, JobName: "Long", LogTail: "this is a much longer log tail"},
+		{JobID: 3, JobName: "Medium", LogTail: "medium length"},
+	}
+
+	c := buildUnclusteredCluster(failures, 5)
+
+	assert.Equal(t, 5, c.ID)
+	require.Len(t, c.Failures, 3)
+	assert.Equal(t, "Long", c.Representative.JobName, "representative should be longest log")
+}
+
+func TestBuildUnclusteredCluster_Single(t *testing.T) {
+	failures := []cluster.FailureInfo{
+		{JobID: 1, JobName: "Only", LogTail: "log"},
+	}
+
+	c := buildUnclusteredCluster(failures, 1)
+	assert.Equal(t, "Only", c.Representative.JobName)
+}
+
+func TestStampRunMeta(t *testing.T) {
+	result := &llm.AnalysisResult{Text: "test"}
+	wfRun := &gh.WorkflowRun{HeadBranch: "main", HeadSHA: "abc123"}
+	stampRunMeta(result, 12345, wfRun)
+
+	assert.Equal(t, int64(12345), result.RunID)
+	assert.Equal(t, "main", result.Branch)
+	assert.Equal(t, "abc123", result.CommitSHA)
+}
+
+func TestStampRunMeta_NilResult(t *testing.T) {
+	// Should not panic
+	stampRunMeta(nil, 12345, &gh.WorkflowRun{})
+}
+
 func TestEmitInfo_NilEmitter(t *testing.T) {
 	// Should not panic
 	emitInfo(nil, "test message")
