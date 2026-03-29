@@ -417,6 +417,33 @@ func TestAnalysis_LegacySingleObjectRCA(t *testing.T) {
 	assert.Equal(t, llm.FailureTypeTimeout, found.RCAs[0].FailureType)
 }
 
+func TestAnalysis_MalformedArrayJSON(t *testing.T) {
+	db := testDB(t)
+	ctx := context.Background()
+
+	clerkID := "clerk_" + uuid.New().String()[:8]
+	user, _ := db.CreateUser(ctx, clerkID, "malformed@example.com")
+	t.Cleanup(func() { _ = db.DeleteUser(ctx, user.ID) })
+
+	org, _ := db.CreateOrganizationWithOwner(ctx, "Malformed JSON Org", user.ID)
+	t.Cleanup(func() { _ = db.DeleteOrganization(ctx, org.ID) })
+
+	repo, _ := db.CreateRepository(ctx, org.ID, "malowner", "malrepo")
+
+	// Insert malformed JSON that starts with '[' but is not valid RCA array
+	id := uuid.New()
+	_, err := db.Pool().Exec(ctx,
+		`INSERT INTO analyses (id, repo_id, run_id, category, rca, text) VALUES ($1, $2, $3, $4, $5, $6)`,
+		id, repo.ID, int64(55555), llm.CategoryDiagnosis, []byte(`[123, "bad"]`), "Malformed",
+	)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.DeleteAnalysis(ctx, id) })
+
+	// Should return a clear error from array unmarshal (not fall through to object path)
+	_, err = db.GetAnalysisByID(ctx, id)
+	require.Error(t, err, "malformed JSON array should return error")
+}
+
 func TestListRepoAnalysesWithCategory(t *testing.T) {
 	db := testDB(t)
 	ctx := context.Background()

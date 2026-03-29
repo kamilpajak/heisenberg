@@ -288,12 +288,12 @@ func (c *Client) RunAgentLoop(ctx context.Context, handler ToolExecutor, toolDec
 
 		currentTools := activeTools(tools, s, i)
 		candidate, err := c.callModel(ctx, s, currentTools, system, handler, si)
-		if err != nil {
-			return nil, err
-		}
 		s.totalModelMs += si.modelMs
 		s.totalTokens += si.tokens
 		s.iterationsUsed = si.step
+		if err != nil {
+			return c.errorResult(s, startTime, err.Error()), err
+		}
 
 		modelContent := candidate.Content
 		modelContent.Role = "model"
@@ -301,7 +301,7 @@ func (c *Client) RunAgentLoop(ctx context.Context, handler ToolExecutor, toolDec
 
 		result, err := c.processResponse(ctx, s, handler, modelContent, si)
 		if err != nil {
-			return nil, err
+			return c.errorResult(s, startTime, err.Error()), err
 		}
 		if result != nil {
 			c.stampEvalMeta(result, s, startTime)
@@ -317,7 +317,8 @@ func (c *Client) RunAgentLoop(ctx context.Context, handler ToolExecutor, toolDec
 		return result, err
 	}
 
-	return nil, fmt.Errorf("agent loop exceeded %d iterations without completing", maxIterations)
+	return c.errorResult(s, startTime, fmt.Sprintf("agent loop exceeded %d iterations without completing", maxIterations)),
+		fmt.Errorf("agent loop exceeded %d iterations without completing", maxIterations)
 }
 
 // callModel calls the LLM and handles empty response retries.
@@ -464,6 +465,14 @@ func (c *Client) stampEvalMeta(result *AnalysisResult, s *loopState, startTime t
 		Tokens:        s.totalTokens,
 		WallMs:        int(time.Since(startTime).Milliseconds()),
 	}
+}
+
+// errorResult creates a minimal AnalysisResult with EvalMeta for error paths,
+// ensuring failed runs still have metrics for evaluation logging.
+func (c *Client) errorResult(s *loopState, startTime time.Time, text string) *AnalysisResult {
+	result := &AnalysisResult{Text: text}
+	c.stampEvalMeta(result, s, startTime)
+	return result
 }
 
 // handleEmptyResponse retries once when the model returns an empty response

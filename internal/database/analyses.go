@@ -64,17 +64,15 @@ func scanAnalysis(row pgx.Row) (*Analysis, error) {
 
 // unmarshalRCAs unmarshals RCA JSON into an Analysis if present.
 // Supports both legacy single-object format and new array format.
+// Format is determined by the first byte: '[' = array, '{' = object.
 func unmarshalRCAs(rcaJSON []byte, a *Analysis) error {
-	if rcaJSON == nil {
+	if len(rcaJSON) == 0 {
 		return nil
 	}
-	// Try array format first
-	var rcas []llm.RootCauseAnalysis
-	if err := json.Unmarshal(rcaJSON, &rcas); err == nil {
-		a.RCAs = rcas
-		return nil
+	if rcaJSON[0] == '[' {
+		return json.Unmarshal(rcaJSON, &a.RCAs)
 	}
-	// Fall back to legacy single-object format
+	// Legacy single-object format
 	var rca llm.RootCauseAnalysis
 	if err := json.Unmarshal(rcaJSON, &rca); err != nil {
 		return err

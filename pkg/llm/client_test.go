@@ -783,10 +783,43 @@ func TestRunAgentLoop_GenerateErrorMidLoop(t *testing.T) {
 	c := newTestClient(ts.URL)
 	handler := &mockToolHandler{emitter: noopEmitter{}}
 
-	_, err := c.RunAgentLoop(context.Background(), handler, testToolDeclarations(), "context", false)
+	result, err := c.RunAgentLoop(context.Background(), handler, testToolDeclarations(), "context", false)
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "gemini API error")
+
+	// Even on error, result should carry EvalMeta for eval logging
+	require.NotNil(t, result, "error path should still return result with EvalMeta")
+	require.NotNil(t, result.Eval)
+	assert.Equal(t, "test-model", result.Eval.Model)
+	assert.Positive(t, result.Eval.Iterations)
+	assert.Positive(t, result.Eval.WallMs)
+}
+
+func TestRunAgentLoop_MaxIterationsExceeded_HasEvalMeta(t *testing.T) {
+	// Model never calls done or returns text — just keeps calling tools
+	resps := make([]GenerateResponse, maxIterations)
+	for i := range maxIterations {
+		resps[i] = GenerateResponse{
+			Candidates: []Candidate{{Content: Content{Parts: []Part{{
+				FunctionCall: &FunctionCall{Name: "fake_tool", Args: map[string]any{"i": float64(i)}},
+			}}}}},
+			UsageMetadata: &UsageMetadata{PromptTokenCount: 100},
+		}
+	}
+	ts := mockServer(t, resps)
+	defer ts.Close()
+
+	c := newTestClient(ts.URL)
+	handler := &mockToolHandler{emitter: noopEmitter{}}
+
+	result, err := c.RunAgentLoop(context.Background(), handler, testToolDeclarations(), "context", false)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "exceeded")
+	require.NotNil(t, result, "max iterations error should still return result with EvalMeta")
+	require.NotNil(t, result.Eval)
+	assert.Equal(t, maxIterations, result.Eval.Iterations)
 }
 
 func TestEmit_NilHandler(t *testing.T) {
