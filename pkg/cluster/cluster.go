@@ -109,74 +109,87 @@ func jaccardMerge(clusters []Cluster) []Cluster {
 		return clusters
 	}
 
-	// Find singletons and multi-member clusters
+	singletons := findSingletons(clusters)
+	if len(singletons) <= 1 {
+		return clusters
+	}
+
+	uf := newUnionFind(len(clusters))
+	mergeSimilarSingletons(uf, singletons, clusters)
+	return rebuildClusters(uf, clusters)
+}
+
+func findSingletons(clusters []Cluster) []int {
 	var singletons []int
 	for i, c := range clusters {
 		if len(c.Failures) == 1 {
 			singletons = append(singletons, i)
 		}
 	}
+	return singletons
+}
 
-	if len(singletons) <= 1 {
-		return clusters
-	}
-
-	// Union-find for merging
-	parent := make([]int, len(clusters))
-	for i := range parent {
-		parent[i] = i
-	}
-
-	find := func(x int) int {
-		for parent[x] != x {
-			parent[x] = parent[parent[x]]
-			x = parent[x]
-		}
-		return x
-	}
-
-	union := func(a, b int) {
-		ra, rb := find(a), find(b)
-		if ra != rb {
-			parent[rb] = ra
-		}
-	}
-
-	// Compare all pairs of singletons
+func mergeSimilarSingletons(uf *unionFind, singletons []int, clusters []Cluster) {
 	for i := 0; i < len(singletons); i++ {
 		for j := i + 1; j < len(singletons); j++ {
 			ci, cj := singletons[i], singletons[j]
-			if find(ci) == find(cj) {
-				continue // already merged
+			if uf.find(ci) == uf.find(cj) {
+				continue
 			}
-			sim := jaccard(
-				clusters[ci].Signature.Tokens,
-				clusters[cj].Signature.Tokens,
-			)
+			sim := jaccard(clusters[ci].Signature.Tokens, clusters[cj].Signature.Tokens)
 			if sim >= jaccardThreshold {
-				union(ci, cj)
+				uf.union(ci, cj)
 			}
 		}
 	}
+}
 
-	// Rebuild clusters based on union-find
-	merged := map[int][]FailureInfo{}
-	mergedSig := map[int]ErrorSignature{}
+func rebuildClusters(uf *unionFind, clusters []Cluster) []Cluster {
+	grouped := map[int][]FailureInfo{}
+	groupSig := map[int]ErrorSignature{}
 	for i, c := range clusters {
-		root := find(i)
-		merged[root] = append(merged[root], c.Failures...)
-		if _, ok := mergedSig[root]; !ok {
-			mergedSig[root] = c.Signature
+		root := uf.find(i)
+		grouped[root] = append(grouped[root], c.Failures...)
+		if _, ok := groupSig[root]; !ok {
+			groupSig[root] = c.Signature
 		}
 	}
 
 	var result []Cluster
-	for root, failures := range merged {
+	for root, failures := range grouped {
 		c := buildCluster(len(result), failures)
-		c.Signature = mergedSig[root]
+		c.Signature = groupSig[root]
 		result = append(result, c)
 	}
 	return result
+}
+
+// unionFind is a simple disjoint-set data structure with path compression.
+type unionFind struct {
+	parent []int
+}
+
+func newUnionFind(n int) *unionFind {
+	parent := make([]int, n)
+	for i := range parent {
+		parent[i] = i
+	}
+	return &unionFind{parent: parent}
+}
+
+func (uf *unionFind) find(x int) int {
+	for uf.parent[x] != x {
+		uf.parent[x] = uf.parent[uf.parent[x]]
+		x = uf.parent[x]
+	}
+	return x
+}
+
+func (uf *unionFind) union(a, b int) {
+	ra, rb := uf.find(a), uf.find(b)
+	if ra != rb {
+		uf.parent[rb] = ra
+	}
 }
 
 // jaccard computes the Jaccard similarity between two token sets.

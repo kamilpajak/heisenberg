@@ -21,16 +21,22 @@ func mergeClusterResults(results []clusterAnalysis) *llm.AnalysisResult {
 	if len(results) == 0 {
 		return &llm.AnalysisResult{}
 	}
-
-	// Single cluster — return as-is
 	if len(results) == 1 {
 		return results[0].Result
 	}
 
-	merged := &llm.AnalysisResult{}
+	return &llm.AnalysisResult{
+		RCAs:        collectRCAs(results),
+		Category:    mergeCategory(results),
+		Confidence:  mergeConfidence(results),
+		Sensitivity: mergeSensitivity(results),
+		Text:        mergeText(results),
+	}
+}
 
-	// Collect RCAs, deduplicating identical root causes
+func collectRCAs(results []clusterAnalysis) []llm.RootCauseAnalysis {
 	seen := map[string]bool{}
+	var rcas []llm.RootCauseAnalysis
 	for _, ca := range results {
 		if ca.Result == nil {
 			continue
@@ -41,30 +47,28 @@ func mergeClusterResults(results []clusterAnalysis) *llm.AnalysisResult {
 				continue
 			}
 			seen[key] = true
-			merged.RCAs = append(merged.RCAs, rca)
+			rcas = append(rcas, rca)
 		}
 	}
+	return rcas
+}
 
-	// Category: diagnosis if any cluster has diagnosis
-	merged.Category = llm.CategoryNotSupported
+func mergeCategory(results []clusterAnalysis) string {
 	for _, ca := range results {
 		if ca.Result != nil && ca.Result.Category == llm.CategoryDiagnosis {
-			merged.Category = llm.CategoryDiagnosis
-			break
+			return llm.CategoryDiagnosis
 		}
 	}
-	if merged.Category != llm.CategoryDiagnosis {
-		for _, ca := range results {
-			if ca.Result != nil && ca.Result.Category == llm.CategoryNoFailures {
-				merged.Category = llm.CategoryNoFailures
-				break
-			}
+	for _, ca := range results {
+		if ca.Result != nil && ca.Result.Category == llm.CategoryNoFailures {
+			return llm.CategoryNoFailures
 		}
 	}
+	return llm.CategoryNotSupported
+}
 
-	// Confidence: weighted average by cluster size
-	totalWeight := 0
-	weightedSum := 0
+func mergeConfidence(results []clusterAnalysis) int {
+	totalWeight, weightedSum := 0, 0
 	for _, ca := range results {
 		if ca.Result == nil {
 			continue
@@ -76,23 +80,28 @@ func mergeClusterResults(results []clusterAnalysis) *llm.AnalysisResult {
 		weightedSum += ca.Result.Confidence * w
 		totalWeight += w
 	}
-	if totalWeight > 0 {
-		merged.Confidence = weightedSum / totalWeight
+	if totalWeight == 0 {
+		return 0
 	}
+	return weightedSum / totalWeight
+}
 
-	// Sensitivity: take highest (worst)
-	sensOrder := map[string]int{"high": 3, "medium": 2, "low": 1}
-	maxSens := 0
+func mergeSensitivity(results []clusterAnalysis) string {
+	order := map[string]int{"high": 3, "medium": 2, "low": 1}
+	best, bestVal := "", 0
 	for _, ca := range results {
-		if ca.Result != nil {
-			if s, ok := sensOrder[ca.Result.Sensitivity]; ok && s > maxSens {
-				maxSens = s
-				merged.Sensitivity = ca.Result.Sensitivity
-			}
+		if ca.Result == nil {
+			continue
+		}
+		if v := order[ca.Result.Sensitivity]; v > bestVal {
+			bestVal = v
+			best = ca.Result.Sensitivity
 		}
 	}
+	return best
+}
 
-	// Text: structured summary
+func mergeText(results []clusterAnalysis) string {
 	var sb strings.Builder
 	for i, ca := range results {
 		if ca.Result == nil {
@@ -105,7 +114,5 @@ func mergeClusterResults(results []clusterAnalysis) *llm.AnalysisResult {
 		sb.WriteString(ca.Result.Text)
 		sb.WriteString("\n")
 	}
-	merged.Text = sb.String()
-
-	return merged
+	return sb.String()
 }
