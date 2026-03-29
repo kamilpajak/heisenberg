@@ -81,13 +81,13 @@ func Run(ctx context.Context, p Params) (*llm.AnalysisResult, error) {
 	failedJobs := filterFailed(jobs)
 	if len(failedJobs) > clusterThreshold {
 		result, err := runClustered(ctx, p, ghClient, wfRun, jobs, failedJobs, artifacts)
-		stampRunMeta(result, p.RunID, wfRun)
+		stampRunMeta(result, p, wfRun)
 		return result, err
 	}
 
 	// Standard single-loop path (unchanged for <= threshold failures)
 	result, err := runSingle(ctx, p, ghClient, wfRun, jobs, artifacts)
-	stampRunMeta(result, p.RunID, wfRun)
+	stampRunMeta(result, p, wfRun)
 	return result, err
 }
 
@@ -336,13 +336,16 @@ func truncate(s string, maxLen int) string {
 	return s[:maxLen-3] + "..."
 }
 
-func stampRunMeta(result *llm.AnalysisResult, runID int64, wfRun *gh.WorkflowRun) {
+func stampRunMeta(result *llm.AnalysisResult, p Params, wfRun *gh.WorkflowRun) {
 	if result == nil {
 		return
 	}
-	result.RunID = runID
+	result.RunID = p.RunID
+	result.Owner = p.Owner
+	result.Repo = p.Repo
 	result.Branch = wfRun.HeadBranch
 	result.CommitSHA = wfRun.HeadSHA
+	result.Event = wfRun.Event
 }
 
 func emitInfo(e llm.ProgressEmitter, msg string) {

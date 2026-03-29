@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 	"unicode/utf8"
@@ -62,7 +63,7 @@ func TestPrintResult_NoFailures(t *testing.T) {
 	printResult(&stderr, &stdout, r)
 
 	assert.NotContains(t, stderr.String(), "Confidence")
-	assert.NotContains(t, stderr.String(), "━")
+	assert.Contains(t, stderr.String(), "Heisenberg")
 	assert.Contains(t, stdout.String(), "All tests passing")
 }
 
@@ -243,7 +244,7 @@ func TestPrintResult_MultipleRCAs(t *testing.T) {
 	out := stdout.String()
 
 	// Summary list
-	assert.Contains(t, out, "2 failures analyzed")
+	assert.Contains(t, out, "2 root causes found")
 	assert.Contains(t, out, "1.")
 	assert.Contains(t, out, "2.")
 	assert.Contains(t, out, "ASSERTION")
@@ -275,7 +276,7 @@ func TestPrintResult_SingleRCA_NoSummaryList(t *testing.T) {
 	out := stdout.String()
 
 	// No summary list for single RCA
-	assert.NotContains(t, out, "failures analyzed")
+	assert.NotContains(t, out, "root causes found")
 	// But detail section present
 	assert.Contains(t, out, "TIMEOUT")
 	assert.Contains(t, out, "tests/checkout.spec.ts:45")
@@ -630,12 +631,12 @@ func TestPrintResult_ThreeRCAs_Numbering(t *testing.T) {
 	out := stdout.String()
 
 	// Summary header
-	assert.Contains(t, out, "3 failures analyzed")
+	assert.Contains(t, out, "3 root causes found")
 
-	// Numbering
-	assert.Contains(t, out, "[1/3]")
-	assert.Contains(t, out, "[2/3]")
-	assert.Contains(t, out, "[3/3]")
+	// Cluster cards
+	assert.Contains(t, out, "Cluster 1/3")
+	assert.Contains(t, out, "Cluster 2/3")
+	assert.Contains(t, out, "Cluster 3/3")
 
 	// All failure types present
 	assert.Contains(t, out, "TIMEOUT")
@@ -646,6 +647,217 @@ func TestPrintResult_ThreeRCAs_Numbering(t *testing.T) {
 	assert.Contains(t, out, "Cookie banner")
 	assert.Contains(t, out, "Changed redirect")
 	assert.Contains(t, out, "DNS failure")
+}
+
+func TestParseRunURL(t *testing.T) {
+	tests := []struct {
+		url       string
+		wantOwner string
+		wantRepo  string
+		wantErr   bool
+	}{
+		{"https://github.com/org/repo/actions/runs/12345", "org", "repo", false},
+		{"https://github.com/microsoft/playwright/actions/runs/23642131867", "microsoft", "playwright", false},
+		{"https://github.com/bad-url", "", "", true},
+		{"not-a-url", "", "", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.url, func(t *testing.T) {
+			runID = 0 // reset global
+			owner, repo, err := parseRunURL(tt.url)
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tt.wantOwner, owner)
+				assert.Equal(t, tt.wantRepo, repo)
+				assert.Positive(t, runID)
+			}
+		})
+	}
+}
+
+func TestResolveRepo_FromArgs(t *testing.T) {
+	fromEnv = false
+	runURL = ""
+	owner, repo, err := resolveRepo([]string{"org/repo"})
+	require.NoError(t, err)
+	assert.Equal(t, "org", owner)
+	assert.Equal(t, "repo", repo)
+}
+
+func TestResolveRepo_InvalidArgs(t *testing.T) {
+	fromEnv = false
+	runURL = ""
+	_, _, err := resolveRepo([]string{"invalid"})
+	assert.Error(t, err)
+}
+
+func TestResolveRepo_NoArgs(t *testing.T) {
+	fromEnv = false
+	runURL = ""
+	_, _, err := resolveRepo(nil)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "provide owner/repo")
+}
+
+func TestResolveRepo_FromEnv(t *testing.T) {
+	fromEnv = true
+	runURL = ""
+	runID = 0
+	t.Setenv("GITHUB_REPOSITORY", "org/repo")
+	t.Setenv("GITHUB_RUN_ID", "99999")
+
+	owner, repo, err := resolveRepo(nil)
+	require.NoError(t, err)
+	assert.Equal(t, "org", owner)
+	assert.Equal(t, "repo", repo)
+	assert.Equal(t, int64(99999), runID)
+
+	fromEnv = false // cleanup
+}
+
+func TestResolveRepo_FromURL(t *testing.T) {
+	fromEnv = false
+	runURL = "https://github.com/microsoft/playwright/actions/runs/12345"
+	runID = 0
+
+	owner, repo, err := resolveRepo(nil)
+	require.NoError(t, err)
+	assert.Equal(t, "microsoft", owner)
+	assert.Equal(t, "playwright", repo)
+	assert.Equal(t, int64(12345), runID)
+
+	runURL = "" // cleanup
+}
+
+func TestPrintRunHeader(t *testing.T) {
+	var buf bytes.Buffer
+	r := &llm.AnalysisResult{
+		Owner:    "org",
+		Repo:     "repo",
+		RunID:    12345,
+		Branch:   "main",
+		Event:    "pull_request",
+		Category: llm.CategoryDiagnosis,
+	}
+	printRunHeader(&buf, r)
+	out := buf.String()
+
+	assert.Contains(t, out, "Heisenberg — org/repo #12345")
+	assert.Contains(t, out, "Branch: main")
+	assert.Contains(t, out, "Event: pull_request")
+	assert.Contains(t, out, "━")
+}
+
+func TestPrintRunHeader_Minimal(t *testing.T) {
+	var buf bytes.Buffer
+	r := &llm.AnalysisResult{Category: llm.CategoryNoFailures}
+	printRunHeader(&buf, r)
+	out := buf.String()
+
+	assert.Contains(t, out, "Heisenberg")
+	assert.NotContains(t, out, "—")
+}
+
+func TestBugLocationLabel(t *testing.T) {
+	// Just verify non-empty returns
+	assert.NotEmpty(t, bugLocationLabel(llm.BugLocationProduction))
+	assert.NotEmpty(t, bugLocationLabel(llm.BugLocationInfrastructure))
+	assert.NotEmpty(t, bugLocationLabel(llm.BugLocationTest))
+	assert.NotEmpty(t, bugLocationLabel(llm.BugLocationUnknown))
+}
+
+func TestPrintClusterSummary(t *testing.T) {
+	var buf bytes.Buffer
+	rcas := []llm.RootCauseAnalysis{
+		{Title: "Timeout", FailureType: llm.FailureTypeTimeout, BugLocation: llm.BugLocationInfrastructure,
+			Location: &llm.CodeLocation{FilePath: "test.spec.ts", LineNumber: 42}},
+		{Title: "Assertion", FailureType: llm.FailureTypeAssertion, BugLocation: llm.BugLocationTest},
+	}
+	printClusterSummary(&buf, rcas)
+	out := buf.String()
+
+	assert.Contains(t, out, "2 root causes found")
+	assert.Contains(t, out, "TIMEOUT")
+	assert.Contains(t, out, "test.spec.ts:42")
+}
+
+func TestPrintClusterSummary_EmptyFailureType(t *testing.T) {
+	var buf bytes.Buffer
+	rcas := []llm.RootCauseAnalysis{
+		{Title: "Unknown", BugLocation: llm.BugLocationUnknown},
+	}
+	printClusterSummary(&buf, rcas)
+	assert.Contains(t, buf.String(), "ERROR")
+}
+
+func TestPrintClusterCard(t *testing.T) {
+	var buf bytes.Buffer
+	rca := &llm.RootCauseAnalysis{
+		Title:                 "DB timeout",
+		FailureType:           llm.FailureTypeTimeout,
+		BugLocation:           llm.BugLocationInfrastructure,
+		BugLocationConfidence: "high",
+		RootCause:             "DB not started",
+		Remediation:           "Start DB",
+	}
+	printClusterCard(&buf, rca, 2, 3)
+	out := buf.String()
+
+	assert.Contains(t, out, "Cluster 2/3")
+	assert.Contains(t, out, "high confidence")
+	assert.Contains(t, out, "DB not started")
+}
+
+func TestIsTerminal_NotTTY(t *testing.T) {
+	f, err := os.CreateTemp("", "test")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.Remove(f.Name()) })
+	defer f.Close()
+	assert.False(t, isTerminal(f))
+}
+
+func TestResolveRepo_FromEnvMissingRepo(t *testing.T) {
+	fromEnv = true
+	runURL = ""
+	t.Setenv("GITHUB_REPOSITORY", "")
+	_, _, err := resolveRepo(nil)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "GITHUB_REPOSITORY not set")
+	fromEnv = false
+}
+
+func TestResolveFormat(t *testing.T) {
+	tests := []struct {
+		name     string
+		flag     string
+		jsonFlag bool
+		isTTY    bool
+		want     string
+	}{
+		{"json flag", "", true, true, "json"},
+		{"format flag json", "json", false, true, "json"},
+		{"format flag human", "human", false, false, "human"},
+		{"TTY auto-detect", "", false, true, "human"},
+		{"pipe auto-detect", "", false, false, "json"},
+		{"json flag overrides TTY", "", true, false, "json"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, resolveFormat(tt.flag, tt.jsonFlag, tt.isTTY))
+		})
+	}
+}
+
+func TestResolveModel(t *testing.T) {
+	assert.Equal(t, "gemini-2.5-pro", resolveModel("gemini-2.5-pro"))
+	assert.Equal(t, "", resolveModel(""))
+
+	t.Setenv("HEISENBERG_MODEL", "gemini-3-pro")
+	assert.Equal(t, "gemini-3-pro", resolveModel(""))
+	assert.Equal(t, "override", resolveModel("override"))
 }
 
 func TestExitCode_APIError(t *testing.T) {

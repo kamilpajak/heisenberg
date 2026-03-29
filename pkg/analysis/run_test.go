@@ -244,17 +244,21 @@ func TestBuildUnclusteredCluster_Single(t *testing.T) {
 
 func TestStampRunMeta(t *testing.T) {
 	result := &llm.AnalysisResult{Text: "test"}
-	wfRun := &gh.WorkflowRun{HeadBranch: "main", HeadSHA: "abc123"}
-	stampRunMeta(result, 12345, wfRun)
+	p := Params{RunID: 12345, Owner: "org", Repo: "repo"}
+	wfRun := &gh.WorkflowRun{HeadBranch: "main", HeadSHA: "abc123", Event: "pull_request"}
+	stampRunMeta(result, p, wfRun)
 
 	assert.Equal(t, int64(12345), result.RunID)
+	assert.Equal(t, "org", result.Owner)
+	assert.Equal(t, "repo", result.Repo)
 	assert.Equal(t, "main", result.Branch)
 	assert.Equal(t, "abc123", result.CommitSHA)
+	assert.Equal(t, "pull_request", result.Event)
 }
 
 func TestStampRunMeta_NilResult(t *testing.T) {
 	// Should not panic
-	stampRunMeta(nil, 12345, &gh.WorkflowRun{})
+	stampRunMeta(nil, Params{}, &gh.WorkflowRun{})
 }
 
 func TestEmitInfo_NilEmitter(t *testing.T) {

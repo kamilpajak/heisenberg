@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/signal"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -39,6 +40,9 @@ const (
 var (
 	verbose    bool
 	jsonOutput bool
+	format     string
+	fromEnv    bool
+	runURL     string
 	runID      int64
 	modelName  string
 	port       int
@@ -48,7 +52,7 @@ var rootCmd = &cobra.Command{
 	Use:           "heisenberg <owner/repo>",
 	Short:         "AI-powered test failure analysis",
 	Long:          `Analyzes test artifacts from GitHub repos using AI to identify root causes.`,
-	Args:          cobra.ExactArgs(1),
+	Args:          cobra.MaximumNArgs(1),
 	RunE:          run,
 	SilenceUsage:  true,
 	SilenceErrors: true,
@@ -72,9 +76,13 @@ var versionCmd = &cobra.Command{
 
 func init() {
 	rootCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Show detailed tool call info")
-	rootCmd.Flags().BoolVar(&jsonOutput, "json", false, "Output result as JSON")
+	rootCmd.Flags().StringVar(&format, "format", "", "Output format: human or json (default: auto-detect from TTY)")
+	rootCmd.Flags().BoolVar(&jsonOutput, "json", false, "Output result as JSON (alias for --format json)")
+	rootCmd.Flags().BoolVar(&fromEnv, "from-env", false, "Read owner/repo from GITHUB_REPOSITORY and run ID from GITHUB_RUN_ID")
+	rootCmd.Flags().StringVar(&runURL, "run", "", "GitHub Actions run URL (e.g. https://github.com/org/repo/actions/runs/123)")
 	rootCmd.Flags().Int64Var(&runID, "run-id", 0, "Specific workflow run ID to analyze")
 	rootCmd.Flags().StringVar(&modelName, "model", "", "Gemini model name (env: HEISENBERG_MODEL, default: "+llm.DefaultModel+")")
+	_ = rootCmd.Flags().MarkHidden("json") // backward compat alias
 
 	serveCmd.Flags().IntVarP(&port, "port", "p", 8080, "Port to listen on")
 	rootCmd.AddCommand(serveCmd)
@@ -136,16 +144,13 @@ func printError(w io.Writer, err error) int {
 }
 
 func run(cmd *cobra.Command, args []string) error {
-	repo := args[0]
-	parts := strings.Split(repo, "/")
-	if len(parts) != 2 {
-		return fmt.Errorf("invalid repo format, use: owner/repo")
+	owner, repoName, err := resolveRepo(args)
+	if err != nil {
+		return err
 	}
-	owner, repoName := parts[0], parts[1]
 
-	if modelName == "" {
-		modelName = os.Getenv("HEISENBERG_MODEL")
-	}
+	format = resolveFormat(format, jsonOutput, isTerminal(os.Stdout))
+	modelName = resolveModel(modelName)
 
 	emitter := llm.NewTextEmitter(os.Stderr, verbose)
 
@@ -184,7 +189,7 @@ func run(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	if jsonOutput {
+	if format == "json" {
 		return json.NewEncoder(os.Stdout).Encode(result)
 	}
 
@@ -192,24 +197,103 @@ func run(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func printResult(stderr, stdout io.Writer, r *llm.AnalysisResult) {
-	if r.Category == llm.CategoryDiagnosis {
-		fmt.Fprintln(stderr)
-		dim := color.New(color.FgHiBlack)
-		_, _ = dim.Fprintln(stderr, "  "+strings.Repeat("━", 50))
-		printConfidenceBar(stderr, r.Confidence, r.Sensitivity)
+// resolveRepo determines owner/repo from args, --from-env, or --run URL.
+func resolveRepo(args []string) (owner, repo string, err error) {
+	switch {
+	case runURL != "":
+		return parseRunURL(runURL)
+	case fromEnv:
+		ghRepo := os.Getenv("GITHUB_REPOSITORY")
+		if ghRepo == "" {
+			return "", "", fmt.Errorf("--from-env: GITHUB_REPOSITORY not set")
+		}
+		parts := strings.SplitN(ghRepo, "/", 2)
+		if len(parts) != 2 {
+			return "", "", fmt.Errorf("--from-env: invalid GITHUB_REPOSITORY: %s", ghRepo)
+		}
+		if ghRunID := os.Getenv("GITHUB_RUN_ID"); ghRunID != "" && runID == 0 {
+			if id, err := strconv.ParseInt(ghRunID, 10, 64); err == nil {
+				runID = id
+			}
+		}
+		return parts[0], parts[1], nil
+	case len(args) > 0:
+		parts := strings.SplitN(args[0], "/", 2)
+		if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+			return "", "", fmt.Errorf("invalid repo format, use: owner/repo")
+		}
+		return parts[0], parts[1], nil
+	default:
+		return "", "", fmt.Errorf("provide owner/repo, --from-env, or --run <URL>")
 	}
+}
 
+// runURLRe matches GitHub Actions run URLs.
+var runURLRe = regexp.MustCompile(`github\.com/([^/]+)/([^/]+)/actions/runs/(\d+)`)
+
+// parseRunURL extracts owner, repo, and run ID from a GitHub Actions URL.
+func parseRunURL(url string) (owner, repo string, err error) {
+	m := runURLRe.FindStringSubmatch(url)
+	if m == nil {
+		return "", "", fmt.Errorf("invalid GitHub Actions URL: %s\nExpected: https://github.com/owner/repo/actions/runs/123", url)
+	}
+	if id, parseErr := strconv.ParseInt(m[3], 10, 64); parseErr == nil {
+		runID = id
+	}
+	return m[1], m[2], nil
+}
+
+// isTerminal returns true if the file is a TTY.
+func isTerminal(f *os.File) bool {
+	fi, err := f.Stat()
+	if err != nil {
+		return false
+	}
+	return fi.Mode()&os.ModeCharDevice != 0
+}
+
+// resolveFormat determines output format from flag, --json alias, and TTY detection.
+func resolveFormat(formatFlag string, jsonFlag bool, isTTY bool) string {
+	if jsonFlag {
+		return "json"
+	}
+	if formatFlag != "" {
+		return formatFlag
+	}
+	if isTTY {
+		return "human"
+	}
+	return "json"
+}
+
+// resolveModel determines model name from flag and environment variable.
+func resolveModel(flag string) string {
+	if flag != "" {
+		return flag
+	}
+	if env := os.Getenv("HEISENBERG_MODEL"); env != "" {
+		return env
+	}
+	return ""
+}
+
+func printResult(stderr, stdout io.Writer, r *llm.AnalysisResult) {
 	fmt.Fprintln(stderr)
 
-	// Use structured RCAs if available, otherwise fall back to legacy text
+	// Run-level header
+	printRunHeader(stderr, r)
+
+	if r.Category == llm.CategoryDiagnosis {
+		printConfidenceBar(stderr, r.Confidence, r.Sensitivity)
+		fmt.Fprintln(stderr)
+	}
+
+	// RCA output
 	if len(r.RCAs) > 1 {
-		printRCASummary(stdout, r.RCAs)
+		printClusterSummary(stdout, r.RCAs)
 		for i := range r.RCAs {
 			fmt.Fprintln(stdout)
-			dim := color.New(color.FgHiBlack)
-			_, _ = dim.Fprintf(stdout, "  [%d/%d] ", i+1, len(r.RCAs))
-			printStructuredRCA(stdout, &r.RCAs[i])
+			printClusterCard(stdout, &r.RCAs[i], i+1, len(r.RCAs))
 		}
 	} else if len(r.RCAs) == 1 && r.RCAs[0].Title != "" {
 		printStructuredRCA(stdout, &r.RCAs[0])
@@ -224,13 +308,45 @@ func printResult(stderr, stdout io.Writer, r *llm.AnalysisResult) {
 	}
 }
 
-func printRCASummary(w io.Writer, rcas []llm.RootCauseAnalysis) {
+// printRunHeader renders the top-level run summary.
+func printRunHeader(w io.Writer, r *llm.AnalysisResult) {
 	bold := color.New(color.Bold)
 	dim := color.New(color.FgHiBlack)
 
-	_, _ = bold.Fprintf(w, "  %d failures analyzed:\n\n", len(rcas))
+	// Title line
+	title := "Heisenberg"
+	if r.Owner != "" && r.Repo != "" {
+		title = fmt.Sprintf("Heisenberg — %s/%s", r.Owner, r.Repo)
+	}
+	if r.RunID > 0 {
+		title += fmt.Sprintf(" #%d", r.RunID)
+	}
+	_, _ = bold.Fprintln(w, "  "+title)
+
+	// Metadata line
+	var meta []string
+	if r.Branch != "" {
+		meta = append(meta, "Branch: "+r.Branch)
+	}
+	if r.Event != "" {
+		meta = append(meta, "Event: "+r.Event)
+	}
+	meta = append(meta, "Status: "+r.Category)
+	_, _ = dim.Fprintf(w, "  %s\n", strings.Join(meta, "   "))
+
+	_, _ = dim.Fprintln(w, "  "+strings.Repeat("━", 50))
+}
+
+// printClusterSummary shows a grouped overview of RCAs by bug_location.
+func printClusterSummary(w io.Writer, rcas []llm.RootCauseAnalysis) {
+	bold := color.New(color.Bold)
+	dim := color.New(color.FgHiBlack)
+
+	_, _ = bold.Fprintf(w, "\n  %d root causes found:\n\n", len(rcas))
+
 	for i, rca := range rcas {
-		failureType := strings.ToUpper(rca.FailureType)
+		tag := bugLocationLabel(rca.BugLocation)
+		failureType := strings.ToUpper(string(rca.FailureType))
 		if failureType == "" {
 			failureType = "ERROR"
 		}
@@ -238,15 +354,43 @@ func printRCASummary(w io.Writer, rcas []llm.RootCauseAnalysis) {
 		if rca.Location != nil && rca.Location.FilePath != "" {
 			loc = " in " + formatCodeLocation(rca.Location)
 		}
-		tag := bugLocationTag(rca.BugLocation, rca.BugLocationConfidence)
-		if tag != "" {
-			tag = "  " + tag
-		}
-		_, _ = dim.Fprintf(w, "  %d. %s%s%s\n", i+1, failureType, loc, tag)
+		_, _ = dim.Fprintf(w, "  %d. %-16s %s%s\n", i+1, tag, failureType, loc)
 		if rca.Title != "" {
 			_, _ = dim.Fprintf(w, "     %s\n", rca.Title)
 		}
 	}
+}
+
+// bugLocationLabel returns a colored tag for the bug location.
+func bugLocationLabel(loc llm.BugLocation) string {
+	switch loc {
+	case llm.BugLocationProduction:
+		return color.RedString("[production]")
+	case llm.BugLocationInfrastructure:
+		return color.YellowString("[infra]")
+	case llm.BugLocationTest:
+		return color.CyanString("[test]")
+	default:
+		return color.HiBlackString("[unknown]")
+	}
+}
+
+// printClusterCard renders a single RCA as a cluster card with header.
+func printClusterCard(w io.Writer, rca *llm.RootCauseAnalysis, num, total int) {
+	dim := color.New(color.FgHiBlack)
+	bold := color.New(color.Bold)
+
+	// Cluster header
+	tag := bugLocationLabel(rca.BugLocation)
+	conf := ""
+	if rca.BugLocationConfidence != "" {
+		conf = ", " + rca.BugLocationConfidence + " confidence"
+	}
+	_, _ = dim.Fprintln(w, "  "+strings.Repeat("━", 50))
+	_, _ = bold.Fprintf(w, "  Cluster %d/%d %s%s\n", num, total, tag, conf)
+
+	// Delegate to existing structured RCA renderer
+	printStructuredRCA(w, rca)
 }
 
 // renderRCAHeader prints the failure type, location, bug location tag, and suspected bug file.
