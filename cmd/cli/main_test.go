@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 	"unicode/utf8"
@@ -766,6 +767,66 @@ func TestBugLocationLabel(t *testing.T) {
 	assert.NotEmpty(t, bugLocationLabel(llm.BugLocationInfrastructure))
 	assert.NotEmpty(t, bugLocationLabel(llm.BugLocationTest))
 	assert.NotEmpty(t, bugLocationLabel(llm.BugLocationUnknown))
+}
+
+func TestPrintClusterSummary(t *testing.T) {
+	var buf bytes.Buffer
+	rcas := []llm.RootCauseAnalysis{
+		{Title: "Timeout", FailureType: llm.FailureTypeTimeout, BugLocation: llm.BugLocationInfrastructure,
+			Location: &llm.CodeLocation{FilePath: "test.spec.ts", LineNumber: 42}},
+		{Title: "Assertion", FailureType: llm.FailureTypeAssertion, BugLocation: llm.BugLocationTest},
+	}
+	printClusterSummary(&buf, rcas)
+	out := buf.String()
+
+	assert.Contains(t, out, "2 root causes found")
+	assert.Contains(t, out, "TIMEOUT")
+	assert.Contains(t, out, "test.spec.ts:42")
+}
+
+func TestPrintClusterSummary_EmptyFailureType(t *testing.T) {
+	var buf bytes.Buffer
+	rcas := []llm.RootCauseAnalysis{
+		{Title: "Unknown", BugLocation: llm.BugLocationUnknown},
+	}
+	printClusterSummary(&buf, rcas)
+	assert.Contains(t, buf.String(), "ERROR")
+}
+
+func TestPrintClusterCard(t *testing.T) {
+	var buf bytes.Buffer
+	rca := &llm.RootCauseAnalysis{
+		Title:                 "DB timeout",
+		FailureType:           llm.FailureTypeTimeout,
+		BugLocation:           llm.BugLocationInfrastructure,
+		BugLocationConfidence: "high",
+		RootCause:             "DB not started",
+		Remediation:           "Start DB",
+	}
+	printClusterCard(&buf, rca, 2, 3)
+	out := buf.String()
+
+	assert.Contains(t, out, "Cluster 2/3")
+	assert.Contains(t, out, "high confidence")
+	assert.Contains(t, out, "DB not started")
+}
+
+func TestIsTerminal_NotTTY(t *testing.T) {
+	f, err := os.CreateTemp("", "test")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.Remove(f.Name()) })
+	defer f.Close()
+	assert.False(t, isTerminal(f))
+}
+
+func TestResolveRepo_FromEnvMissingRepo(t *testing.T) {
+	fromEnv = true
+	runURL = ""
+	t.Setenv("GITHUB_REPOSITORY", "")
+	_, _, err := resolveRepo(nil)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "GITHUB_REPOSITORY not set")
+	fromEnv = false
 }
 
 func TestExitCode_APIError(t *testing.T) {
