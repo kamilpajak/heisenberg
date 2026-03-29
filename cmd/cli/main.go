@@ -149,21 +149,8 @@ func run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// Resolve output format
-	if jsonOutput {
-		format = "json"
-	}
-	if format == "" {
-		if isTerminal(os.Stdout) {
-			format = "human"
-		} else {
-			format = "json"
-		}
-	}
-
-	if modelName == "" {
-		modelName = os.Getenv("HEISENBERG_MODEL")
-	}
+	format = resolveFormat(format, jsonOutput, isTerminal(os.Stdout))
+	modelName = resolveModel(modelName)
 
 	emitter := llm.NewTextEmitter(os.Stderr, verbose)
 
@@ -263,6 +250,31 @@ func isTerminal(f *os.File) bool {
 		return false
 	}
 	return fi.Mode()&os.ModeCharDevice != 0
+}
+
+// resolveFormat determines output format from flag, --json alias, and TTY detection.
+func resolveFormat(formatFlag string, jsonFlag bool, isTTY bool) string {
+	if jsonFlag {
+		return "json"
+	}
+	if formatFlag != "" {
+		return formatFlag
+	}
+	if isTTY {
+		return "human"
+	}
+	return "json"
+}
+
+// resolveModel determines model name from flag and environment variable.
+func resolveModel(flag string) string {
+	if flag != "" {
+		return flag
+	}
+	if env := os.Getenv("HEISENBERG_MODEL"); env != "" {
+		return env
+	}
+	return ""
 }
 
 func printResult(stderr, stdout io.Writer, r *llm.AnalysisResult) {

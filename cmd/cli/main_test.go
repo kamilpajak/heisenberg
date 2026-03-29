@@ -829,6 +829,37 @@ func TestResolveRepo_FromEnvMissingRepo(t *testing.T) {
 	fromEnv = false
 }
 
+func TestResolveFormat(t *testing.T) {
+	tests := []struct {
+		name     string
+		flag     string
+		jsonFlag bool
+		isTTY    bool
+		want     string
+	}{
+		{"json flag", "", true, true, "json"},
+		{"format flag json", "json", false, true, "json"},
+		{"format flag human", "human", false, false, "human"},
+		{"TTY auto-detect", "", false, true, "human"},
+		{"pipe auto-detect", "", false, false, "json"},
+		{"json flag overrides TTY", "", true, false, "json"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, resolveFormat(tt.flag, tt.jsonFlag, tt.isTTY))
+		})
+	}
+}
+
+func TestResolveModel(t *testing.T) {
+	assert.Equal(t, "gemini-2.5-pro", resolveModel("gemini-2.5-pro"))
+	assert.Equal(t, "", resolveModel(""))
+
+	t.Setenv("HEISENBERG_MODEL", "gemini-3-pro")
+	assert.Equal(t, "gemini-3-pro", resolveModel(""))
+	assert.Equal(t, "override", resolveModel("override"))
+}
+
 func TestExitCode_APIError(t *testing.T) {
 	var buf bytes.Buffer
 	apiErr := &llm.APIError{
