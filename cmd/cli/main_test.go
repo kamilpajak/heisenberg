@@ -852,12 +852,15 @@ func TestResolveFormat(t *testing.T) {
 }
 
 func TestResolveModel(t *testing.T) {
-	assert.Equal(t, "gemini-2.5-pro", resolveModel("gemini-2.5-pro"))
-	assert.Equal(t, "", resolveModel(""))
+	// flag > env > config > empty
+	assert.Equal(t, "gemini-2.5-pro", resolveModel("gemini-2.5-pro", ""))
+	assert.Equal(t, "", resolveModel("", ""))
+	assert.Equal(t, "from-config", resolveModel("", "from-config"))
 
 	t.Setenv("HEISENBERG_MODEL", "gemini-3-pro")
-	assert.Equal(t, "gemini-3-pro", resolveModel(""))
-	assert.Equal(t, "override", resolveModel("override"))
+	assert.Equal(t, "gemini-3-pro", resolveModel("", ""))
+	assert.Equal(t, "gemini-3-pro", resolveModel("", "from-config"))     // env beats config
+	assert.Equal(t, "override", resolveModel("override", "from-config")) // flag beats all
 }
 
 func TestExitCode_APIError(t *testing.T) {

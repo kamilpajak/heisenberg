@@ -17,6 +17,7 @@ import (
 	"github.com/fatih/color"
 	"github.com/kamilpajak/heisenberg/internal/dashboard"
 	"github.com/kamilpajak/heisenberg/pkg/analysis"
+	"github.com/kamilpajak/heisenberg/pkg/config"
 	"github.com/kamilpajak/heisenberg/pkg/llm"
 	"github.com/kamilpajak/heisenberg/pkg/saas"
 	"github.com/kamilpajak/heisenberg/pkg/trace"
@@ -165,7 +166,14 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	format = resolveFormat(format, jsonOutput, isTerminal(os.Stdout))
-	modelName = resolveModel(modelName)
+
+	cfg, err := config.Load()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: %v (using defaults)\n", err)
+		cfg = &config.Config{}
+	}
+
+	modelName = resolveModel(modelName, cfg.Model)
 
 	emitter := llm.NewTextEmitter(os.Stderr, verbose)
 
@@ -177,6 +185,8 @@ func run(cmd *cobra.Command, args []string) error {
 		Emitter:      emitter,
 		SnapshotHTML: trace.SnapshotHTML,
 		Model:        modelName,
+		GitHubToken:  cfg.GitHubToken,
+		GoogleAPIKey: cfg.GoogleAPIKey,
 	})
 	if err != nil {
 		emitter.MarkFailed()
@@ -285,14 +295,14 @@ func resolveFormat(formatFlag string, jsonFlag bool, isTTY bool) string {
 }
 
 // resolveModel determines model name from flag and environment variable.
-func resolveModel(flag string) string {
+func resolveModel(flag, configValue string) string {
 	if flag != "" {
 		return flag
 	}
 	if env := os.Getenv("HEISENBERG_MODEL"); env != "" {
 		return env
 	}
-	return ""
+	return configValue
 }
 
 func printResult(stderr, stdout io.Writer, r *llm.AnalysisResult) {

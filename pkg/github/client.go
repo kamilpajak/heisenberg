@@ -25,10 +25,14 @@ type Client struct {
 	baseURL    string
 }
 
-// NewClient creates a new GitHub client
-func NewClient() *Client {
+// NewClient creates a new GitHub client.
+// If token is empty, falls back to the GITHUB_TOKEN environment variable.
+func NewClient(token string) *Client {
+	if token == "" {
+		token = os.Getenv("GITHUB_TOKEN")
+	}
 	return &Client{
-		token:      os.Getenv("GITHUB_TOKEN"),
+		token:      token,
 		httpClient: &http.Client{},
 		baseURL:    "https://api.github.com",
 	}
