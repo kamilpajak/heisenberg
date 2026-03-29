@@ -110,6 +110,28 @@ func TestMergeClusterResults_Empty(t *testing.T) {
 	assert.Empty(t, merged.RCAs)
 }
 
+func TestMergeCategory_NoFailures(t *testing.T) {
+	results := []clusterAnalysis{
+		{Result: &llm.AnalysisResult{Category: llm.CategoryNoFailures}},
+	}
+	assert.Equal(t, llm.CategoryNoFailures, mergeCategory(results))
+}
+
+func TestMergeCategory_NotSupported(t *testing.T) {
+	results := []clusterAnalysis{
+		{Result: &llm.AnalysisResult{Category: llm.CategoryNotSupported}},
+	}
+	assert.Equal(t, llm.CategoryNotSupported, mergeCategory(results))
+}
+
+func TestMergeConfidence_Empty(t *testing.T) {
+	assert.Equal(t, 0, mergeConfidence(nil))
+}
+
+func TestMergeSensitivity_Empty(t *testing.T) {
+	assert.Equal(t, "", mergeSensitivity(nil))
+}
+
 func TestMergeClusterResults_MixedCategories(t *testing.T) {
 	results := []clusterAnalysis{
 		{

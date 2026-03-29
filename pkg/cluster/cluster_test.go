@@ -173,6 +173,27 @@ func TestJaccard_Empty(t *testing.T) {
 	assert.Equal(t, 0.0, jaccard(nil, nil))
 }
 
+func TestFindSingletons(t *testing.T) {
+	clusters := []Cluster{
+		{Failures: make([]FailureInfo, 3)},
+		{Failures: make([]FailureInfo, 1)},
+		{Failures: make([]FailureInfo, 1)},
+		{Failures: make([]FailureInfo, 5)},
+	}
+	singletons := findSingletons(clusters)
+	assert.Equal(t, []int{1, 2}, singletons)
+}
+
+func TestUnionFind(t *testing.T) {
+	uf := newUnionFind(5)
+	uf.union(0, 1)
+	uf.union(2, 3)
+	uf.union(1, 3)
+
+	assert.Equal(t, uf.find(0), uf.find(3), "0,1,2,3 should be in same set")
+	assert.NotEqual(t, uf.find(0), uf.find(4), "4 should be separate")
+}
+
 // repeatWord returns a unique word for index i.
 func repeatWord(i int) string {
 	words := []string{"alpha", "beta", "gamma", "delta", "epsilon", "zeta", "eta", "theta", "iota", "kappa", "lambda", "mu", "nu", "xi", "omicron"}
