@@ -585,6 +585,13 @@ func TestRunAgentLoop_MultiRCA(t *testing.T) {
 	assert.Equal(t, FailureTypeTimeout, result.RCAs[0].FailureType)
 	assert.Equal(t, "Assertion in login", result.RCAs[1].Title)
 	assert.Equal(t, FailureTypeAssertion, result.RCAs[1].FailureType)
+
+	// EvalMeta populated
+	require.NotNil(t, result.Eval)
+	assert.Equal(t, "m", result.Eval.Model)
+	assert.Equal(t, 2, result.Eval.Iterations)
+	assert.Equal(t, 30, result.Eval.MaxIterations)
+	assert.Positive(t, result.Eval.WallMs)
 }
 
 func TestRunAgentLoop_EmptyResponseRetry(t *testing.T) {

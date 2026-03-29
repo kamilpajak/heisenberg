@@ -1,0 +1,14 @@
+{
+  "repo": "microsoft/playwright",
+  "run_id": 23642131867,
+  "expected_category": "diagnosis",
+  "min_confidence": 60,
+  "expected_analyses_count": 0,
+  "expected_analyses": [
+    {
+      "file_path_contains": "perf.spec.ts",
+      "failure_type": "assertion"
+    }
+  ],
+  "notes": "2 macos shards fail. perf.spec.ts assertion on utilsBundle is the primary failure. Model may find 1-3 RCAs depending on depth. expected_analyses_count=0 means any count is acceptable."
+}

@@ -248,11 +248,15 @@ type loopState struct {
 	softWarned           bool            // true after soft limit warning injected
 	consecutiveFileReads int             // counts consecutive get_repo_file/get_workflow_file calls
 	fileToolsHiddenUntil int             // iteration index after which file tools are restored
+	totalModelMs         int             // accumulated model call time
+	totalTokens          int             // accumulated prompt tokens
+	iterationsUsed       int             // final iteration count
 }
 
 // RunAgentLoop runs the agentic conversation loop. The model can call tools
 // iteratively until it produces a text response or hits the iteration limit.
 func (c *Client) RunAgentLoop(ctx context.Context, handler ToolExecutor, toolDecls []FunctionDeclaration, initialContext string, verbose bool) (*AnalysisResult, error) {
+	startTime := time.Now()
 	tools := []Tool{{FunctionDeclarations: toolDecls}}
 	system := systemPrompt()
 
@@ -287,6 +291,9 @@ func (c *Client) RunAgentLoop(ctx context.Context, handler ToolExecutor, toolDec
 		if err != nil {
 			return nil, err
 		}
+		s.totalModelMs += si.modelMs
+		s.totalTokens += si.tokens
+		s.iterationsUsed = si.step
 
 		modelContent := candidate.Content
 		modelContent.Role = "model"
@@ -297,12 +304,17 @@ func (c *Client) RunAgentLoop(ctx context.Context, handler ToolExecutor, toolDec
 			return nil, err
 		}
 		if result != nil {
+			c.stampEvalMeta(result, s, startTime)
 			return result, nil
 		}
 	}
 
 	if s.pendingDone {
-		return c.generateFinal(ctx, s.history, tools, system, handler, verbose)
+		result, err := c.generateFinal(ctx, s, tools, system, handler, verbose)
+		if result != nil {
+			c.stampEvalMeta(result, s, startTime)
+		}
+		return result, err
 	}
 
 	return nil, fmt.Errorf("agent loop exceeded %d iterations without completing", maxIterations)
@@ -440,6 +452,18 @@ func buildResult(texts []string, handler ToolExecutor) *AnalysisResult {
 		result.Sensitivity = "medium"
 	}
 	return result
+}
+
+// stampEvalMeta populates performance metadata on the result for evaluation.
+func (c *Client) stampEvalMeta(result *AnalysisResult, s *loopState, startTime time.Time) {
+	result.Eval = &EvalMeta{
+		Model:         c.model,
+		Iterations:    s.iterationsUsed,
+		MaxIterations: maxIterations,
+		ModelMs:       s.totalModelMs,
+		Tokens:        s.totalTokens,
+		WallMs:        int(time.Since(startTime).Milliseconds()),
+	}
 }
 
 // handleEmptyResponse retries once when the model returns an empty response
@@ -610,7 +634,7 @@ func emitToolResult(handler ToolExecutor, si *stepInfo, ci, totalCalls, toolMs i
 // extracting the final text analysis.
 func (c *Client) generateFinal(
 	ctx context.Context,
-	history []Content,
+	s *loopState,
 	tools []Tool,
 	system *Content,
 	handler ToolExecutor,
@@ -618,7 +642,7 @@ func (c *Client) generateFinal(
 ) (*AnalysisResult, error) {
 	emit(handler, ProgressEvent{Type: "step", Step: maxIterations, MaxStep: maxIterations, Message: "Generating final analysis..."})
 	t0 := time.Now()
-	resp, err := c.generate(ctx, history, tools, system)
+	resp, err := c.generate(ctx, s.history, tools, system)
 	finalModelMs := int(time.Since(t0).Milliseconds())
 	if err != nil {
 		return nil, fmt.Errorf("final step: %w", err)
@@ -627,6 +651,9 @@ func (c *Client) generateFinal(
 	if resp.UsageMetadata != nil {
 		finalTokens = resp.UsageMetadata.PromptTokenCount
 	}
+	s.totalModelMs += finalModelMs
+	s.totalTokens += finalTokens
+	s.iterationsUsed++
 	if verbose {
 		emit(handler, ProgressEvent{Type: "result", Step: maxIterations, MaxStep: maxIterations, ModelMs: finalModelMs, Tokens: finalTokens})
 	}

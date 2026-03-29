@@ -117,6 +117,17 @@ type AnalysisResult struct {
 	RunID       int64               `json:"run_id,omitempty"`     // GitHub workflow run ID
 	Branch      string              `json:"branch,omitempty"`     // Git branch name
 	CommitSHA   string              `json:"commit_sha,omitempty"` // Git commit SHA
+	Eval        *EvalMeta           `json:"eval,omitempty"`       // Performance metadata for eval
+}
+
+// EvalMeta captures performance metrics from the agent loop for evaluation.
+type EvalMeta struct {
+	Model         string `json:"model"`
+	Iterations    int    `json:"iterations"`
+	MaxIterations int    `json:"max_iterations"`
+	ModelMs       int    `json:"model_ms"`
+	Tokens        int    `json:"tokens"`
+	WallMs        int    `json:"wall_ms"`
 }
 
 // GenerationConfig controls response generation.
