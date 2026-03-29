@@ -128,6 +128,9 @@ type EvalMeta struct {
 	ModelMs       int    `json:"model_ms"`
 	Tokens        int    `json:"tokens"`
 	WallMs        int    `json:"wall_ms"`
+	Clustered     bool   `json:"clustered,omitempty"`
+	ClusterCount  int    `json:"cluster_count,omitempty"`
+	ClusterMethod string `json:"cluster_method,omitempty"`
 }
 
 // GenerationConfig controls response generation.
