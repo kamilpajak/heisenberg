@@ -132,10 +132,9 @@ func parseAPIError(statusCode int, status string, body []byte) *APIError {
 
 // roundHours produces a human-friendly duration like "5h" or "30m".
 func roundHours(hours, mins int) string {
-	total := float64(hours) + float64(mins)/60
-	rounded := int(math.Round(total))
-	if rounded < 1 {
+	if hours == 0 {
 		return fmt.Sprintf("%dm", mins)
 	}
-	return fmt.Sprintf("%dh", rounded)
+	total := float64(hours) + float64(mins)/60
+	return fmt.Sprintf("%dh", int(math.Round(total)))
 }

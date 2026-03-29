@@ -101,6 +101,7 @@ const errorFmt = "  Error: %s\n"
 // exitCodeLabel maps exit codes to human-readable descriptions.
 var exitCodeLabel = map[int]string{
 	exitGeneral:     "runtime error",
+	exitUsage:       "bad arguments",
 	exitAPIError:    "external API error",
 	exitConfigError: "configuration error",
 }
