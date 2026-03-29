@@ -134,17 +134,19 @@ func TestAnalysisResult_WithRCA(t *testing.T) {
 		Category:    CategoryDiagnosis,
 		Confidence:  85,
 		Sensitivity: "low",
-		RCA: &RootCauseAnalysis{
-			Title:       "Element Interception",
-			FailureType: FailureTypeTimeout,
-			Location: &CodeLocation{
-				FilePath:   "tests/checkout.spec.ts",
-				LineNumber: 45,
+		RCAs: []RootCauseAnalysis{
+			{
+				Title:       "Element Interception",
+				FailureType: FailureTypeTimeout,
+				Location: &CodeLocation{
+					FilePath:   "tests/checkout.spec.ts",
+					LineNumber: 45,
+				},
+				Symptom:     "Timeout waiting for '#submit-btn'",
+				RootCause:   "Cookie banner blocks element",
+				Evidence:    []Evidence{{Type: EvidenceScreenshot, Content: "Overlay visible"}},
+				Remediation: "Dismiss cookie banner first",
 			},
-			Symptom:     "Timeout waiting for '#submit-btn'",
-			RootCause:   "Cookie banner blocks element",
-			Evidence:    []Evidence{{Type: EvidenceScreenshot, Content: "Overlay visible"}},
-			Remediation: "Dismiss cookie banner first",
 		},
 	}
 
@@ -157,13 +159,13 @@ func TestAnalysisResult_WithRCA(t *testing.T) {
 
 	assert.Equal(t, CategoryDiagnosis, decoded.Category)
 	assert.Equal(t, 85, decoded.Confidence)
-	require.NotNil(t, decoded.RCA)
-	assert.Equal(t, "Element Interception", decoded.RCA.Title)
-	assert.Equal(t, FailureTypeTimeout, decoded.RCA.FailureType)
+	require.Len(t, decoded.RCAs, 1)
+	assert.Equal(t, "Element Interception", decoded.RCAs[0].Title)
+	assert.Equal(t, FailureTypeTimeout, decoded.RCAs[0].FailureType)
 }
 
 func TestAnalysisResult_WithoutRCA_LegacyText(t *testing.T) {
-	// For backward compatibility: category != diagnosis should not have RCA
+	// For backward compatibility: category != diagnosis should not have RCAs
 	result := &AnalysisResult{
 		Text:     "All tests passing",
 		Category: CategoryNoFailures,
@@ -178,7 +180,7 @@ func TestAnalysisResult_WithoutRCA_LegacyText(t *testing.T) {
 
 	assert.Equal(t, CategoryNoFailures, decoded.Category)
 	assert.Equal(t, "All tests passing", decoded.Text)
-	assert.Nil(t, decoded.RCA)
+	assert.Empty(t, decoded.RCAs)
 }
 
 func TestBugLocation_Constants(t *testing.T) {
@@ -376,4 +378,68 @@ func TestRCA_FormatForCLI_NoLocation(t *testing.T) {
 
 	assert.Contains(t, formatted, "NETWORK")
 	assert.NotContains(t, formatted, ":0") // Should not show line 0
+}
+
+func TestParseRCAsFromArgs_MultipleAnalyses(t *testing.T) {
+	args := map[string]any{
+		"category":   "diagnosis",
+		"confidence": float64(90),
+		"analyses": []any{
+			map[string]any{
+				"title":        "utilsBundle not loaded",
+				"failure_type": "assertion",
+				"bug_location": "test",
+				"file_path":    "tests/perf.spec.ts",
+				"line_number":  float64(29),
+				"symptom":      "Expected utilsBundle in output",
+				"root_cause":   "Test assertion outdated",
+				"remediation":  "Update test",
+			},
+			map[string]any{
+				"title":        "File not found",
+				"failure_type": "infra",
+				"bug_location": "infrastructure",
+				"file_path":    "registry/index.spec.ts",
+				"symptom":      "ENOENT",
+				"root_cause":   "Temp dir not created",
+				"remediation":  "Fix CI setup",
+			},
+		},
+	}
+
+	rcas := ParseRCAsFromArgs(args)
+
+	require.Len(t, rcas, 2)
+	assert.Equal(t, "utilsBundle not loaded", rcas[0].Title)
+	assert.Equal(t, FailureTypeAssertion, rcas[0].FailureType)
+	assert.Equal(t, BugLocationTest, rcas[0].BugLocation)
+	assert.Equal(t, "tests/perf.spec.ts", rcas[0].Location.FilePath)
+	assert.Equal(t, 29, rcas[0].Location.LineNumber)
+
+	assert.Equal(t, "File not found", rcas[1].Title)
+	assert.Equal(t, FailureTypeInfra, rcas[1].FailureType)
+	assert.Equal(t, BugLocationInfrastructure, rcas[1].BugLocation)
+}
+
+func TestParseRCAsFromArgs_BackwardCompat_FlatArgs(t *testing.T) {
+	// Old-style flat args without analyses array → single-element slice
+	args := map[string]any{
+		"title":        "Timeout Error",
+		"failure_type": "timeout",
+		"file_path":    "tests/login.spec.ts",
+		"symptom":      "Timed out",
+		"root_cause":   "Slow",
+		"remediation":  "Fix",
+	}
+
+	rcas := ParseRCAsFromArgs(args)
+
+	require.Len(t, rcas, 1)
+	assert.Equal(t, "Timeout Error", rcas[0].Title)
+	assert.Equal(t, FailureTypeTimeout, rcas[0].FailureType)
+}
+
+func TestParseRCAsFromArgs_Empty(t *testing.T) {
+	rcas := ParseRCAsFromArgs(nil)
+	assert.Empty(t, rcas)
 }

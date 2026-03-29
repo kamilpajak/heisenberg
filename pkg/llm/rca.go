@@ -60,6 +60,36 @@ type Evidence struct {
 	Content string `json:"content"` // Description of the evidence
 }
 
+// ParseRCAsFromArgs extracts multiple RootCauseAnalysis from done tool arguments.
+// If args contains an "analyses" array, each element is parsed as a separate RCA.
+// Otherwise falls back to ParseRCAFromArgs for backward compatibility (single RCA).
+func ParseRCAsFromArgs(args map[string]any) []RootCauseAnalysis {
+	if args == nil {
+		return nil
+	}
+
+	// New format: analyses array
+	if raw, ok := args["analyses"].([]any); ok {
+		var rcas []RootCauseAnalysis
+		for _, item := range raw {
+			if m, ok := item.(map[string]any); ok {
+				rca := ParseRCAFromArgs(m)
+				if rca != nil && rca.Title != "" {
+					rcas = append(rcas, *rca)
+				}
+			}
+		}
+		return rcas
+	}
+
+	// Backward compat: flat args → single-element slice
+	rca := ParseRCAFromArgs(args)
+	if rca != nil && rca.Title != "" {
+		return []RootCauseAnalysis{*rca}
+	}
+	return nil
+}
+
 // ParseRCAFromArgs extracts RootCauseAnalysis from done tool arguments.
 func ParseRCAFromArgs(args map[string]any) *RootCauseAnalysis {
 	if args == nil {

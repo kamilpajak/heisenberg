@@ -3,6 +3,7 @@ package llm
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -148,4 +149,36 @@ func TestAPIError_ErrorsAs(t *testing.T) {
 	var target *APIError
 	assert.True(t, errors.As(wrapped, &target))
 	assert.Equal(t, 429, target.StatusCode)
+}
+
+func TestShortMessage_SentenceBoundary(t *testing.T) {
+	e := &APIError{
+		Message: "You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits.",
+	}
+	msg := e.shortMessage()
+	assert.Equal(t, "You exceeded your current quota, please check your plan and billing details", msg)
+}
+
+func TestShortMessage_NoCommaFallback(t *testing.T) {
+	// No sentence boundary within threshold, but comma at position 35.
+	// Old code would truncate at comma; new code truncates at hard limit.
+	e := &APIError{
+		Message: "Resource has been exhausted (e.g., check your plan and billing details and contact support for refund and upgrade)",
+	}
+	msg := e.shortMessage()
+	// Should NOT cut at first ", " (position 33 inside parenthetical)
+	assert.Len(t, msg, shortMessageThreshold, "should truncate at hard limit, not comma")
+}
+
+func TestShortMessage_Short(t *testing.T) {
+	e := &APIError{Message: "Resource exhausted"}
+	assert.Equal(t, "Resource exhausted", e.shortMessage())
+}
+
+func TestShortMessage_NoSentenceBoundary(t *testing.T) {
+	e := &APIError{
+		Message: strings.Repeat("a", 100),
+	}
+	msg := e.shortMessage()
+	assert.Len(t, msg, shortMessageThreshold)
 }

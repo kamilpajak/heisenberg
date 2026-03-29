@@ -109,6 +109,95 @@ func TestDoneWithInvalidCategory(t *testing.T) {
 	assert.Equal(t, llm.CategoryDiagnosis, h.DiagnosisCategory(), "invalid category should fall back to diagnosis")
 }
 
+func TestDoneWithAnalysesArray(t *testing.T) {
+	h := &ToolHandler{}
+	_, isDone, err := h.Execute(context.Background(), llm.FunctionCall{
+		Name: "done",
+		Args: map[string]any{
+			"category":   "diagnosis",
+			"confidence": float64(90),
+			"analyses": []any{
+				map[string]any{
+					"title":        "Timeout in checkout",
+					"failure_type": "timeout",
+					"file_path":    "tests/checkout.spec.ts",
+					"line_number":  float64(45),
+					"bug_location": "test",
+					"root_cause":   "Cookie banner overlay",
+					"remediation":  "Dismiss banner first",
+				},
+				map[string]any{
+					"title":        "Assertion failed in login",
+					"failure_type": "assertion",
+					"file_path":    "tests/login.spec.ts",
+					"line_number":  float64(12),
+					"bug_location": "production",
+					"root_cause":   "Changed redirect URL",
+					"remediation":  "Update expected URL",
+				},
+			},
+		},
+	})
+	require.NoError(t, err)
+	require.True(t, isDone)
+
+	rcas := h.DiagnosisRCAs()
+	require.Len(t, rcas, 2)
+
+	assert.Equal(t, "Timeout in checkout", rcas[0].Title)
+	assert.Equal(t, llm.FailureTypeTimeout, rcas[0].FailureType)
+	assert.Equal(t, "tests/checkout.spec.ts", rcas[0].Location.FilePath)
+	assert.Equal(t, 45, rcas[0].Location.LineNumber)
+	assert.Equal(t, llm.BugLocationTest, rcas[0].BugLocation)
+
+	assert.Equal(t, "Assertion failed in login", rcas[1].Title)
+	assert.Equal(t, llm.FailureTypeAssertion, rcas[1].FailureType)
+	assert.Equal(t, llm.BugLocationProduction, rcas[1].BugLocation)
+}
+
+func TestDoneWithFlatArgsBackwardCompat(t *testing.T) {
+	h := &ToolHandler{}
+	_, isDone, err := h.Execute(context.Background(), llm.FunctionCall{
+		Name: "done",
+		Args: map[string]any{
+			"category":     "diagnosis",
+			"confidence":   float64(80),
+			"title":        "Network error",
+			"failure_type": "network",
+			"file_path":    "tests/api.spec.ts",
+			"root_cause":   "API server down",
+			"remediation":  "Retry",
+		},
+	})
+	require.NoError(t, err)
+	require.True(t, isDone)
+
+	rcas := h.DiagnosisRCAs()
+	require.Len(t, rcas, 1)
+	assert.Equal(t, "Network error", rcas[0].Title)
+	assert.Equal(t, llm.FailureTypeNetwork, rcas[0].FailureType)
+}
+
+func TestDoneNoFailures_SkipsRCAs(t *testing.T) {
+	h := &ToolHandler{}
+	_, isDone, err := h.Execute(context.Background(), llm.FunctionCall{
+		Name: "done",
+		Args: map[string]any{
+			"category": "no_failures",
+			"analyses": []any{
+				map[string]any{
+					"title":        "Should be ignored",
+					"failure_type": "assertion",
+				},
+			},
+		},
+	})
+	require.NoError(t, err)
+	require.True(t, isDone)
+	assert.Equal(t, llm.CategoryNoFailures, h.DiagnosisCategory())
+	assert.Empty(t, h.DiagnosisRCAs(), "no_failures should not parse analyses")
+}
+
 func TestDoneConfidenceClampedAbove100(t *testing.T) {
 	h := &ToolHandler{}
 	_, _, err := h.Execute(context.Background(), llm.FunctionCall{
@@ -1083,7 +1172,7 @@ func TestToolDeclarations(t *testing.T) {
 	assert.Len(t, decls, 8)
 }
 
-func TestToolDeclarations_DoneEvidenceArrayHasItems(t *testing.T) {
+func TestToolDeclarations_DoneAnalysesArrayHasItems(t *testing.T) {
 	decls := ToolDeclarations()
 
 	// Find the done tool
@@ -1097,9 +1186,16 @@ func TestToolDeclarations_DoneEvidenceArrayHasItems(t *testing.T) {
 	require.NotNil(t, doneDecl, "done tool should exist")
 	require.NotNil(t, doneDecl.Parameters, "done tool should have parameters")
 
-	// Check evidence field exists and has Items schema (required by Gemini API for arrays)
-	evidenceSchema, ok := doneDecl.Parameters.Properties["evidence"]
-	require.True(t, ok, "done tool should have evidence property")
+	// Check analyses array exists and has proper nested schema
+	analysesSchema, ok := doneDecl.Parameters.Properties["analyses"]
+	require.True(t, ok, "done tool should have analyses property")
+	assert.Equal(t, "array", analysesSchema.Type, "analyses should be array type")
+	require.NotNil(t, analysesSchema.Items, "analyses array MUST have Items schema for Gemini API")
+	assert.Equal(t, "object", analysesSchema.Items.Type, "analyses items should be objects")
+
+	// Check evidence nested inside analyses items
+	evidenceSchema, ok := analysesSchema.Items.Properties["evidence"]
+	require.True(t, ok, "analyses items should have evidence property")
 	assert.Equal(t, "array", evidenceSchema.Type, "evidence should be array type")
 	require.NotNil(t, evidenceSchema.Items, "evidence array MUST have Items schema for Gemini API")
 	assert.Equal(t, "object", evidenceSchema.Items.Type, "evidence items should be objects")

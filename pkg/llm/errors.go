@@ -39,11 +39,8 @@ func (e *APIError) shortMessage() string {
 	if msg == "" || len(msg) <= shortMessageThreshold {
 		return msg
 	}
-	// Truncate at first sentence boundary (". "), then fall back to comma
+	// Truncate at first sentence boundary (". ") only
 	if idx := strings.Index(msg, ". "); idx > 0 && idx <= shortMessageThreshold {
-		return msg[:idx]
-	}
-	if idx := strings.Index(msg, ", "); idx > 0 && idx <= shortMessageThreshold {
 		return msg[:idx]
 	}
 	return msg[:shortMessageThreshold]

@@ -62,8 +62,8 @@ func TestAnalyzeSSE_Diagnosis(t *testing.T) {
 	srv := httptest.NewServer(NewHandler())
 	defer srv.Close()
 
-	// TryGhost/Ghost — 1 Playwright failure (comment-replies.test.ts)
-	resp, err := http.Get(srv.URL + "/api/analyze?repo=TryGhost/Ghost&run_id=21588220201")
+	// microsoft/playwright — assertion failure in perf.spec.ts (2 macos shards)
+	resp, err := http.Get(srv.URL + "/api/analyze?repo=microsoft/playwright&run_id=23642131867")
 	require.NoError(t, err)
 	defer resp.Body.Close()
 
@@ -102,6 +102,25 @@ func TestAnalyzeSSE_Diagnosis(t *testing.T) {
 	assert.InDelta(t, 50, a.Confidence, 50, "confidence should be 1-100")
 	assert.Contains(t, []string{"high", "medium", "low"}, a.Sensitivity)
 	assert.NotEmpty(t, a.Text)
+
+	// Multi-RCA structure assertions
+	require.GreaterOrEqual(t, len(a.RCAs), 1, "diagnosis should have at least 1 RCA")
+	for i, rca := range a.RCAs {
+		assert.NotEmpty(t, rca.Title, "RCA[%d] title should not be empty", i)
+		assert.NotEmpty(t, rca.FailureType, "RCA[%d] failure_type should not be empty", i)
+		assert.Contains(t, []string{"timeout", "assertion", "network", "infra", "flake"}, string(rca.FailureType),
+			"RCA[%d] failure_type should be valid enum", i)
+		assert.NotEmpty(t, rca.RootCause, "RCA[%d] root_cause should not be empty", i)
+		assert.NotEmpty(t, rca.Remediation, "RCA[%d] remediation should not be empty", i)
+		if rca.BugLocation != "" {
+			assert.Contains(t, []string{"test", "production", "infrastructure", "unknown"}, string(rca.BugLocation),
+				"RCA[%d] bug_location should be valid enum", i)
+		}
+	}
+	t.Logf("RCA count: %d", len(a.RCAs))
+	for i, rca := range a.RCAs {
+		t.Logf("  RCA[%d]: %s (%s) — %s", i, rca.Title, rca.FailureType, rca.BugLocation)
+	}
 }
 
 func TestAnalyzeSSE_PassingRun(t *testing.T) {
@@ -110,9 +129,9 @@ func TestAnalyzeSSE_PassingRun(t *testing.T) {
 	srv := httptest.NewServer(NewHandler())
 	defer srv.Close()
 
-	// carbon-design-system/carbon — 0 failures, 10 skipped
+	// carbon-design-system/carbon — passing run, 0 failures
 	// LLM may classify as "no_failures" or "diagnosis" (flagging skipped tests).
-	resp, err := http.Get(srv.URL + "/api/analyze?repo=carbon-design-system/carbon&run_id=21585598963")
+	resp, err := http.Get(srv.URL + "/api/analyze?repo=carbon-design-system/carbon&run_id=23704804673")
 	require.NoError(t, err)
 	defer resp.Body.Close()
 

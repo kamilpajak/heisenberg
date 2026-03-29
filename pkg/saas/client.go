@@ -82,8 +82,8 @@ func (c *Client) SubmitAnalysis(ctx context.Context, p SubmitParams) (string, er
 	if p.Result.Sensitivity != "" {
 		body["sensitivity"] = p.Result.Sensitivity
 	}
-	if p.Result.RCA != nil {
-		body["rca"] = p.Result.RCA
+	if len(p.Result.RCAs) > 0 {
+		body["analyses"] = p.Result.RCAs
 	}
 
 	jsonBody, err := json.Marshal(body)

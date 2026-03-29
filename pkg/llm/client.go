@@ -25,7 +25,8 @@ func emit(h ToolExecutor, ev ProgressEvent) {
 const maxIterations = 30
 const softLimitIteration = 15
 const circuitBreakerThreshold = 3 // consecutive file reads before breaker fires
-const circuitBreakerCooldown = 3  // iterations to hide file tools (current + 2 more)
+const errMaxIterations = "agent loop exceeded %d iterations without completing"
+const circuitBreakerCooldown = 3 // iterations to hide file tools (current + 2 more)
 
 var ansiRe = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
 
@@ -103,17 +104,25 @@ func describeEmptyResponse(c *Candidate) string {
 	return msg
 }
 
+// DefaultModel is the Gemini model used when no override is specified.
+const DefaultModel = "gemini-3-pro-preview"
+
 // NewClient creates a new LLM client (Google Gemini).
-func NewClient() (*Client, error) {
+// If model is empty, DefaultModel is used.
+func NewClient(model string) (*Client, error) {
 	apiKey := os.Getenv("GOOGLE_API_KEY")
 	if apiKey == "" {
 		return nil, &ConfigError{Message: "GOOGLE_API_KEY environment variable required"}
 	}
 
+	if model == "" {
+		model = DefaultModel
+	}
+
 	return &Client{
 		apiKey:     apiKey,
 		baseURL:    "https://generativelanguage.googleapis.com/v1beta",
-		model:      "gemini-3-pro-preview",
+		model:      model,
 		httpClient: &http.Client{Timeout: 120 * time.Second},
 		limiter:    rate.NewLimiter(rate.Every(6*time.Second), 1), // ~10 RPM
 	}, nil
@@ -134,11 +143,11 @@ Strategy:
 6. When you have enough information, you MUST call the "done" tool with structured RCA data, then provide your analysis text.
 
 When calling the "done" tool, classify your conclusion:
-- category "diagnosis": you identified a specific failure root cause. Include ALL structured RCA fields.
+- category "diagnosis": you identified specific failure root causes. Include the "analyses" array with one entry per distinct failing test (group tests sharing the same root cause into one entry).
 - category "no_failures": all tests are passing, nothing to diagnose.
 - category "not_supported": the test framework or artifact format cannot be analyzed.
 
-For "diagnosis" category, provide structured Root Cause Analysis:
+For "diagnosis" category, provide an "analyses" array. Each entry contains:
   - title: Short summary (e.g., "Timeout waiting for Submit Button")
   - failure_type: One of: timeout, assertion, network, infra, flake
   - file_path: Test file where failure occurred
@@ -151,7 +160,9 @@ For "diagnosis" category, provide structured Root Cause Analysis:
   - root_cause: Why it failed (the underlying issue)
   - evidence: Array of supporting data points
   - remediation: How to fix it (actionable guidance)
-  - confidence: 0-100 score
+
+Top-level fields (outside analyses):
+  - confidence: 0-100 score (overall diagnosis confidence)
   - missing_information_sensitivity: high/medium/low
 
 Bug location classification:
@@ -238,11 +249,15 @@ type loopState struct {
 	softWarned           bool            // true after soft limit warning injected
 	consecutiveFileReads int             // counts consecutive get_repo_file/get_workflow_file calls
 	fileToolsHiddenUntil int             // iteration index after which file tools are restored
+	totalModelMs         int             // accumulated model call time
+	totalTokens          int             // accumulated prompt tokens
+	iterationsUsed       int             // final iteration count
 }
 
 // RunAgentLoop runs the agentic conversation loop. The model can call tools
 // iteratively until it produces a text response or hits the iteration limit.
 func (c *Client) RunAgentLoop(ctx context.Context, handler ToolExecutor, toolDecls []FunctionDeclaration, initialContext string, verbose bool) (*AnalysisResult, error) {
+	startTime := time.Now()
 	tools := []Tool{{FunctionDeclarations: toolDecls}}
 	system := systemPrompt()
 
@@ -274,8 +289,11 @@ func (c *Client) RunAgentLoop(ctx context.Context, handler ToolExecutor, toolDec
 
 		currentTools := activeTools(tools, s, i)
 		candidate, err := c.callModel(ctx, s, currentTools, system, handler, si)
+		s.totalModelMs += si.modelMs
+		s.totalTokens += si.tokens
+		s.iterationsUsed = si.step
 		if err != nil {
-			return nil, err
+			return c.errorResult(s, startTime, err.Error()), err
 		}
 
 		modelContent := candidate.Content
@@ -284,18 +302,24 @@ func (c *Client) RunAgentLoop(ctx context.Context, handler ToolExecutor, toolDec
 
 		result, err := c.processResponse(ctx, s, handler, modelContent, si)
 		if err != nil {
-			return nil, err
+			return c.errorResult(s, startTime, err.Error()), err
 		}
 		if result != nil {
+			c.stampEvalMeta(result, s, startTime)
 			return result, nil
 		}
 	}
 
 	if s.pendingDone {
-		return c.generateFinal(ctx, s.history, tools, system, handler, verbose)
+		result, err := c.generateFinal(ctx, s, tools, system, handler, verbose)
+		if result != nil {
+			c.stampEvalMeta(result, s, startTime)
+		}
+		return result, err
 	}
 
-	return nil, fmt.Errorf("agent loop exceeded %d iterations without completing", maxIterations)
+	msg := fmt.Sprintf(errMaxIterations, maxIterations)
+	return c.errorResult(s, startTime, msg), fmt.Errorf("%s", msg)
 }
 
 // callModel calls the LLM and handles empty response retries.
@@ -422,13 +446,33 @@ func buildResult(texts []string, handler ToolExecutor) *AnalysisResult {
 		Category:    handler.DiagnosisCategory(),
 		Confidence:  handler.DiagnosisConfidence(),
 		Sensitivity: handler.DiagnosisSensitivity(),
-		RCA:         handler.DiagnosisRCA(),
+		RCAs:        handler.DiagnosisRCAs(),
 	}
 	if result.Category == "" {
 		result.Category = CategoryDiagnosis
 		result.Confidence = 50
 		result.Sensitivity = "medium"
 	}
+	return result
+}
+
+// stampEvalMeta populates performance metadata on the result for evaluation.
+func (c *Client) stampEvalMeta(result *AnalysisResult, s *loopState, startTime time.Time) {
+	result.Eval = &EvalMeta{
+		Model:         c.model,
+		Iterations:    s.iterationsUsed,
+		MaxIterations: maxIterations,
+		ModelMs:       s.totalModelMs,
+		Tokens:        s.totalTokens,
+		WallMs:        int(time.Since(startTime).Milliseconds()),
+	}
+}
+
+// errorResult creates a minimal AnalysisResult with EvalMeta for error paths,
+// ensuring failed runs still have metrics for evaluation logging.
+func (c *Client) errorResult(s *loopState, startTime time.Time, text string) *AnalysisResult {
+	result := &AnalysisResult{Text: text}
+	c.stampEvalMeta(result, s, startTime)
 	return result
 }
 
@@ -600,7 +644,7 @@ func emitToolResult(handler ToolExecutor, si *stepInfo, ci, totalCalls, toolMs i
 // extracting the final text analysis.
 func (c *Client) generateFinal(
 	ctx context.Context,
-	history []Content,
+	s *loopState,
 	tools []Tool,
 	system *Content,
 	handler ToolExecutor,
@@ -608,7 +652,7 @@ func (c *Client) generateFinal(
 ) (*AnalysisResult, error) {
 	emit(handler, ProgressEvent{Type: "step", Step: maxIterations, MaxStep: maxIterations, Message: "Generating final analysis..."})
 	t0 := time.Now()
-	resp, err := c.generate(ctx, history, tools, system)
+	resp, err := c.generate(ctx, s.history, tools, system)
 	finalModelMs := int(time.Since(t0).Milliseconds())
 	if err != nil {
 		return nil, fmt.Errorf("final step: %w", err)
@@ -617,6 +661,9 @@ func (c *Client) generateFinal(
 	if resp.UsageMetadata != nil {
 		finalTokens = resp.UsageMetadata.PromptTokenCount
 	}
+	s.totalModelMs += finalModelMs
+	s.totalTokens += finalTokens
+	s.iterationsUsed++
 	if verbose {
 		emit(handler, ProgressEvent{Type: "result", Step: maxIterations, MaxStep: maxIterations, ModelMs: finalModelMs, Tokens: finalTokens})
 	}
@@ -626,7 +673,7 @@ func (c *Client) generateFinal(
 			return buildResult(texts, handler), nil
 		}
 	}
-	return nil, fmt.Errorf("agent loop exceeded %d iterations without completing", maxIterations)
+	return nil, fmt.Errorf(errMaxIterations, maxIterations)
 }
 
 // forceTraces calls get_test_traces programmatically when the model skips it.

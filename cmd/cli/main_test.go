@@ -213,26 +213,97 @@ func TestPrintStructuredRCA_UnknownBugLocation_NoTag(t *testing.T) {
 	assert.NotContains(t, out, "[infrastructure")
 }
 
+func TestPrintResult_MultipleRCAs(t *testing.T) {
+	var stderr, stdout bytes.Buffer
+	r := &llm.AnalysisResult{
+		Category:    llm.CategoryDiagnosis,
+		Confidence:  90,
+		Sensitivity: "low",
+		RCAs: []llm.RootCauseAnalysis{
+			{
+				Title:       "utilsBundle not loaded",
+				FailureType: llm.FailureTypeAssertion,
+				BugLocation: llm.BugLocationTest,
+				Location:    &llm.CodeLocation{FilePath: "tests/perf.spec.ts", LineNumber: 29},
+				RootCause:   "Test assertion outdated",
+				Remediation: "Update test",
+			},
+			{
+				Title:       "File not found",
+				FailureType: llm.FailureTypeInfra,
+				BugLocation: llm.BugLocationInfrastructure,
+				Location:    &llm.CodeLocation{FilePath: "registry/index.spec.ts"},
+				RootCause:   "Temp dir not created",
+				Remediation: "Fix CI setup",
+			},
+		},
+	}
+
+	printResult(&stderr, &stdout, r)
+	out := stdout.String()
+
+	// Summary list
+	assert.Contains(t, out, "2 failures analyzed")
+	assert.Contains(t, out, "1.")
+	assert.Contains(t, out, "2.")
+	assert.Contains(t, out, "ASSERTION")
+	assert.Contains(t, out, "INFRA")
+	// Detail sections
+	assert.Contains(t, out, "Root Cause")
+	assert.Contains(t, out, "Test assertion outdated")
+	assert.Contains(t, out, "Temp dir not created")
+}
+
+func TestPrintResult_SingleRCA_NoSummaryList(t *testing.T) {
+	var stderr, stdout bytes.Buffer
+	r := &llm.AnalysisResult{
+		Category:    llm.CategoryDiagnosis,
+		Confidence:  90,
+		Sensitivity: "low",
+		RCAs: []llm.RootCauseAnalysis{
+			{
+				Title:       "Timeout waiting for Submit Button",
+				FailureType: llm.FailureTypeTimeout,
+				Location:    &llm.CodeLocation{FilePath: "tests/checkout.spec.ts", LineNumber: 45},
+				RootCause:   "Cookie banner overlays submit button",
+				Remediation: "Dismiss cookie banner",
+			},
+		},
+	}
+
+	printResult(&stderr, &stdout, r)
+	out := stdout.String()
+
+	// No summary list for single RCA
+	assert.NotContains(t, out, "failures analyzed")
+	// But detail section present
+	assert.Contains(t, out, "TIMEOUT")
+	assert.Contains(t, out, "tests/checkout.spec.ts:45")
+	assert.Contains(t, out, "Root Cause")
+}
+
 func TestPrintResult_WithStructuredRCA(t *testing.T) {
 	var stderr, stdout bytes.Buffer
 	r := &llm.AnalysisResult{
 		Category:    llm.CategoryDiagnosis,
 		Confidence:  90,
 		Sensitivity: "low",
-		RCA: &llm.RootCauseAnalysis{
-			Title:       "Timeout waiting for Submit Button",
-			FailureType: llm.FailureTypeTimeout,
-			Location: &llm.CodeLocation{
-				FilePath:   "tests/checkout.spec.ts",
-				LineNumber: 45,
+		RCAs: []llm.RootCauseAnalysis{
+			{
+				Title:       "Timeout waiting for Submit Button",
+				FailureType: llm.FailureTypeTimeout,
+				Location: &llm.CodeLocation{
+					FilePath:   "tests/checkout.spec.ts",
+					LineNumber: 45,
+				},
+				Symptom:   "Test timed out after 30000ms",
+				RootCause: "Cookie banner overlays submit button",
+				Evidence: []llm.Evidence{
+					{Type: llm.EvidenceScreenshot, Content: "Overlay visible at z=999"},
+					{Type: llm.EvidenceTrace, Content: "Click blocked at 12:34:56"},
+				},
+				Remediation: "Dismiss cookie banner before form submission",
 			},
-			Symptom:   "Test timed out after 30000ms",
-			RootCause: "Cookie banner overlays submit button",
-			Evidence: []llm.Evidence{
-				{Type: llm.EvidenceScreenshot, Content: "Overlay visible at z=999"},
-				{Type: llm.EvidenceTrace, Content: "Click blocked at 12:34:56"},
-			},
-			Remediation: "Dismiss cookie banner before form submission",
 		},
 	}
 
@@ -372,7 +443,7 @@ func TestPrintResult_FallbackToText(t *testing.T) {
 		Category:    llm.CategoryDiagnosis,
 		Confidence:  75,
 		Sensitivity: "medium",
-		RCA:         nil, // No structured RCA
+		RCAs:        nil, // No structured RCA
 	}
 
 	printResult(&stderr, &stdout, r)
@@ -389,7 +460,7 @@ func TestPrintResult_EmptyRCATitle(t *testing.T) {
 		Category:    llm.CategoryDiagnosis,
 		Confidence:  60,
 		Sensitivity: "medium",
-		RCA:         &llm.RootCauseAnalysis{Title: ""}, // Empty title = fallback
+		RCAs:        []llm.RootCauseAnalysis{{Title: ""}}, // Empty title = fallback
 	}
 
 	printResult(&stderr, &stdout, r)
@@ -448,17 +519,19 @@ func TestJSONOutput_WithRCA(t *testing.T) {
 		Category:    llm.CategoryDiagnosis,
 		Confidence:  85,
 		Sensitivity: "low",
-		RCA: &llm.RootCauseAnalysis{
-			Title:       "Timeout Error",
-			FailureType: llm.FailureTypeTimeout,
-			Location: &llm.CodeLocation{
-				FilePath:   "tests/login.spec.ts",
-				LineNumber: 42,
+		RCAs: []llm.RootCauseAnalysis{
+			{
+				Title:       "Timeout Error",
+				FailureType: llm.FailureTypeTimeout,
+				Location: &llm.CodeLocation{
+					FilePath:   "tests/login.spec.ts",
+					LineNumber: 42,
+				},
+				Symptom:     "Timed out",
+				RootCause:   "Slow network",
+				Evidence:    []llm.Evidence{{Type: llm.EvidenceTrace, Content: "Delay"}},
+				Remediation: "Add retry",
 			},
-			Symptom:     "Timed out",
-			RootCause:   "Slow network",
-			Evidence:    []llm.Evidence{{Type: llm.EvidenceTrace, Content: "Delay"}},
-			Remediation: "Add retry",
 		},
 	}
 
@@ -470,12 +543,109 @@ func TestJSONOutput_WithRCA(t *testing.T) {
 	err = json.Unmarshal(buf.Bytes(), &decoded)
 	require.NoError(t, err)
 
-	require.NotNil(t, decoded.RCA)
-	assert.Equal(t, "Timeout Error", decoded.RCA.Title)
-	assert.Equal(t, llm.FailureTypeTimeout, decoded.RCA.FailureType)
-	assert.Equal(t, "tests/login.spec.ts", decoded.RCA.Location.FilePath)
-	assert.Equal(t, 42, decoded.RCA.Location.LineNumber)
-	assert.Len(t, decoded.RCA.Evidence, 1)
+	require.Len(t, decoded.RCAs, 1)
+	assert.Equal(t, "Timeout Error", decoded.RCAs[0].Title)
+	assert.Equal(t, llm.FailureTypeTimeout, decoded.RCAs[0].FailureType)
+	assert.Equal(t, "tests/login.spec.ts", decoded.RCAs[0].Location.FilePath)
+	assert.Equal(t, 42, decoded.RCAs[0].Location.LineNumber)
+	assert.Len(t, decoded.RCAs[0].Evidence, 1)
+}
+
+func TestJSONOutput_MultiRCA(t *testing.T) {
+	r := &llm.AnalysisResult{
+		Category:    llm.CategoryDiagnosis,
+		Confidence:  90,
+		Sensitivity: "low",
+		RCAs: []llm.RootCauseAnalysis{
+			{
+				Title:       "Timeout in checkout",
+				FailureType: llm.FailureTypeTimeout,
+				Location:    &llm.CodeLocation{FilePath: "tests/checkout.spec.ts", LineNumber: 45},
+				RootCause:   "Cookie banner",
+				Remediation: "Dismiss banner",
+			},
+			{
+				Title:       "Assertion in login",
+				FailureType: llm.FailureTypeAssertion,
+				Location:    &llm.CodeLocation{FilePath: "tests/login.spec.ts", LineNumber: 12},
+				RootCause:   "Changed redirect",
+				Remediation: "Update URL",
+			},
+		},
+	}
+
+	var buf bytes.Buffer
+	err := json.NewEncoder(&buf).Encode(r)
+	require.NoError(t, err)
+
+	// Verify JSON key is "analyses" not "rca"
+	raw := buf.String()
+	assert.Contains(t, raw, `"analyses"`)
+	assert.NotContains(t, raw, `"rca"`)
+
+	var decoded llm.AnalysisResult
+	err = json.Unmarshal(buf.Bytes(), &decoded)
+	require.NoError(t, err)
+
+	require.Len(t, decoded.RCAs, 2)
+	assert.Equal(t, "Timeout in checkout", decoded.RCAs[0].Title)
+	assert.Equal(t, "Assertion in login", decoded.RCAs[1].Title)
+}
+
+func TestPrintResult_ThreeRCAs_Numbering(t *testing.T) {
+	var stderr, stdout bytes.Buffer
+	r := &llm.AnalysisResult{
+		Category:    llm.CategoryDiagnosis,
+		Confidence:  85,
+		Sensitivity: "low",
+		RCAs: []llm.RootCauseAnalysis{
+			{
+				Title:       "Timeout in checkout",
+				FailureType: llm.FailureTypeTimeout,
+				BugLocation: llm.BugLocationTest,
+				Location:    &llm.CodeLocation{FilePath: "tests/checkout.spec.ts", LineNumber: 45},
+				RootCause:   "Cookie banner",
+				Remediation: "Dismiss banner",
+			},
+			{
+				Title:       "Assertion in login",
+				FailureType: llm.FailureTypeAssertion,
+				BugLocation: llm.BugLocationProduction,
+				Location:    &llm.CodeLocation{FilePath: "tests/login.spec.ts", LineNumber: 12},
+				RootCause:   "Changed redirect",
+				Remediation: "Update URL",
+			},
+			{
+				Title:       "Network error in API",
+				FailureType: llm.FailureTypeNetwork,
+				BugLocation: llm.BugLocationInfrastructure,
+				Location:    &llm.CodeLocation{FilePath: "tests/api.spec.ts"},
+				RootCause:   "DNS failure",
+				Remediation: "Fix DNS",
+			},
+		},
+	}
+
+	printResult(&stderr, &stdout, r)
+	out := stdout.String()
+
+	// Summary header
+	assert.Contains(t, out, "3 failures analyzed")
+
+	// Numbering
+	assert.Contains(t, out, "[1/3]")
+	assert.Contains(t, out, "[2/3]")
+	assert.Contains(t, out, "[3/3]")
+
+	// All failure types present
+	assert.Contains(t, out, "TIMEOUT")
+	assert.Contains(t, out, "ASSERTION")
+	assert.Contains(t, out, "NETWORK")
+
+	// All detail sections present
+	assert.Contains(t, out, "Cookie banner")
+	assert.Contains(t, out, "Changed redirect")
+	assert.Contains(t, out, "DNS failure")
 }
 
 func TestExitCode_APIError(t *testing.T) {
@@ -612,12 +782,14 @@ func TestIntegration_State3_SuccessFlow(t *testing.T) {
 		Category:    llm.CategoryDiagnosis,
 		Confidence:  95,
 		Sensitivity: "low",
-		RCA: &llm.RootCauseAnalysis{
-			Title:       "Flaky Test Detected",
-			FailureType: llm.FailureTypeFlake,
-			Location:    &llm.CodeLocation{FilePath: "tests/perf.spec.ts", LineNumber: 29},
-			RootCause:   "utilsBundle loads too fast on macOS runners",
-			Remediation: "Relax assertion in perf.spec.ts",
+		RCAs: []llm.RootCauseAnalysis{
+			{
+				Title:       "Flaky Test Detected",
+				FailureType: llm.FailureTypeFlake,
+				Location:    &llm.CodeLocation{FilePath: "tests/perf.spec.ts", LineNumber: 29},
+				RootCause:   "utilsBundle loads too fast on macOS runners",
+				Remediation: "Relax assertion in perf.spec.ts",
+			},
 		},
 	}
 	printResult(&stderr, &stdout, r)
@@ -642,14 +814,16 @@ func TestPrintResult_ExecutiveSummary(t *testing.T) {
 		Category:    llm.CategoryDiagnosis,
 		Confidence:  95,
 		Sensitivity: "low",
-		RCA: &llm.RootCauseAnalysis{
-			Title:       "Flaky Test Detected",
-			FailureType: llm.FailureTypeFlake,
-			Location:    &llm.CodeLocation{FilePath: "tests/perf.spec.ts", LineNumber: 29},
-			Symptom:     "utilsBundle not in output",
-			RootCause:   "utilsBundle loads too fast on macOS runners",
-			Evidence:    []llm.Evidence{{Type: llm.EvidenceTrace, Content: "Trace data"}},
-			Remediation: "Relax assertion in perf.spec.ts",
+		RCAs: []llm.RootCauseAnalysis{
+			{
+				Title:       "Flaky Test Detected",
+				FailureType: llm.FailureTypeFlake,
+				Location:    &llm.CodeLocation{FilePath: "tests/perf.spec.ts", LineNumber: 29},
+				Symptom:     "utilsBundle not in output",
+				RootCause:   "utilsBundle loads too fast on macOS runners",
+				Evidence:    []llm.Evidence{{Type: llm.EvidenceTrace, Content: "Trace data"}},
+				Remediation: "Relax assertion in perf.spec.ts",
+			},
 		},
 	}
 
@@ -672,13 +846,15 @@ func TestPrintResult_ExecutiveSummary_SectionNames(t *testing.T) {
 		Category:    llm.CategoryDiagnosis,
 		Confidence:  90,
 		Sensitivity: "low",
-		RCA: &llm.RootCauseAnalysis{
-			Title:       "Timeout Error",
-			FailureType: llm.FailureTypeTimeout,
-			Location:    &llm.CodeLocation{FilePath: "test.spec.ts", LineNumber: 1},
-			Symptom:     "Timeout",
-			RootCause:   "Slow network",
-			Remediation: "Add retry",
+		RCAs: []llm.RootCauseAnalysis{
+			{
+				Title:       "Timeout Error",
+				FailureType: llm.FailureTypeTimeout,
+				Location:    &llm.CodeLocation{FilePath: "test.spec.ts", LineNumber: 1},
+				Symptom:     "Timeout",
+				RootCause:   "Slow network",
+				Remediation: "Add retry",
+			},
 		},
 	}
 

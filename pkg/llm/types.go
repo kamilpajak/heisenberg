@@ -102,21 +102,32 @@ type ToolExecutor interface {
 	DiagnosisCategory() string
 	DiagnosisConfidence() int
 	DiagnosisSensitivity() string
-	DiagnosisRCA() *RootCauseAnalysis
+	DiagnosisRCAs() []RootCauseAnalysis
 	GetEmitter() ProgressEmitter
 	HasTestArtifacts() bool
 }
 
 // AnalysisResult holds the final output from the agent loop.
 type AnalysisResult struct {
-	Text        string             `json:"text"`
-	Category    string             `json:"category"`             // "diagnosis", "no_failures", "not_supported", or "" (model skipped done)
-	Confidence  int                `json:"confidence"`           // 0-100, meaningful only for "diagnosis"
-	Sensitivity string             `json:"sensitivity"`          // "high", "medium", "low", meaningful only for "diagnosis"
-	RCA         *RootCauseAnalysis `json:"rca,omitempty"`        // Structured diagnosis, only for "diagnosis"
-	RunID       int64              `json:"run_id,omitempty"`     // GitHub workflow run ID
-	Branch      string             `json:"branch,omitempty"`     // Git branch name
-	CommitSHA   string             `json:"commit_sha,omitempty"` // Git commit SHA
+	Text        string              `json:"text"`
+	Category    string              `json:"category"`             // "diagnosis", "no_failures", "not_supported", or "" (model skipped done)
+	Confidence  int                 `json:"confidence"`           // 0-100, meaningful only for "diagnosis"
+	Sensitivity string              `json:"sensitivity"`          // "high", "medium", "low", meaningful only for "diagnosis"
+	RCAs        []RootCauseAnalysis `json:"analyses,omitempty"`   // Structured diagnoses, one per failing test
+	RunID       int64               `json:"run_id,omitempty"`     // GitHub workflow run ID
+	Branch      string              `json:"branch,omitempty"`     // Git branch name
+	CommitSHA   string              `json:"commit_sha,omitempty"` // Git commit SHA
+	Eval        *EvalMeta           `json:"eval,omitempty"`       // Performance metadata for eval
+}
+
+// EvalMeta captures performance metrics from the agent loop for evaluation.
+type EvalMeta struct {
+	Model         string `json:"model"`
+	Iterations    int    `json:"iterations"`
+	MaxIterations int    `json:"max_iterations"`
+	ModelMs       int    `json:"model_ms"`
+	Tokens        int    `json:"tokens"`
+	WallMs        int    `json:"wall_ms"`
 }
 
 // GenerationConfig controls response generation.
