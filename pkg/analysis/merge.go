@@ -101,7 +101,7 @@ func mergeClusterResults(results []clusterAnalysis) *llm.AnalysisResult {
 		if i > 0 {
 			sb.WriteString("\n---\n\n")
 		}
-		sb.WriteString(fmt.Sprintf("## Cluster %d (%d jobs)\n\n", ca.Cluster.ID, len(ca.Cluster.Failures)))
+		fmt.Fprintf(&sb, "## Cluster %d (%d jobs)\n\n", ca.Cluster.ID, len(ca.Cluster.Failures))
 		sb.WriteString(ca.Result.Text)
 		sb.WriteString("\n")
 	}
