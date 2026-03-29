@@ -35,6 +35,11 @@ Thumbs.db
 .env.local
 .envrc
 
+# Ad-hoc e2e test artifacts (baselines are in testdata/e2e/snapshots/)
+result*.json
+e2e-stderr*.log
+*.cast
+
 # Web frontend (SvelteKit)
 web/node_modules/
 web/.svelte-kit/
