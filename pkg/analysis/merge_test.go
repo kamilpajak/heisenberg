@@ -132,6 +132,42 @@ func TestMergeSensitivity_Empty(t *testing.T) {
 	assert.Equal(t, "", mergeSensitivity(nil))
 }
 
+func TestMergeText_NilResult(t *testing.T) {
+	results := []clusterAnalysis{
+		{
+			Cluster: cluster.Cluster{ID: 1, Failures: make([]cluster.FailureInfo, 2)},
+			Result:  &llm.AnalysisResult{Text: "Cluster 1 text"},
+		},
+		{
+			Cluster: cluster.Cluster{ID: 2, Failures: make([]cluster.FailureInfo, 1)},
+			Result:  nil, // nil result should be skipped
+		},
+		{
+			Cluster: cluster.Cluster{ID: 3, Failures: make([]cluster.FailureInfo, 1)},
+			Result:  &llm.AnalysisResult{Text: "Cluster 3 text"},
+		},
+	}
+
+	text := mergeText(results)
+
+	assert.Contains(t, text, "Cluster 1")
+	assert.Contains(t, text, "Cluster 3")
+	assert.NotContains(t, text, "Cluster 2")
+}
+
+func TestCollectRCAs_NilResult(t *testing.T) {
+	results := []clusterAnalysis{
+		{Result: nil},
+		{Result: &llm.AnalysisResult{
+			RCAs: []llm.RootCauseAnalysis{{Title: "Bug", RootCause: "reason"}},
+		}},
+	}
+
+	rcas := collectRCAs(results)
+	require.Len(t, rcas, 1)
+	assert.Equal(t, "Bug", rcas[0].Title)
+}
+
 func TestMergeClusterResults_MixedCategories(t *testing.T) {
 	results := []clusterAnalysis{
 		{
