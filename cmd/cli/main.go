@@ -195,9 +195,17 @@ func printResult(stderr, stdout io.Writer, r *llm.AnalysisResult) {
 
 	fmt.Fprintln(stderr)
 
-	// Use structured RCA if available, otherwise fall back to legacy text
-	if r.RCA != nil && r.RCA.Title != "" {
-		printStructuredRCA(stdout, r.RCA)
+	// Use structured RCAs if available, otherwise fall back to legacy text
+	if len(r.RCAs) > 1 {
+		printRCASummary(stdout, r.RCAs)
+		for i := range r.RCAs {
+			fmt.Fprintln(stdout)
+			dim := color.New(color.FgHiBlack)
+			_, _ = dim.Fprintf(stdout, "  [%d/%d] ", i+1, len(r.RCAs))
+			printStructuredRCA(stdout, &r.RCAs[i])
+		}
+	} else if len(r.RCAs) == 1 && r.RCAs[0].Title != "" {
+		printStructuredRCA(stdout, &r.RCAs[0])
 	} else {
 		fmt.Fprintln(stdout, r.Text)
 	}
@@ -206,6 +214,31 @@ func printResult(stderr, stdout io.Writer, r *llm.AnalysisResult) {
 		fmt.Fprintln(stderr)
 		yellow := color.New(color.FgYellow)
 		_, _ = yellow.Fprintln(stderr, "  Tip: Additional data sources (backend logs, Docker state) may improve this diagnosis.")
+	}
+}
+
+func printRCASummary(w io.Writer, rcas []llm.RootCauseAnalysis) {
+	bold := color.New(color.Bold)
+	dim := color.New(color.FgHiBlack)
+
+	_, _ = bold.Fprintf(w, "  %d failures analyzed:\n\n", len(rcas))
+	for i, rca := range rcas {
+		failureType := strings.ToUpper(rca.FailureType)
+		if failureType == "" {
+			failureType = "ERROR"
+		}
+		loc := ""
+		if rca.Location != nil && rca.Location.FilePath != "" {
+			loc = " in " + formatCodeLocation(rca.Location)
+		}
+		tag := bugLocationTag(rca.BugLocation, rca.BugLocationConfidence)
+		if tag != "" {
+			tag = "  " + tag
+		}
+		_, _ = dim.Fprintf(w, "  %d. %s%s%s\n", i+1, failureType, loc, tag)
+		if rca.Title != "" {
+			_, _ = dim.Fprintf(w, "     %s\n", rca.Title)
+		}
 	}
 }
 

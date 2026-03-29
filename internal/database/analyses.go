@@ -21,7 +21,7 @@ type Analysis struct {
 	Category    string
 	Confidence  *int
 	Sensitivity *string
-	RCA         *llm.RootCauseAnalysis
+	RCAs        []llm.RootCauseAnalysis
 	Text        string
 	CreatedAt   time.Time
 }
@@ -35,7 +35,7 @@ type CreateAnalysisParams struct {
 	Category    string
 	Confidence  *int
 	Sensitivity *string
-	RCA         *llm.RootCauseAnalysis
+	RCAs        []llm.RootCauseAnalysis
 	Text        string
 }
 
@@ -56,18 +56,30 @@ func scanAnalysis(row pgx.Row) (*Analysis, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := unmarshalRCA(rcaJSON, &a); err != nil {
+	if err := unmarshalRCAs(rcaJSON, &a); err != nil {
 		return nil, err
 	}
 	return &a, nil
 }
 
-// unmarshalRCA unmarshals RCA JSON into an Analysis if present.
-func unmarshalRCA(rcaJSON []byte, a *Analysis) error {
-	if rcaJSON != nil {
-		a.RCA = &llm.RootCauseAnalysis{}
-		return json.Unmarshal(rcaJSON, a.RCA)
+// unmarshalRCAs unmarshals RCA JSON into an Analysis if present.
+// Supports both legacy single-object format and new array format.
+func unmarshalRCAs(rcaJSON []byte, a *Analysis) error {
+	if rcaJSON == nil {
+		return nil
 	}
+	// Try array format first
+	var rcas []llm.RootCauseAnalysis
+	if err := json.Unmarshal(rcaJSON, &rcas); err == nil {
+		a.RCAs = rcas
+		return nil
+	}
+	// Fall back to legacy single-object format
+	var rca llm.RootCauseAnalysis
+	if err := json.Unmarshal(rcaJSON, &rca); err != nil {
+		return err
+	}
+	a.RCAs = []llm.RootCauseAnalysis{rca}
 	return nil
 }
 
@@ -75,8 +87,8 @@ func unmarshalRCA(rcaJSON []byte, a *Analysis) error {
 func (db *DB) CreateAnalysis(ctx context.Context, params CreateAnalysisParams) (*Analysis, error) {
 	var rcaJSON []byte
 	var err error
-	if params.RCA != nil {
-		rcaJSON, err = json.Marshal(params.RCA)
+	if len(params.RCAs) > 0 {
+		rcaJSON, err = json.Marshal(params.RCAs)
 		if err != nil {
 			return nil, err
 		}
@@ -159,7 +171,7 @@ func (db *DB) ListRepoAnalyses(ctx context.Context, params ListRepoAnalysesParam
 		); err != nil {
 			return nil, err
 		}
-		if err := unmarshalRCA(rcaJSON, &a); err != nil {
+		if err := unmarshalRCAs(rcaJSON, &a); err != nil {
 			return nil, err
 		}
 		analyses = append(analyses, a)

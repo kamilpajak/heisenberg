@@ -60,6 +60,46 @@ func TestSubmitAnalysis_Success(t *testing.T) {
 	assert.Equal(t, "analysis-uuid-123", id)
 }
 
+func TestSubmitAnalysis_SendsAnalysesKey(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		err := json.NewDecoder(r.Body).Decode(&body)
+		require.NoError(t, err)
+
+		// Verify "analyses" key is sent (not "rca")
+		_, hasAnalyses := body["analyses"]
+		assert.True(t, hasAnalyses, "request body should contain 'analyses' key")
+		_, hasRCA := body["rca"]
+		assert.False(t, hasRCA, "request body should NOT contain 'rca' key")
+
+		analyses, ok := body["analyses"].([]any)
+		require.True(t, ok)
+		assert.Len(t, analyses, 2)
+
+		w.WriteHeader(http.StatusCreated)
+		_ = json.NewEncoder(w).Encode(map[string]string{"id": "multi-rca-id"})
+	}))
+	defer srv.Close()
+
+	c := &Client{baseURL: srv.URL, apiKey: "key", http: http.DefaultClient}
+	id, err := c.SubmitAnalysis(context.Background(), SubmitParams{
+		OrgID: "org-1",
+		Owner: "owner",
+		Repo:  "repo",
+		RunID: 999,
+		Result: &llm.AnalysisResult{
+			Text:     "Multi-RCA",
+			Category: llm.CategoryDiagnosis,
+			RCAs: []llm.RootCauseAnalysis{
+				{Title: "Failure A", FailureType: llm.FailureTypeTimeout},
+				{Title: "Failure B", FailureType: llm.FailureTypeAssertion},
+			},
+		},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "multi-rca-id", id)
+}
+
 func TestSubmitAnalysis_Unauthorized(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)

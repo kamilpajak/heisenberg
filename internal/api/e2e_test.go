@@ -103,11 +103,13 @@ func TestE2E_CLIPersistence(t *testing.T) {
 			Category:    llm.CategoryDiagnosis,
 			Confidence:  confidence,
 			Sensitivity: "medium",
-			RCA: &llm.RootCauseAnalysis{
-				Title:       "Checkout timeout",
-				FailureType: llm.FailureTypeTimeout,
-				RootCause:   "Modal overlay blocks submit button",
-				Remediation: "Wait for modal to close before clicking submit",
+			RCAs: []llm.RootCauseAnalysis{
+				{
+					Title:       "Checkout timeout",
+					FailureType: llm.FailureTypeTimeout,
+					RootCause:   "Modal overlay blocks submit button",
+					Remediation: "Wait for modal to close before clicking submit",
+				},
 			},
 		},
 	})
@@ -122,10 +124,65 @@ func TestE2E_CLIPersistence(t *testing.T) {
 	assert.Equal(t, "E2E root cause: timeout in checkout flow", analysis.Text)
 	assert.Equal(t, llm.CategoryDiagnosis, analysis.Category)
 	assert.Equal(t, &confidence, analysis.Confidence)
-	assert.NotNil(t, analysis.RCA)
-	assert.Equal(t, "Checkout timeout", analysis.RCA.Title)
+	require.Len(t, analysis.RCAs, 1)
+	assert.Equal(t, "Checkout timeout", analysis.RCAs[0].Title)
 	assert.Equal(t, "main", *analysis.Branch)
 	assert.Equal(t, "e2eabc123", *analysis.CommitSHA)
+}
+
+func TestE2E_MultiRCAPersistence(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	ctx := context.Background()
+
+	apiKey, orgID := seedTestAPIKey(t, db)
+	ts := e2eServer(t, db)
+	client := mustNewTestClient(ts.URL, apiKey)
+
+	confidence := 90
+	id, err := client.SubmitAnalysis(ctx, saas.SubmitParams{
+		OrgID:     orgID.String(),
+		Owner:     "multiowner",
+		Repo:      "multirepo",
+		RunID:     77002,
+		Branch:    "feature/multi",
+		CommitSHA: "multi123",
+		Result: &llm.AnalysisResult{
+			Text:        "Two distinct failures found",
+			Category:    llm.CategoryDiagnosis,
+			Confidence:  confidence,
+			Sensitivity: "low",
+			RCAs: []llm.RootCauseAnalysis{
+				{
+					Title:       "Timeout in checkout",
+					FailureType: llm.FailureTypeTimeout,
+					BugLocation: llm.BugLocationTest,
+					RootCause:   "Cookie banner overlay",
+					Remediation: "Dismiss banner first",
+				},
+				{
+					Title:       "Assertion in login",
+					FailureType: llm.FailureTypeAssertion,
+					BugLocation: llm.BugLocationProduction,
+					RootCause:   "Changed redirect URL",
+					Remediation: "Update expected URL",
+				},
+			},
+		},
+	})
+	require.NoError(t, err)
+	assert.NotEmpty(t, id)
+
+	// Verify both RCAs survive the full pipeline
+	analysisID, err := uuid.Parse(id)
+	require.NoError(t, err)
+	analysis, err := db.GetAnalysisByID(ctx, analysisID)
+	require.NoError(t, err)
+	assert.Equal(t, "Two distinct failures found", analysis.Text)
+	require.Len(t, analysis.RCAs, 2)
+	assert.Equal(t, "Timeout in checkout", analysis.RCAs[0].Title)
+	assert.Equal(t, llm.FailureTypeTimeout, analysis.RCAs[0].FailureType)
+	assert.Equal(t, "Assertion in login", analysis.RCAs[1].Title)
+	assert.Equal(t, llm.FailureTypeAssertion, analysis.RCAs[1].FailureType)
 }
 
 func TestE2E_DuplicateRunID(t *testing.T) {

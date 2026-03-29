@@ -133,16 +133,16 @@ func (s *Server) handleCreateAnalysis(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		Owner       string                 `json:"owner"`
-		Repo        string                 `json:"repo"`
-		RunID       int64                  `json:"run_id"`
-		Branch      string                 `json:"branch"`
-		CommitSHA   string                 `json:"commit_sha"`
-		Category    string                 `json:"category"`
-		Confidence  *int                   `json:"confidence"`
-		Sensitivity string                 `json:"sensitivity"`
-		RCA         *llm.RootCauseAnalysis `json:"rca"`
-		Text        string                 `json:"text"`
+		Owner       string                  `json:"owner"`
+		Repo        string                  `json:"repo"`
+		RunID       int64                   `json:"run_id"`
+		Branch      string                  `json:"branch"`
+		CommitSHA   string                  `json:"commit_sha"`
+		Category    string                  `json:"category"`
+		Confidence  *int                    `json:"confidence"`
+		Sensitivity string                  `json:"sensitivity"`
+		RCAs        []llm.RootCauseAnalysis `json:"analyses"`
+		Text        string                  `json:"text"`
 	}
 	if err := readJSON(r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
@@ -178,7 +178,7 @@ func (s *Server) handleCreateAnalysis(w http.ResponseWriter, r *http.Request) {
 		RunID:    req.RunID,
 		Category: req.Category,
 		Text:     req.Text,
-		RCA:      req.RCA,
+		RCAs:     req.RCAs,
 	}
 	if req.Branch != "" {
 		params.Branch = &req.Branch

@@ -201,21 +201,23 @@ func TestAnalysisCRUD(t *testing.T) {
 
 	repo, _ := db.CreateRepository(ctx, org.ID, "owner", "repo")
 
-	// Create analysis with RCA
+	// Create analysis with RCAs
 	confidence := 85
 	sensitivity := "medium"
-	rca := &llm.RootCauseAnalysis{
-		Title:       "Timeout in checkout",
-		FailureType: llm.FailureTypeTimeout,
-		Location: &llm.CodeLocation{
-			FilePath:   "tests/checkout.spec.ts",
-			LineNumber: 45,
-		},
-		Symptom:     "Submit button not clickable",
-		RootCause:   "Element hidden by modal",
-		Remediation: "Wait for modal to close",
-		Evidence: []llm.Evidence{
-			{Type: llm.EvidenceScreenshot, Content: "Shows modal over button"},
+	rcas := []llm.RootCauseAnalysis{
+		{
+			Title:       "Timeout in checkout",
+			FailureType: llm.FailureTypeTimeout,
+			Location: &llm.CodeLocation{
+				FilePath:   "tests/checkout.spec.ts",
+				LineNumber: 45,
+			},
+			Symptom:     "Submit button not clickable",
+			RootCause:   "Element hidden by modal",
+			Remediation: "Wait for modal to close",
+			Evidence: []llm.Evidence{
+				{Type: llm.EvidenceScreenshot, Content: "Shows modal over button"},
+			},
 		},
 	}
 
@@ -225,7 +227,7 @@ func TestAnalysisCRUD(t *testing.T) {
 		Category:    llm.CategoryDiagnosis,
 		Confidence:  &confidence,
 		Sensitivity: &sensitivity,
-		RCA:         rca,
+		RCAs:        rcas,
 		Text:        "Analysis text",
 	})
 	require.NoError(t, err)
@@ -235,9 +237,9 @@ func TestAnalysisCRUD(t *testing.T) {
 	found, err := db.GetAnalysisByID(ctx, analysis.ID)
 	require.NoError(t, err)
 	assert.Equal(t, "Analysis text", found.Text)
-	assert.NotNil(t, found.RCA)
-	assert.Equal(t, "Timeout in checkout", found.RCA.Title)
-	assert.Len(t, found.RCA.Evidence, 1)
+	require.Len(t, found.RCAs, 1)
+	assert.Equal(t, "Timeout in checkout", found.RCAs[0].Title)
+	assert.Len(t, found.RCAs[0].Evidence, 1)
 
 	// Get by run ID
 	found, err = db.GetAnalysisByRunID(ctx, repo.ID, 12345)
@@ -316,13 +318,103 @@ func TestAnalysisWithoutRCA(t *testing.T) {
 		Text:     "No failures detected",
 	})
 	require.NoError(t, err)
-	assert.Nil(t, analysis.RCA)
+	assert.Empty(t, analysis.RCAs)
 	assert.Nil(t, analysis.Confidence)
 
-	// Get by ID should also have nil RCA
+	// Get by ID should also have empty RCAs
 	found, err := db.GetAnalysisByID(ctx, analysis.ID)
 	require.NoError(t, err)
-	assert.Nil(t, found.RCA)
+	assert.Empty(t, found.RCAs)
+}
+
+func TestAnalysisCRUD_MultipleRCAs(t *testing.T) {
+	db := testDB(t)
+	ctx := context.Background()
+
+	// Setup
+	clerkID := "clerk_" + uuid.New().String()[:8]
+	user, _ := db.CreateUser(ctx, clerkID, "multirca@example.com")
+	t.Cleanup(func() { _ = db.DeleteUser(ctx, user.ID) })
+
+	org, _ := db.CreateOrganizationWithOwner(ctx, "Multi RCA Org", user.ID)
+	t.Cleanup(func() { _ = db.DeleteOrganization(ctx, org.ID) })
+
+	repo, _ := db.CreateRepository(ctx, org.ID, "multiowner", "multirepo")
+
+	confidence := 90
+	sensitivity := "low"
+	rcas := []llm.RootCauseAnalysis{
+		{
+			Title:       "Timeout in checkout",
+			FailureType: llm.FailureTypeTimeout,
+			Location:    &llm.CodeLocation{FilePath: "tests/checkout.spec.ts", LineNumber: 45},
+			BugLocation: llm.BugLocationTest,
+			RootCause:   "Cookie banner",
+			Remediation: "Dismiss banner",
+			Evidence:    []llm.Evidence{{Type: llm.EvidenceScreenshot, Content: "Overlay visible"}},
+		},
+		{
+			Title:       "Assertion in login",
+			FailureType: llm.FailureTypeAssertion,
+			Location:    &llm.CodeLocation{FilePath: "tests/login.spec.ts", LineNumber: 12},
+			BugLocation: llm.BugLocationProduction,
+			RootCause:   "Changed redirect URL",
+			Remediation: "Update expected URL",
+		},
+	}
+
+	analysis, err := db.CreateAnalysis(ctx, database.CreateAnalysisParams{
+		RepoID:      repo.ID,
+		RunID:       77777,
+		Category:    llm.CategoryDiagnosis,
+		Confidence:  &confidence,
+		Sensitivity: &sensitivity,
+		RCAs:        rcas,
+		Text:        "Two failures found",
+	})
+	require.NoError(t, err)
+
+	found, err := db.GetAnalysisByID(ctx, analysis.ID)
+	require.NoError(t, err)
+	require.Len(t, found.RCAs, 2)
+	assert.Equal(t, "Timeout in checkout", found.RCAs[0].Title)
+	assert.Equal(t, llm.FailureTypeTimeout, found.RCAs[0].FailureType)
+	assert.Equal(t, llm.BugLocationTest, found.RCAs[0].BugLocation)
+	assert.Len(t, found.RCAs[0].Evidence, 1)
+	assert.Equal(t, "Assertion in login", found.RCAs[1].Title)
+	assert.Equal(t, llm.BugLocationProduction, found.RCAs[1].BugLocation)
+}
+
+func TestAnalysis_LegacySingleObjectRCA(t *testing.T) {
+	db := testDB(t)
+	ctx := context.Background()
+
+	// Setup
+	clerkID := "clerk_" + uuid.New().String()[:8]
+	user, _ := db.CreateUser(ctx, clerkID, "legacy@example.com")
+	t.Cleanup(func() { _ = db.DeleteUser(ctx, user.ID) })
+
+	org, _ := db.CreateOrganizationWithOwner(ctx, "Legacy RCA Org", user.ID)
+	t.Cleanup(func() { _ = db.DeleteOrganization(ctx, org.ID) })
+
+	repo, _ := db.CreateRepository(ctx, org.ID, "legacyowner", "legacyrepo")
+
+	// Insert legacy single-object RCA format directly via SQL
+	legacyJSON := `{"title":"Legacy timeout","failure_type":"timeout","symptom":"Timed out","root_cause":"Slow","remediation":"Fix"}`
+	id := uuid.New()
+	_, err := db.Pool().Exec(ctx,
+		`INSERT INTO analyses (id, repo_id, run_id, category, rca, text) VALUES ($1, $2, $3, $4, $5, $6)`,
+		id, repo.ID, int64(66666), llm.CategoryDiagnosis, []byte(legacyJSON), "Legacy analysis",
+	)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.DeleteAnalysis(ctx, id) })
+
+	// Read back — unmarshalRCAs should convert single object to 1-element slice
+	found, err := db.GetAnalysisByID(ctx, id)
+	require.NoError(t, err)
+	require.Len(t, found.RCAs, 1, "legacy single-object RCA should be read as 1-element slice")
+	assert.Equal(t, "Legacy timeout", found.RCAs[0].Title)
+	assert.Equal(t, llm.FailureTypeTimeout, found.RCAs[0].FailureType)
 }
 
 func TestListRepoAnalysesWithCategory(t *testing.T) {

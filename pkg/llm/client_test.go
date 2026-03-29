@@ -396,6 +396,7 @@ type mockToolHandler struct {
 	category    string
 	confidence  int
 	sensitivity string
+	rcas        []RootCauseAnalysis
 }
 
 func (m *mockToolHandler) Execute(_ context.Context, call FunctionCall) (string, bool, error) {
@@ -415,18 +416,21 @@ func (m *mockToolHandler) Execute(_ context.Context, call FunctionCall) (string,
 		} else {
 			m.sensitivity = "medium"
 		}
+		if m.category == CategoryDiagnosis {
+			m.rcas = ParseRCAsFromArgs(call.Args)
+		}
 		return "", true, nil
 	}
 	return "unknown tool: " + call.Name, false, nil
 }
 
-func (m *mockToolHandler) HasPendingTraces() bool           { return false }
-func (m *mockToolHandler) DiagnosisCategory() string        { return m.category }
-func (m *mockToolHandler) DiagnosisConfidence() int         { return m.confidence }
-func (m *mockToolHandler) DiagnosisSensitivity() string     { return m.sensitivity }
-func (m *mockToolHandler) DiagnosisRCA() *RootCauseAnalysis { return nil }
-func (m *mockToolHandler) GetEmitter() ProgressEmitter      { return m.emitter }
-func (m *mockToolHandler) HasTestArtifacts() bool           { return false }
+func (m *mockToolHandler) HasPendingTraces() bool             { return false }
+func (m *mockToolHandler) DiagnosisCategory() string          { return m.category }
+func (m *mockToolHandler) DiagnosisConfidence() int           { return m.confidence }
+func (m *mockToolHandler) DiagnosisSensitivity() string       { return m.sensitivity }
+func (m *mockToolHandler) DiagnosisRCAs() []RootCauseAnalysis { return m.rcas }
+func (m *mockToolHandler) GetEmitter() ProgressEmitter        { return m.emitter }
+func (m *mockToolHandler) HasTestArtifacts() bool             { return false }
 
 // testToolDeclarations returns minimal tool declarations for tests.
 func testToolDeclarations() []FunctionDeclaration {
@@ -518,6 +522,62 @@ func TestRunAgentLoop_DoneThenText(t *testing.T) {
 	assert.Equal(t, CategoryDiagnosis, result.Category)
 	assert.Equal(t, 90, result.Confidence)
 	assert.Equal(t, "low", result.Sensitivity)
+}
+
+func TestRunAgentLoop_MultiRCA(t *testing.T) {
+	ts := mockServer(t, []GenerateResponse{
+		// Step 1: model calls done with 2 analyses
+		{
+			Candidates: []Candidate{{Content: Content{Parts: []Part{{
+				FunctionCall: &FunctionCall{
+					Name: "done",
+					Args: map[string]any{
+						"category":   "diagnosis",
+						"confidence": float64(85),
+						"analyses": []any{
+							map[string]any{
+								"title":        "Timeout in checkout",
+								"failure_type": "timeout",
+								"file_path":    "tests/checkout.spec.ts",
+								"root_cause":   "Cookie banner",
+								"remediation":  "Dismiss banner",
+							},
+							map[string]any{
+								"title":        "Assertion in login",
+								"failure_type": "assertion",
+								"file_path":    "tests/login.spec.ts",
+								"root_cause":   "Changed redirect",
+								"remediation":  "Update URL",
+							},
+						},
+					},
+				},
+			}}}}},
+			UsageMetadata: &UsageMetadata{PromptTokenCount: 1000},
+		},
+		// Step 2: final text
+		{
+			Candidates:    []Candidate{{Content: Content{Parts: []Part{{Text: "Two failures found"}}}}},
+			UsageMetadata: &UsageMetadata{PromptTokenCount: 1200},
+		},
+	})
+	defer ts.Close()
+
+	c := &Client{apiKey: "test", baseURL: ts.URL, model: "m"}
+	handler := &mockToolHandler{emitter: noopEmitter{}}
+
+	result, err := c.RunAgentLoop(context.Background(), handler, testToolDeclarations(), "context", false)
+
+	require.NoError(t, err)
+	assert.Equal(t, "Two failures found", result.Text)
+	assert.Equal(t, CategoryDiagnosis, result.Category)
+	assert.Equal(t, 85, result.Confidence)
+
+	require.Len(t, result.RCAs, 2)
+	assert.Equal(t, "Timeout in checkout", result.RCAs[0].Title)
+	assert.Equal(t, FailureTypeTimeout, result.RCAs[0].FailureType)
+	assert.Equal(t, "Assertion in login", result.RCAs[1].Title)
+	assert.Equal(t, FailureTypeAssertion, result.RCAs[1].FailureType)
 }
 
 func TestRunAgentLoop_EmptyResponseRetry(t *testing.T) {

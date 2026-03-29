@@ -134,11 +134,11 @@ Strategy:
 6. When you have enough information, you MUST call the "done" tool with structured RCA data, then provide your analysis text.
 
 When calling the "done" tool, classify your conclusion:
-- category "diagnosis": you identified a specific failure root cause. Include ALL structured RCA fields.
+- category "diagnosis": you identified specific failure root causes. Include the "analyses" array with one entry per distinct failing test (group tests sharing the same root cause into one entry).
 - category "no_failures": all tests are passing, nothing to diagnose.
 - category "not_supported": the test framework or artifact format cannot be analyzed.
 
-For "diagnosis" category, provide structured Root Cause Analysis:
+For "diagnosis" category, provide an "analyses" array. Each entry contains:
   - title: Short summary (e.g., "Timeout waiting for Submit Button")
   - failure_type: One of: timeout, assertion, network, infra, flake
   - file_path: Test file where failure occurred
@@ -151,7 +151,9 @@ For "diagnosis" category, provide structured Root Cause Analysis:
   - root_cause: Why it failed (the underlying issue)
   - evidence: Array of supporting data points
   - remediation: How to fix it (actionable guidance)
-  - confidence: 0-100 score
+
+Top-level fields (outside analyses):
+  - confidence: 0-100 score (overall diagnosis confidence)
   - missing_information_sensitivity: high/medium/low
 
 Bug location classification:
@@ -422,7 +424,7 @@ func buildResult(texts []string, handler ToolExecutor) *AnalysisResult {
 		Category:    handler.DiagnosisCategory(),
 		Confidence:  handler.DiagnosisConfidence(),
 		Sensitivity: handler.DiagnosisSensitivity(),
-		RCA:         handler.DiagnosisRCA(),
+		RCAs:        handler.DiagnosisRCAs(),
 	}
 	if result.Category == "" {
 		result.Category = CategoryDiagnosis
