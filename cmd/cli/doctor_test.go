@@ -4,9 +4,14 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
+
+	"github.com/kamilpajak/heisenberg/pkg/config"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -146,11 +151,77 @@ func TestCheckVersion(t *testing.T) {
 	assert.Contains(t, result.message, "heisenberg")
 }
 
+func TestCheckVersion_WithCommit(t *testing.T) {
+	old := commit
+	commit = "abc1234"
+	defer func() { commit = old }()
+
+	result := checkVersion(context.Background())
+	assert.Equal(t, statusInfo, result.status)
+	assert.Contains(t, result.message, "abc1234")
+}
+
+func TestCheckNetworkFunc_Reachable(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	defer func() { _ = ln.Close() }()
+
+	check := checkNetworkFunc(ln.Addr().String())
+	result := check(context.Background())
+	assert.Equal(t, statusOK, result.status)
+	assert.Contains(t, result.message, "reachable")
+}
+
+func TestCheckNetworkFunc_Unreachable(t *testing.T) {
+	// Port 1 is almost certainly not listening
+	check := checkNetworkFunc("127.0.0.1:1")
+	result := check(context.Background())
+	assert.Equal(t, statusFail, result.status)
+	assert.Contains(t, result.message, "unreachable")
+	assert.NotEmpty(t, result.detail)
+}
+
 func TestCheckConfigFile_NoFile(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	result := checkConfigFile(context.Background())
 	assert.Equal(t, statusInfo, result.status)
 	assert.Contains(t, result.message, "not found")
+}
+
+func TestCheckConfigFile_ValidWithModel(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	cfgPath := config.Path()
+	require.NoError(t, os.MkdirAll(filepath.Dir(cfgPath), 0o755))
+	require.NoError(t, os.WriteFile(cfgPath, []byte("model: gemini-2.5-flash\n"), 0o644))
+
+	result := checkConfigFile(context.Background())
+	assert.Equal(t, statusOK, result.status)
+	assert.Contains(t, result.message, "gemini-2.5-flash")
+}
+
+func TestCheckConfigFile_Empty(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	cfgPath := config.Path()
+	require.NoError(t, os.MkdirAll(filepath.Dir(cfgPath), 0o755))
+	require.NoError(t, os.WriteFile(cfgPath, []byte(""), 0o644))
+
+	result := checkConfigFile(context.Background())
+	assert.Equal(t, statusOK, result.status)
+	assert.Contains(t, result.message, "empty")
+}
+
+func TestCheckConfigFile_Invalid(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	cfgPath := config.Path()
+	require.NoError(t, os.MkdirAll(filepath.Dir(cfgPath), 0o755))
+	require.NoError(t, os.WriteFile(cfgPath, []byte("model: [broken"), 0o644))
+
+	result := checkConfigFile(context.Background())
+	assert.Equal(t, statusFail, result.status)
+	assert.Contains(t, result.message, "invalid")
 }
 
 func TestDefaultChecks_ConfigFallback(t *testing.T) {
