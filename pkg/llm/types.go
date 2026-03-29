@@ -115,8 +115,11 @@ type AnalysisResult struct {
 	Sensitivity string              `json:"sensitivity"`          // "high", "medium", "low", meaningful only for "diagnosis"
 	RCAs        []RootCauseAnalysis `json:"analyses,omitempty"`   // Structured diagnoses, one per failing test
 	RunID       int64               `json:"run_id,omitempty"`     // GitHub workflow run ID
+	Owner       string              `json:"owner,omitempty"`      // Repository owner
+	Repo        string              `json:"repo,omitempty"`       // Repository name
 	Branch      string              `json:"branch,omitempty"`     // Git branch name
 	CommitSHA   string              `json:"commit_sha,omitempty"` // Git commit SHA
+	Event       string              `json:"event,omitempty"`      // GitHub event type (push, pull_request)
 	Eval        *EvalMeta           `json:"eval,omitempty"`       // Performance metadata for eval
 }
 
