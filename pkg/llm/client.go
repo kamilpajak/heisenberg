@@ -25,7 +25,8 @@ func emit(h ToolExecutor, ev ProgressEvent) {
 const maxIterations = 30
 const softLimitIteration = 15
 const circuitBreakerThreshold = 3 // consecutive file reads before breaker fires
-const circuitBreakerCooldown = 3  // iterations to hide file tools (current + 2 more)
+const errMaxIterations = "agent loop exceeded %d iterations without completing"
+const circuitBreakerCooldown = 3 // iterations to hide file tools (current + 2 more)
 
 var ansiRe = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
 
@@ -317,8 +318,8 @@ func (c *Client) RunAgentLoop(ctx context.Context, handler ToolExecutor, toolDec
 		return result, err
 	}
 
-	return c.errorResult(s, startTime, fmt.Sprintf("agent loop exceeded %d iterations without completing", maxIterations)),
-		fmt.Errorf("agent loop exceeded %d iterations without completing", maxIterations)
+	msg := fmt.Sprintf(errMaxIterations, maxIterations)
+	return c.errorResult(s, startTime, msg), fmt.Errorf("%s", msg)
 }
 
 // callModel calls the LLM and handles empty response retries.
@@ -672,7 +673,7 @@ func (c *Client) generateFinal(
 			return buildResult(texts, handler), nil
 		}
 	}
-	return nil, fmt.Errorf("agent loop exceeded %d iterations without completing", maxIterations)
+	return nil, fmt.Errorf(errMaxIterations, maxIterations)
 }
 
 // forceTraces calls get_test_traces programmatically when the model skips it.

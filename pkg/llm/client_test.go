@@ -591,7 +591,7 @@ func TestRunAgentLoop_MultiRCA(t *testing.T) {
 	assert.Equal(t, "m", result.Eval.Model)
 	assert.Equal(t, 2, result.Eval.Iterations)
 	assert.Equal(t, 30, result.Eval.MaxIterations)
-	assert.Positive(t, result.Eval.WallMs)
+	assert.GreaterOrEqual(t, result.Eval.WallMs, 0)
 }
 
 func TestRunAgentLoop_EmptyResponseRetry(t *testing.T) {

@@ -7,17 +7,17 @@
 # Normalizes analyses array order by file_path before comparison.
 set -euo pipefail
 
-if [ $# -ne 2 ]; then
-  echo "Usage: $0 <snapshot_dir_a> <snapshot_dir_b>"
-  echo "Example: $0 testdata/e2e/snapshots/2026-03-29_gemini-2.5-pro testdata/e2e/snapshots/2026-03-29_gemini-3-pro-preview"
+if [[ $# -ne 2 ]]; then
+  echo "Usage: $0 <snapshot_dir_a> <snapshot_dir_b>" >&2
+  echo "Example: $0 testdata/e2e/snapshots/2026-03-29_gemini-2.5-pro testdata/e2e/snapshots/2026-03-29_gemini-3-pro-preview" >&2
   exit 1
 fi
 
 DIR_A="$1"
 DIR_B="$2"
 
-if [ ! -d "$DIR_A" ]; then echo "Error: $DIR_A not found"; exit 1; fi
-if [ ! -d "$DIR_B" ]; then echo "Error: $DIR_B not found"; exit 1; fi
+if [[ ! -d "$DIR_A" ]]; then echo "Error: $DIR_A not found" >&2; exit 1; fi
+if [[ ! -d "$DIR_B" ]]; then echo "Error: $DIR_B not found" >&2; exit 1; fi
 
 LABEL_A=$(basename "$DIR_A")
 LABEL_B=$(basename "$DIR_B")
@@ -30,6 +30,7 @@ NC='\033[0m'
 
 # Extract structural fields (sorted analyses by file_path)
 structural() {
+  local file="$1"
   jq '{
     category,
     confidence,
@@ -43,7 +44,8 @@ structural() {
       file_path: (.location.file_path // null),
       line_number: (.location.line_number // null)
     }]
-  }' "$1"
+  }' "$file"
+  return $?
 }
 
 echo ""
@@ -57,7 +59,7 @@ for FILE_A in "$DIR_A"/*.json; do
   BASENAME=$(basename "$FILE_A")
   FILE_B="$DIR_B/$BASENAME"
 
-  if [ ! -f "$FILE_B" ]; then
+  if [[ ! -f "$FILE_B" ]]; then
     printf "  ${YELLOW}%-45s  MISSING in B${NC}\n" "$BASENAME"
     DIFF=$((DIFF + 1))
     continue
@@ -76,7 +78,7 @@ for FILE_A in "$DIR_A"/*.json; do
 
   # Build comparison line
   SLUG="${BASENAME%.json}"
-  if [ "$STRUCT_A" = "$STRUCT_B" ]; then
+  if [[ "$STRUCT_A" = "$STRUCT_B" ]]; then
     printf "  ${GREEN}%-45s  MATCH${NC}  category=%s confidence=%s analyses=%s\n" \
       "$SLUG" "$CAT_A" "$CONF_A" "$COUNT_A"
     MATCH=$((MATCH + 1))
@@ -84,20 +86,20 @@ for FILE_A in "$DIR_A"/*.json; do
     printf "  ${RED}%-45s  DIFF${NC}\n" "$SLUG"
 
     # Show per-field diff
-    if [ "$CAT_A" != "$CAT_B" ]; then
+    if [[ "$CAT_A" != "$CAT_B" ]]; then
       printf "    ${DIM}category:${NC}    ${RED}%s → %s${NC}\n" "$CAT_A" "$CAT_B"
     else
       printf "    ${DIM}category:${NC}    %s\n" "$CAT_A"
     fi
 
-    if [ "$CONF_A" != "$CONF_B" ]; then
+    if [[ "$CONF_A" != "$CONF_B" ]]; then
       DELTA=$((CONF_B - CONF_A))
       printf "    ${DIM}confidence:${NC}  ${YELLOW}%s → %s (Δ%+d)${NC}\n" "$CONF_A" "$CONF_B" "$DELTA"
     else
       printf "    ${DIM}confidence:${NC}  %s\n" "$CONF_A"
     fi
 
-    if [ "$COUNT_A" != "$COUNT_B" ]; then
+    if [[ "$COUNT_A" != "$COUNT_B" ]]; then
       printf "    ${DIM}analyses:${NC}    ${RED}%s → %s${NC}\n" "$COUNT_A" "$COUNT_B"
     else
       printf "    ${DIM}analyses:${NC}    %s\n" "$COUNT_A"
@@ -113,7 +115,7 @@ for FILE_A in "$DIR_A"/*.json; do
       TITLE_A=$(echo "$STRUCT_A" | jq -r ".analyses[$i].title // \"—\"" | head -c 40)
       TITLE_B=$(echo "$STRUCT_B" | jq -r ".analyses[$i].title // \"—\"" | head -c 40)
 
-      if [ "$TYPE_A" = "$TYPE_B" ] && [ "$BUG_A" = "$BUG_B" ]; then
+      if [[ "$TYPE_A" = "$TYPE_B" ]] && [[ "$BUG_A" = "$BUG_B" ]]; then
         printf "    ${DIM}[%d] %s (%s, %s)${NC}\n" "$((i+1))" "$TITLE_A" "$TYPE_A" "$BUG_A"
       else
         printf "    ${RED}[%d] A: %s (%s, %s)${NC}\n" "$((i+1))" "$TITLE_A" "$TYPE_A" "$BUG_A"

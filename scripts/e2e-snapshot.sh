@@ -21,7 +21,7 @@ REPOS=(
 )
 
 BINARY="./heisenberg"
-if [ ! -f "$BINARY" ]; then
+if [[ ! -f "$BINARY" ]]; then
   echo "Building heisenberg..."
   go build -o "$BINARY" ./cmd/cli/
 fi
