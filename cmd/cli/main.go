@@ -88,6 +88,7 @@ func init() {
 	serveCmd.Flags().IntVarP(&port, "port", "p", 8080, "Port to listen on")
 	rootCmd.AddCommand(serveCmd)
 	rootCmd.AddCommand(versionCmd)
+	rootCmd.AddCommand(doctorCmd)
 }
 
 func main() {
