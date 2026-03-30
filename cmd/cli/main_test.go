@@ -439,6 +439,22 @@ func TestPrintStructuredRCA_FixConfidenceLow(t *testing.T) {
 	assert.Contains(t, out, "Fix (suggested direction)")
 }
 
+func TestPrintStructuredRCA_FixConfidenceMedium(t *testing.T) {
+	var buf bytes.Buffer
+	rca := &llm.RootCauseAnalysis{
+		Title:         "Config mismatch",
+		FailureType:   llm.FailureTypeAssertion,
+		RootCause:     "Rate limits differ",
+		Remediation:   "Adjust rate limiter config",
+		FixConfidence: "medium",
+	}
+
+	printStructuredRCA(&buf, rca)
+	out := buf.String()
+
+	assert.Contains(t, out, "Fix (medium confidence)")
+}
+
 func TestPrintStructuredRCA_NoFixConfidence(t *testing.T) {
 	var buf bytes.Buffer
 	rca := &llm.RootCauseAnalysis{

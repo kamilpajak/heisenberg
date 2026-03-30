@@ -505,3 +505,16 @@ func TestParseRCAFromArgs_WithoutFixConfidence(t *testing.T) {
 	rca := ParseRCAFromArgs(args)
 	assert.Empty(t, rca.FixConfidence)
 }
+
+func TestParseRCAFromArgs_FixConfidence_CaseNormalized(t *testing.T) {
+	args := map[string]any{
+		"title":          "Error",
+		"failure_type":   "assertion",
+		"root_cause":     "Bug",
+		"remediation":    "Fix it",
+		"fix_confidence": "High",
+	}
+
+	rca := ParseRCAFromArgs(args)
+	assert.Equal(t, "high", rca.FixConfidence, "LLM may return capitalized values")
+}

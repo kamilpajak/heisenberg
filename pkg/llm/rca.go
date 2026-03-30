@@ -105,7 +105,7 @@ func ParseRCAFromArgs(args map[string]any) *RootCauseAnalysis {
 		Symptom:               stringArg(args, "symptom"),
 		RootCause:             stringArg(args, "root_cause"),
 		Remediation:           stringArg(args, "remediation"),
-		FixConfidence:         stringArg(args, "fix_confidence"),
+		FixConfidence:         strings.ToLower(stringArg(args, "fix_confidence")),
 	}
 
 	// Parse test failure location
