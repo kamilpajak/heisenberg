@@ -10,7 +10,7 @@ Bring your own Gemini key. Heisenberg analyzes workflow logs, artifacts, and tra
 
 ## Why?
 
-A failed CI run gives you 800 lines of logs and a red badge. Heisenberg reads those logs for you — plus artifacts, traces, and source code — and tells you **why** the test failed, **where** the bug is, and **how** to fix it. Locally, with your own API key, in under a minute.
+A failed CI run gives you 800 lines of logs and a red badge. Heisenberg reads those logs for you — plus artifacts, traces, and source code — and tells you **why** the test failed, **where** the bug is, and **how** to fix it. Locally, with your own API key, typically in under a minute.
 
 ## Example Output
 
@@ -91,7 +91,7 @@ heisenberg owner/repo                       # analyze latest failed run
   [OK] Network: generativelanguage.googleapis.com reachable
   [OK] Playwright browser installed
   [INFO] Config file: not found (using defaults)
-  [INFO] heisenberg v0.3.0
+  [INFO] heisenberg v0.3.1
 
   5 passed
 ```
@@ -134,11 +134,13 @@ heisenberg owner/repo
               ▼                          ▼
 ┌─────────────────────────────┐
 │  Tool calls:                │
+│  • list_jobs                │
 │  • get_job_logs             │
 │  • get_artifact (HTML/blob) │
 │  • get_test_traces          │
 │  • get_repo_file            │
 │  • get_workflow_file        │
+│  • get_pr_diff              │
 └─────────────┬───────────────┘
               │
               ▼
@@ -195,6 +197,7 @@ The `--format json` output includes a `schema_version` field for forward compati
   "schema_version": "1",
   "category": "diagnosis",
   "confidence": 85,
+  "sensitivity": "low",
   "analyses": [
     {
       "title": "Timeout in beforeEach hook",
@@ -204,7 +207,8 @@ The `--format json` output includes a `schema_version` field for forward compati
       "bug_location_confidence": "high",
       "root_cause": "CSS selector changed, loading indicator not found",
       "evidence": [{ "type": "trace", "content": "waitForSelector timed out" }],
-      "remediation": "Update selector to match new data attribute"
+      "remediation": "Update selector to match new data attribute",
+      "fix_confidence": "high"
     }
   ],
   "run_id": 21575780517,
@@ -261,6 +265,7 @@ The action writes the diagnosis to the [Job Summary](https://docs.github.com/en/
 | Input | Required | Default | Description |
 |-------|----------|---------|-------------|
 | `google-api-key` | Yes | - | Google AI API key for Gemini |
+| `github-token` | No | `github.token` | GitHub token for API access (override for cross-repo analysis) |
 | `repository` | No | Current repo | Repository to analyze (owner/repo) |
 | `run-id` | No | Latest failed | Specific workflow run ID |
 
