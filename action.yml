@@ -1,4 +1,4 @@
-name: 'Heisenberg'
+name: 'Heisenberg CI Failure Analysis'
 description: 'AI-powered test failure analysis for GitHub repositories'
 author: 'kamilpajak'
 branding:
