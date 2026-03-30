@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-03-30
+
+### Added
+
+- Hybrid failure clustering for large CI runs (>6 failed jobs) — pre-clusters by error signature, runs parallel per-cluster LLM analysis (#26)
+- Multi-RCA output — `analyses[]` array with per-failure structured diagnosis (#25)
+- Bug location classification — production, infrastructure, test, or unknown — with confidence level (#24)
+- `heisenberg doctor` command — pre-flight check for tokens, network, Playwright, and config (#28)
+- Config file support — optional YAML config at OS-appropriate path with precedence: flag > env > config > default (#28)
+- `schema_version` field in JSON output (v1) for forward compatibility (#28)
+- Structured JSON error output when `--format json` is active — CI pipelines always get parseable output (#28)
+- `--from-env` flag — read `GITHUB_REPOSITORY` and `GITHUB_RUN_ID` from environment for zero-config CI mode (#27)
+- `--format human|json` flag — replaces `--json`, auto-detects TTY (#27)
+- `--run <URL>` flag — paste a GitHub Actions run URL directly (#27)
+- `--model` flag — override Gemini model (env: `HEISENBERG_MODEL`) (#25)
+- Run header with branch, event, status metadata in CLI output (#27)
+- Cluster cards with colored bug location tags (#27)
+- Compact progress mode for cleaner CLI output (#23)
+- Agent loop circuit breaker — prevents repetitive tool calls with dynamic tool removal (#22)
+- Eval framework with ground truth scoring and snapshot comparison tooling (#25)
+- CLI-to-API persistence with API key authentication (`hsb_` prefix, SHA-256 hashed) (#18)
+- SaaS infrastructure under BSL 1.1 — Kinde auth, Stripe billing, PostgreSQL, SvelteKit dashboard (#15)
+- Testcontainers for integration tests (#17)
+
+### Fixed
+
+- `roundHours(0, 45)` returning "1h" instead of "45m" (#28)
+- Missing `exitUsage` label in exit code map (#28)
+- Agent loop guardrails for large repos — prevent infinite iteration (#19, #21)
+- IDOR, RBAC, and duplicate detection in API key management (#18)
+
+### Changed
+
+- CLI output completely redesigned with structured RCA rendering, run header, and cluster cards (#27)
+- `NewClient` signatures accept explicit token/key parameters with env var fallback (#28)
+- Google API key validation in `heisenberg doctor` uses `x-goog-api-key` header (#28)
+- README overhauled for OSS launch — product positioning, real example output, JSON schema docs (#29)
+
 ## [0.2.2] - 2026-02-11
 
 ### Added
@@ -93,7 +131,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automatic artifact format detection (HTML, blob, JSON)
 - HTML report rendering via headless Playwright
 
-[Unreleased]: https://github.com/kamilpajak/heisenberg/compare/v0.2.2...HEAD
+[Unreleased]: https://github.com/kamilpajak/heisenberg/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/kamilpajak/heisenberg/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/kamilpajak/heisenberg/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/kamilpajak/heisenberg/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/kamilpajak/heisenberg/compare/v0.1.2...v0.2.0
