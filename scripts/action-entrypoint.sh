@@ -1,14 +1,19 @@
 #!/bin/bash
-set -euo pipefail
+set -uo pipefail
 
 REPO="${INPUT_REPOSITORY:-$GITHUB_REPOSITORY}"
 RUN_ID="${INPUT_RUN_ID:-}"
 
-CMD=("heisenberg" "$REPO" "--json")
+CMD=("heisenberg" "$REPO" "--format" "json")
 [[ -n "$RUN_ID" ]] && CMD+=("--run-id" "$RUN_ID")
 
-# Run and capture JSON
-OUTPUT=$("${CMD[@]}" 2>/dev/stderr)
+# Run and capture JSON (allow non-zero exit — structured errors are still valid JSON)
+OUTPUT=$("${CMD[@]}" 2>/dev/stderr) || true
+
+if [[ -z "$OUTPUT" ]]; then
+  echo "::error::Heisenberg produced no output. Check stderr above for details."
+  exit 1
+fi
 
 # Parse JSON
 DIAGNOSIS=$(echo "$OUTPUT" | jq -r '.text')
