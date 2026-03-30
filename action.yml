@@ -9,6 +9,9 @@ inputs:
   google-api-key:
     description: 'Google AI API key for Gemini'
     required: true
+  github-token:
+    description: 'GitHub token for API access'
+    default: ${{ github.token }}
   repository:
     description: 'Repository to analyze (owner/repo)'
     default: ${{ github.repository }}
@@ -28,5 +31,5 @@ runs:
   using: 'docker'
   image: 'Dockerfile.action'
   env:
-    GITHUB_TOKEN: ${{ github.token }}
+    GITHUB_TOKEN: ${{ inputs.github-token }}
     GOOGLE_API_KEY: ${{ inputs.google-api-key }}
