@@ -233,14 +233,19 @@ on:
     workflows: ["CI"]
     types: [completed]
 
+permissions:
+  contents: read
+  actions: read
+
 jobs:
   analyze:
     if: ${{ github.event.workflow_run.conclusion == 'failure' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: kamilpajak/heisenberg@v1
+      - uses: kamilpajak/heisenberg@v0.3.1
         with:
           google-api-key: ${{ secrets.GOOGLE_API_KEY }}
+          run-id: ${{ github.event.workflow_run.id }}
 ```
 
 The action writes the diagnosis to the [Job Summary](https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#adding-a-job-summary) and exposes outputs for downstream steps:

@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-03-30
+
+### Fixed
+
+- GitHub Action: pass token via input default instead of `runs.env` (fixes `github.token` context error)
+- GitHub Action: move `# NOSONAR` comment off `FROM` line in Dockerfile (fixes Docker parse error)
+- GitHub Action: update Go builder image from 1.24 to 1.25 to match go.mod
+- GitHub Action: improve entrypoint error handling — non-zero exit no longer silently swallowed
+- GitHub Action: use `--format json` instead of deprecated `--json` flag
+
+### Changed
+
+- GitHub Action: renamed from "Heisenberg" to "Heisenberg CI Failure Analysis" for Marketplace uniqueness
+- README: GitHub Action example includes `run-id` and `permissions` for `workflow_run` pattern
+
 ## [0.3.0] - 2026-03-30
 
 ### Added
@@ -131,7 +146,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automatic artifact format detection (HTML, blob, JSON)
 - HTML report rendering via headless Playwright
 
-[Unreleased]: https://github.com/kamilpajak/heisenberg/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/kamilpajak/heisenberg/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/kamilpajak/heisenberg/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/kamilpajak/heisenberg/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/kamilpajak/heisenberg/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/kamilpajak/heisenberg/compare/v0.2.0...v0.2.1
