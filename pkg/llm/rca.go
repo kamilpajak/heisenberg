@@ -45,6 +45,7 @@ type RootCauseAnalysis struct {
 	RootCause             string        `json:"root_cause"`                        // Why it failed
 	Evidence              []Evidence    `json:"evidence"`                          // Supporting data points
 	Remediation           string        `json:"remediation"`                       // How to fix it
+	FixConfidence         string        `json:"fix_confidence,omitempty"`          // high, medium, low
 }
 
 // CodeLocation identifies a specific location in source code.
@@ -104,6 +105,7 @@ func ParseRCAFromArgs(args map[string]any) *RootCauseAnalysis {
 		Symptom:               stringArg(args, "symptom"),
 		RootCause:             stringArg(args, "root_cause"),
 		Remediation:           stringArg(args, "remediation"),
+		FixConfidence:         stringArg(args, "fix_confidence"),
 	}
 
 	// Parse test failure location

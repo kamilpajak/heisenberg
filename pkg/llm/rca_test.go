@@ -443,3 +443,65 @@ func TestParseRCAsFromArgs_Empty(t *testing.T) {
 	rcas := ParseRCAsFromArgs(nil)
 	assert.Empty(t, rcas)
 }
+
+func TestRCA_FixConfidence_JSONSerialization(t *testing.T) {
+	rca := &RootCauseAnalysis{
+		Title:         "Rate limit test fails",
+		FailureType:   FailureTypeAssertion,
+		RootCause:     "Tests expect 20/h but production has 100,000/h",
+		Remediation:   "Mock the rate limiter or lower production limits",
+		FixConfidence: "medium",
+	}
+
+	data, err := json.Marshal(rca)
+	require.NoError(t, err)
+
+	var decoded RootCauseAnalysis
+	err = json.Unmarshal(data, &decoded)
+	require.NoError(t, err)
+
+	assert.Equal(t, "medium", decoded.FixConfidence)
+
+	// Verify JSON key name
+	assert.Contains(t, string(data), `"fix_confidence":"medium"`)
+}
+
+func TestRCA_FixConfidence_OmittedWhenEmpty(t *testing.T) {
+	rca := &RootCauseAnalysis{
+		Title:       "Some failure",
+		FailureType: FailureTypeTimeout,
+		RootCause:   "Slow",
+		Remediation: "Speed it up",
+	}
+
+	data, err := json.Marshal(rca)
+	require.NoError(t, err)
+	assert.NotContains(t, string(data), "fix_confidence")
+}
+
+func TestParseRCAFromArgs_WithFixConfidence(t *testing.T) {
+	args := map[string]any{
+		"title":          "Rate limit mismatch",
+		"failure_type":   "assertion",
+		"symptom":        "Expected 429, got 200",
+		"root_cause":     "Rate limits set to 100,000",
+		"remediation":    "Mock maxRequests",
+		"fix_confidence": "low",
+	}
+
+	rca := ParseRCAFromArgs(args)
+	assert.Equal(t, "low", rca.FixConfidence)
+}
+
+func TestParseRCAFromArgs_WithoutFixConfidence(t *testing.T) {
+	args := map[string]any{
+		"title":        "Error",
+		"failure_type": "timeout",
+		"symptom":      "Timed out",
+		"root_cause":   "Slow",
+		"remediation":  "Speed it up",
+	}
+
+	rca := ParseRCAFromArgs(args)
+	assert.Empty(t, rca.FixConfidence)
+}

@@ -163,6 +163,21 @@ For "diagnosis" category, provide an "analyses" array. Each entry contains:
   - root_cause: Why it failed (the underlying issue)
   - evidence: Array of supporting data points
   - remediation: How to fix it (actionable guidance)
+  - fix_confidence: How actionable the remediation is (high/medium/low)
+
+Remediation quality rules:
+  - Before suggesting to mock, patch, or override a property, use get_repo_file to read the
+    implementation of the class or module involved. Do not suggest mocking private/readonly
+    fields, sealed classes, or final methods.
+  - If you cannot inspect the implementation, state that the fix direction is likely correct
+    but the exact approach may need adjustment.
+  - Prefer concrete, copy-pasteable guidance when you have enough context. When you don't,
+    say so explicitly.
+
+Fix confidence:
+  - "high": You inspected the relevant source code and the fix is specific and copy-pasteable
+  - "medium": Direction is correct but implementation details may vary (e.g. you didn't read the class)
+  - "low": General suggestion — you didn't inspect the implementation
 
 Top-level fields (outside analyses):
   - confidence: 0-100 score (overall diagnosis confidence)
