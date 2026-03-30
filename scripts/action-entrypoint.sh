@@ -2,7 +2,8 @@
 set -uo pipefail
 
 REPO="${INPUT_REPOSITORY:-$GITHUB_REPOSITORY}"
-RUN_ID="${INPUT_RUN_ID:-}"
+# Docker actions set INPUT_RUN-ID (with hyphen), bash can't reference that directly
+RUN_ID=$(printenv 'INPUT_RUN-ID' 2>/dev/null || echo "")
 
 CMD=("heisenberg" "$REPO" "--format" "json")
 [[ -n "$RUN_ID" ]] && CMD+=("--run-id" "$RUN_ID")
