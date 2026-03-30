@@ -495,7 +495,16 @@ func printStructuredRCA(w io.Writer, rca *llm.RootCauseAnalysis) {
 	}
 
 	// Remediation
-	_, _ = fixColor.Fprintln(w, "  Fix")
+	fixLabel := "  Fix"
+	switch rca.FixConfidence {
+	case "high":
+		fixLabel = "  Fix (high confidence)"
+	case "medium":
+		fixLabel = "  Fix (medium confidence)"
+	case "low":
+		fixLabel = "  Fix (suggested direction)"
+	}
+	_, _ = fixColor.Fprintln(w, fixLabel)
 	_, _ = dim.Fprintln(w, separator)
 	fmt.Fprintln(w, wrapBullets(rca.Remediation, maxLineWidth, "  "))
 }

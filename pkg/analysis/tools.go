@@ -668,6 +668,11 @@ func ToolDeclarations() []llm.FunctionDeclaration {
 									Type:        "string",
 									Description: "How to fix it - actionable guidance for resolving the issue.",
 								},
+								"fix_confidence": {
+									Type:        "string",
+									Description: "How actionable the remediation is. high: inspected source, specific fix. medium: correct direction, details may vary. low: general suggestion without source inspection.",
+									Enum:        []string{"high", "medium", "low"},
+								},
 							},
 						},
 					},

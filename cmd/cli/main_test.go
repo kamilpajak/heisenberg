@@ -407,6 +407,71 @@ func TestWrapBullets(t *testing.T) {
 	}
 }
 
+func TestPrintStructuredRCA_FixConfidenceHigh(t *testing.T) {
+	var buf bytes.Buffer
+	rca := &llm.RootCauseAnalysis{
+		Title:         "Selector changed",
+		FailureType:   llm.FailureTypeTimeout,
+		RootCause:     "CSS selector outdated",
+		Remediation:   "Update selector to [data-loaded]",
+		FixConfidence: "high",
+	}
+
+	printStructuredRCA(&buf, rca)
+	out := buf.String()
+
+	assert.Contains(t, out, "Fix (high confidence)")
+}
+
+func TestPrintStructuredRCA_FixConfidenceLow(t *testing.T) {
+	var buf bytes.Buffer
+	rca := &llm.RootCauseAnalysis{
+		Title:         "Rate limit test",
+		FailureType:   llm.FailureTypeAssertion,
+		RootCause:     "Limits mismatch",
+		Remediation:   "Mock maxRequests",
+		FixConfidence: "low",
+	}
+
+	printStructuredRCA(&buf, rca)
+	out := buf.String()
+
+	assert.Contains(t, out, "Fix (suggested direction)")
+}
+
+func TestPrintStructuredRCA_FixConfidenceMedium(t *testing.T) {
+	var buf bytes.Buffer
+	rca := &llm.RootCauseAnalysis{
+		Title:         "Config mismatch",
+		FailureType:   llm.FailureTypeAssertion,
+		RootCause:     "Rate limits differ",
+		Remediation:   "Adjust rate limiter config",
+		FixConfidence: "medium",
+	}
+
+	printStructuredRCA(&buf, rca)
+	out := buf.String()
+
+	assert.Contains(t, out, "Fix (medium confidence)")
+}
+
+func TestPrintStructuredRCA_NoFixConfidence(t *testing.T) {
+	var buf bytes.Buffer
+	rca := &llm.RootCauseAnalysis{
+		Title:       "Some failure",
+		FailureType: llm.FailureTypeAssertion,
+		RootCause:   "Something broke",
+		Remediation: "Fix it",
+	}
+
+	printStructuredRCA(&buf, rca)
+	out := buf.String()
+
+	assert.Contains(t, out, "  Fix\n")
+	assert.NotContains(t, out, "confidence")
+	assert.NotContains(t, out, "direction")
+}
+
 func TestPrintStructuredRCA_WordWrap(t *testing.T) {
 	var buf bytes.Buffer
 	rca := &llm.RootCauseAnalysis{
