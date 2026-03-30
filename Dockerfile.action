@@ -4,12 +4,13 @@ WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 # .dockerignore excludes sensitive files (.env, .git, etc.)
-COPY . .  # NOSONAR
+COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /heisenberg ./cmd/cli
 
 # Stage 2: Runtime with Playwright
 # Playwright requires root for browser installation; acceptable for GitHub Action containers
-FROM mcr.microsoft.com/playwright:v1.52.0-noble  # NOSONAR
+# NOSONAR: Playwright image runs as root by design
+FROM mcr.microsoft.com/playwright:v1.52.0-noble
 RUN apt-get update && apt-get install -y --no-install-recommends jq && rm -rf /var/lib/apt/lists/*
 COPY --from=builder /heisenberg /usr/local/bin/
 COPY scripts/action-entrypoint.sh /entrypoint.sh
