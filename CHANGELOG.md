@@ -17,6 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - GitHub Action: improve entrypoint error handling — non-zero exit no longer silently swallowed
 - GitHub Action: use `--format json` instead of deprecated `--json` flag
 
+### Added
+
+- `fix_confidence` field in RCA output (high/medium/low) — signals how actionable the remediation is
+- System prompt rules for implementation-aware remediation — model inspects source before suggesting mocks
+
 ### Changed
 
 - GitHub Action: renamed from "Heisenberg" to "Heisenberg CI Failure Analysis" for Marketplace uniqueness
