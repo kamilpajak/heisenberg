@@ -1522,3 +1522,71 @@ func TestToolDeclarations_GitHub(t *testing.T) {
 	assert.NotContains(t, names, "get_test_results")
 	assert.Contains(t, names, "done")
 }
+
+// mockTestResultsProvider implements ci.Provider + ci.TestResultsProvider for testing.
+type mockTestResultsProvider struct {
+	ci.Provider // embed to satisfy interface
+	testRuns    []ci.TestRun
+	testResults []ci.TestResult
+	testRunsErr error
+}
+
+func (m *mockTestResultsProvider) Name() string          { return "mock" }
+func (m *mockTestResultsProvider) AnalysisHints() string { return "" }
+func (m *mockTestResultsProvider) GetTestRuns(_ context.Context, _ int64) ([]ci.TestRun, error) {
+	return m.testRuns, m.testRunsErr
+}
+func (m *mockTestResultsProvider) GetTestResults(_ context.Context, _ int64) ([]ci.TestResult, error) {
+	return m.testResults, nil
+}
+
+func TestGetTestResults_Success(t *testing.T) {
+	mock := &mockTestResultsProvider{
+		testRuns: []ci.TestRun{
+			{ID: 1, Name: "Unit Tests", TotalTests: 10, PassedTests: 8, FailedTests: 2},
+		},
+		testResults: []ci.TestResult{
+			{ID: 1, TestName: "test_login", Outcome: "Failed", ErrorMessage: "timeout", StackTrace: "at login.go:5", DurationMs: 500},
+			{ID: 2, TestName: "test_ok", Outcome: "Passed", DurationMs: 10},
+		},
+	}
+	h := &ToolHandler{CI: mock, RunID: 100}
+	result, isDone, err := h.Execute(context.Background(), llm.FunctionCall{Name: "get_test_results"})
+	require.NoError(t, err)
+	assert.False(t, isDone)
+	assert.Contains(t, result, "Unit Tests")
+	assert.Contains(t, result, "test_login")
+	assert.Contains(t, result, "timeout")
+	assert.NotContains(t, result, "test_ok")
+}
+
+func TestGetTestResults_NoRuns(t *testing.T) {
+	mock := &mockTestResultsProvider{testRuns: []ci.TestRun{}}
+	h := &ToolHandler{CI: mock, RunID: 100}
+	result, _, err := h.Execute(context.Background(), llm.FunctionCall{Name: "get_test_results"})
+	require.NoError(t, err)
+	assert.Contains(t, result, "no test runs found")
+}
+
+func TestGetTestResults_AllPassing(t *testing.T) {
+	mock := &mockTestResultsProvider{
+		testRuns: []ci.TestRun{
+			{ID: 1, Name: "Tests", TotalTests: 5, PassedTests: 5, FailedTests: 0},
+		},
+	}
+	h := &ToolHandler{CI: mock, RunID: 100}
+	result, _, err := h.Execute(context.Background(), llm.FunctionCall{Name: "get_test_results"})
+	require.NoError(t, err)
+	assert.Contains(t, result, "Tests")
+	assert.Contains(t, result, "Failed: 0")
+}
+
+func TestToolDeclarations_Azure(t *testing.T) {
+	mock := &mockTestResultsProvider{}
+	decls := ToolDeclarations(mock)
+	names := make([]string, len(decls))
+	for i, d := range decls {
+		names[i] = d.Name
+	}
+	assert.Contains(t, names, "get_test_results")
+}
