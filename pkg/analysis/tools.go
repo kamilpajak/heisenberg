@@ -262,8 +262,11 @@ func (h *ToolHandler) findTraceArtifact(name string) *ci.Artifact {
 		if name != "" && a.Name == name {
 			return &h.artifacts[i]
 		}
-		if name == "" && strings.Contains(strings.ToLower(a.Name), testResultsArtifact) {
-			return &h.artifacts[i]
+		if name == "" {
+			n := strings.ToLower(a.Name)
+			if strings.Contains(n, testResultsArtifact) || strings.Contains(n, "report") || strings.Contains(n, "blob") {
+				return &h.artifacts[i]
+			}
 		}
 	}
 	return nil

@@ -1,8 +1,6 @@
 package github
 
 import (
-	"archive/zip"
-	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -168,7 +166,15 @@ func (f *prFile) toCIChangedFile() ci.ChangedFile {
 
 // ListRuns returns recent completed workflow runs.
 func (c *Client) ListRuns(ctx context.Context, filter ci.RunFilter) ([]ci.Run, error) {
-	url := fmt.Sprintf("%s/repos/%s/%s/actions/runs?per_page=10&status=completed", c.baseURL, c.owner, c.repo)
+	status := filter.Status
+	if status == "" {
+		status = "completed"
+	}
+	perPage := filter.PerPage
+	if perPage <= 0 {
+		perPage = 10
+	}
+	url := fmt.Sprintf("%s/repos/%s/%s/actions/runs?per_page=%d&status=%s", c.baseURL, c.owner, c.repo, perPage, status)
 
 	var result struct {
 		WorkflowRuns []workflowRun `json:"workflow_runs"`
@@ -292,7 +298,7 @@ func (c *Client) DownloadAndExtract(ctx context.Context, artifactID int64) ([]by
 		return nil, err
 	}
 
-	return extractFirstFile(zipData)
+	return ci.ExtractFirstFile(zipData)
 }
 
 // GetRepoFile fetches a file from the repo's default branch via the contents API.
@@ -438,51 +444,6 @@ func (c *Client) doRequest(ctx context.Context, url string, result interface{}) 
 	}
 
 	return json.NewDecoder(resp.Body).Decode(result)
-}
-
-// ZIP extraction helpers
-
-func readZipEntry(f *zip.File) []byte {
-	rc, err := f.Open()
-	if err != nil {
-		return nil
-	}
-	content, err := io.ReadAll(rc)
-	rc.Close()
-	if err != nil || len(content) == 0 {
-		return nil
-	}
-	return content
-}
-
-func extractFirstFile(zipData []byte) ([]byte, error) {
-	reader, err := zip.NewReader(bytes.NewReader(zipData), int64(len(zipData)))
-	if err != nil {
-		return nil, err
-	}
-
-	var fallback []byte
-	for _, f := range reader.File {
-		if f.FileInfo().IsDir() {
-			continue
-		}
-		content := readZipEntry(f)
-		if content == nil {
-			continue
-		}
-		name := strings.ToLower(f.Name)
-		if strings.HasSuffix(name, ".html") || strings.HasSuffix(name, ".json") {
-			return content, nil
-		}
-		if fallback == nil {
-			fallback = content
-		}
-	}
-
-	if fallback != nil {
-		return fallback, nil
-	}
-	return nil, fmt.Errorf("no files found in artifact")
 }
 
 func base64Decode(s string) ([]byte, error) {

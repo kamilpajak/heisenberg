@@ -272,7 +272,7 @@ func TestFindTraceArtifactByName(t *testing.T) {
 func TestFindTraceArtifactAutoDetect(t *testing.T) {
 	h := &ToolHandler{
 		artifacts: []ci.Artifact{
-			{ID: 1, Name: "html-report", Expired: false},
+			{ID: 1, Name: "build-cache", Expired: false},
 			{ID: 2, Name: "test-results", Expired: false},
 		},
 	}
@@ -298,7 +298,7 @@ func TestFindTraceArtifactSkipsExpired(t *testing.T) {
 func TestFindTraceArtifactNotFound(t *testing.T) {
 	h := &ToolHandler{
 		artifacts: []ci.Artifact{
-			{ID: 1, Name: "html-report", Expired: false},
+			{ID: 1, Name: "build-cache", Expired: false},
 		},
 	}
 
@@ -718,7 +718,7 @@ func TestExecuteGetArtifactCacheError(t *testing.T) {
 }
 
 func TestExecuteGetTestTracesNotFound(t *testing.T) {
-	artifacts := []ci.Artifact{{ID: 1, Name: "html-report", Expired: false}}
+	artifacts := []ci.Artifact{{ID: 1, Name: "build-cache", Expired: false}}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(map[string]any{"artifacts": artifacts})
 	}))

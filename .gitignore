@@ -46,3 +46,4 @@ testdata/e2e/eval.jsonl
 web/node_modules/
 web/.svelte-kit/
 web/build/
+cli

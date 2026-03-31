@@ -172,7 +172,7 @@ func printError(w io.Writer, err error) int {
 }
 
 func run(cmd *cobra.Command, args []string) error {
-	target, err := resolveTarget(args)
+	target, err := resolveTarget(args, runID)
 	if err != nil {
 		return err
 	}
@@ -248,7 +248,8 @@ type targetInfo struct {
 }
 
 // resolveTarget determines the CI target from args, --from-env, --run URL, or explicit flags.
-func resolveTarget(args []string) (*targetInfo, error) {
+// flagRunID is the value of the --run-id flag.
+func resolveTarget(args []string, flagRunID int64) (*targetInfo, error) {
 	// 1. --run URL (auto-detects provider)
 	if runURL != "" {
 		return parseRunURL(runURL)
@@ -256,7 +257,7 @@ func resolveTarget(args []string) (*targetInfo, error) {
 
 	// 2. --from-env (detect from CI environment variables)
 	if fromEnv {
-		return resolveFromEnv()
+		return resolveFromEnv(flagRunID)
 	}
 
 	// 3. Explicit Azure flags
@@ -268,7 +269,7 @@ func resolveTarget(args []string) (*targetInfo, error) {
 			provider: "azure",
 			owner:    azureOrg,
 			repo:     azureProject,
-			runID:    runID,
+			runID:    flagRunID,
 		}, nil
 	}
 
@@ -282,14 +283,14 @@ func resolveTarget(args []string) (*targetInfo, error) {
 			provider: "github",
 			owner:    parts[0],
 			repo:     parts[1],
-			runID:    runID,
+			runID:    flagRunID,
 		}, nil
 	}
 
 	return nil, fmt.Errorf("provide owner/repo, --from-env, or --run <URL>")
 }
 
-func resolveFromEnv() (*targetInfo, error) {
+func resolveFromEnv(flagRunID int64) (*targetInfo, error) {
 	hasGitHub := os.Getenv("GITHUB_REPOSITORY") != ""
 	hasAzure := os.Getenv("SYSTEM_TEAMPROJECT") != ""
 
@@ -300,13 +301,13 @@ func resolveFromEnv() (*targetInfo, error) {
 
 	// Explicit provider override or single env
 	if providerFlag == "azure" || (hasAzure && !hasGitHub) {
-		return resolveAzureEnv()
+		return resolveAzureEnv(flagRunID)
 	}
 
-	return resolveGitHubEnv()
+	return resolveGitHubEnv(flagRunID)
 }
 
-func resolveGitHubEnv() (*targetInfo, error) {
+func resolveGitHubEnv(flagRunID int64) (*targetInfo, error) {
 	ghRepo := os.Getenv("GITHUB_REPOSITORY")
 	if ghRepo == "" {
 		return nil, fmt.Errorf("--from-env: GITHUB_REPOSITORY not set")
@@ -320,7 +321,7 @@ func resolveGitHubEnv() (*targetInfo, error) {
 		provider: "github",
 		owner:    parts[0],
 		repo:     parts[1],
-		runID:    runID,
+		runID:    flagRunID,
 	}
 
 	if ghRunID := os.Getenv("GITHUB_RUN_ID"); ghRunID != "" && target.runID == 0 {
@@ -331,7 +332,7 @@ func resolveGitHubEnv() (*targetInfo, error) {
 	return target, nil
 }
 
-func resolveAzureEnv() (*targetInfo, error) {
+func resolveAzureEnv(flagRunID int64) (*targetInfo, error) {
 	project := os.Getenv("SYSTEM_TEAMPROJECT")
 	if project == "" {
 		return nil, fmt.Errorf("--from-env: SYSTEM_TEAMPROJECT not set")
@@ -347,7 +348,7 @@ func resolveAzureEnv() (*targetInfo, error) {
 		provider: "azure",
 		owner:    org,
 		repo:     project,
-		runID:    runID,
+		runID:    flagRunID,
 	}
 
 	if buildID := os.Getenv("BUILD_BUILDID"); buildID != "" && target.runID == 0 {

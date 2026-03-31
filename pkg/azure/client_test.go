@@ -6,6 +6,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/kamilpajak/heisenberg/pkg/ci"
@@ -338,7 +339,7 @@ func TestListDirectory(t *testing.T) {
 	assert.Contains(t, entries, "utils.ts")
 }
 
-func TestGetChangedFiles(t *testing.T) {
+func TestGetChangedFiles_Commits(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Contains(t, r.URL.Path, "/diffs/commits")
 		assert.Equal(t, "main", r.URL.Query().Get("baseVersion"))
@@ -363,6 +364,40 @@ func TestGetChangedFiles(t *testing.T) {
 	assert.Equal(t, "added", files[1].Status)
 	assert.Equal(t, "old.ts", files[2].Path)
 	assert.Equal(t, "removed", files[2].Status)
+}
+
+func TestGetChangedFiles_PR(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "/iterations/") && strings.Contains(r.URL.Path, "/changes") {
+			w.Write([]byte(`{
+				"changeEntries": [
+					{"changeType": "edit", "item": {"path": "/src/main.ts"}},
+					{"changeType": "add", "item": {"path": "/src/new.ts"}}
+				]
+			}`))
+			return
+		}
+		if strings.Contains(r.URL.Path, "/iterations") {
+			w.Write([]byte(`{"value": [{"id": 1}, {"id": 2}]}`))
+			return
+		}
+		w.WriteHeader(404)
+	}))
+	defer srv.Close()
+
+	c := NewTestClient("myorg", "myproject", srv.URL, srv.Client())
+	files, err := c.GetChangedFiles(context.Background(), ci.ChangeRef{PRNumber: 42})
+	require.NoError(t, err)
+	assert.Len(t, files, 2)
+	assert.Equal(t, "src/main.ts", files[0].Path)
+	assert.Equal(t, "modified", files[0].Status)
+}
+
+func TestGetChangedFiles_NoRef(t *testing.T) {
+	c := NewTestClient("myorg", "myproject", "http://localhost", http.DefaultClient)
+	_, err := c.GetChangedFiles(context.Background(), ci.ChangeRef{})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "no commit SHA or PR number")
 }
 
 func TestGetTestRuns(t *testing.T) {
@@ -472,14 +507,14 @@ func TestDownloadAndExtract(t *testing.T) {
 
 func TestExtractFirstFile(t *testing.T) {
 	data := buildTestZip(t, "data.json", []byte(`{"key":"value"}`))
-	content, err := extractFirstFile(data)
+	content, err := ci.ExtractFirstFile(data)
 	require.NoError(t, err)
 	assert.Equal(t, `{"key":"value"}`, string(content))
 }
 
 func TestExtractFirstFile_Empty(t *testing.T) {
 	data := buildTestZip(t, "", nil)
-	_, err := extractFirstFile(data)
+	_, err := ci.ExtractFirstFile(data)
 	assert.Error(t, err)
 }
 

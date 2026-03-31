@@ -1,9 +1,12 @@
 package ci
 
 import (
+	"archive/zip"
+	"bytes"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCheckArtifacts(t *testing.T) {
@@ -43,4 +46,31 @@ func TestCheckArtifacts(t *testing.T) {
 			assert.Equal(t, len(tt.artifacts), status.Total)
 		})
 	}
+}
+
+func TestExtractFirstFile(t *testing.T) {
+	data := buildZip(t, "data.json", []byte(`{"key":"value"}`))
+	content, err := ExtractFirstFile(data)
+	require.NoError(t, err)
+	assert.Equal(t, `{"key":"value"}`, string(content))
+}
+
+func TestExtractFirstFile_Empty(t *testing.T) {
+	data := buildZip(t, "", nil)
+	_, err := ExtractFirstFile(data)
+	assert.Error(t, err)
+}
+
+func buildZip(t *testing.T, name string, content []byte) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	w := zip.NewWriter(&buf)
+	if name != "" && content != nil {
+		fw, err := w.Create(name)
+		require.NoError(t, err)
+		_, err = fw.Write(content)
+		require.NoError(t, err)
+	}
+	require.NoError(t, w.Close())
+	return buf.Bytes()
 }

@@ -2,8 +2,6 @@
 package azure
 
 import (
-	"archive/zip"
-	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -20,7 +18,10 @@ import (
 	"github.com/kamilpajak/heisenberg/pkg/ci"
 )
 
-const apiVersionKey = "api-version"
+const (
+	apiVersionKey   = "api-version"
+	apiVersionValue = "7.1"
+)
 
 // Client handles Azure DevOps API interactions and implements ci.Provider
 // and ci.TestResultsProvider.
@@ -185,9 +186,13 @@ type testResult struct {
 // Provider interface implementation
 
 func (c *Client) ListRuns(ctx context.Context, filter ci.RunFilter) ([]ci.Run, error) {
+	status := filter.Status
+	if status == "" {
+		status = "completed"
+	}
 	params := url.Values{
-		apiVersionKey:  {"7.1"},
-		"statusFilter": {"completed"},
+		apiVersionKey:  {apiVersionValue},
+		"statusFilter": {status},
 	}
 	if filter.PerPage > 0 {
 		params.Set("$top", strconv.Itoa(filter.PerPage))
@@ -210,7 +215,7 @@ func (c *Client) ListRuns(ctx context.Context, filter ci.RunFilter) ([]ci.Run, e
 }
 
 func (c *Client) GetRun(ctx context.Context, runID int64) (*ci.Run, error) {
-	apiURL := fmt.Sprintf("%s/%s/_apis/build/builds/%d?api-version=7.1", c.baseURL, c.project, runID)
+	apiURL := fmt.Sprintf("%s/%s/_apis/build/builds/%d?%s=%s", c.baseURL, c.project, runID, apiVersionKey, apiVersionValue)
 
 	var b build
 	if err := c.doRequest(ctx, apiURL, &b); err != nil {
@@ -233,7 +238,7 @@ func decodeJobID(jobID int64) (buildID int64, logID int) {
 }
 
 func (c *Client) ListJobs(ctx context.Context, runID int64) ([]ci.Job, error) {
-	apiURL := fmt.Sprintf("%s/%s/_apis/build/builds/%d/timeline?api-version=7.1", c.baseURL, c.project, runID)
+	apiURL := fmt.Sprintf("%s/%s/_apis/build/builds/%d/timeline?%s=%s", c.baseURL, c.project, runID, apiVersionKey, apiVersionValue)
 
 	var result struct {
 		Records []timelineRecord `json:"records"`
@@ -269,7 +274,7 @@ func (c *Client) GetJobLogs(ctx context.Context, jobID int64) (string, error) {
 		return "", fmt.Errorf("no logs available for this job")
 	}
 
-	apiURL := fmt.Sprintf("%s/%s/_apis/build/builds/%d/logs/%d?api-version=7.1", c.baseURL, c.project, buildID, logID)
+	apiURL := fmt.Sprintf("%s/%s/_apis/build/builds/%d/logs/%d?%s=%s", c.baseURL, c.project, buildID, logID, apiVersionKey, apiVersionValue)
 
 	req, err := c.newAPIRequest(ctx, apiURL)
 	if err != nil {
@@ -294,7 +299,7 @@ func (c *Client) GetJobLogs(ctx context.Context, jobID int64) (string, error) {
 }
 
 func (c *Client) ListArtifacts(ctx context.Context, runID int64) ([]ci.Artifact, error) {
-	apiURL := fmt.Sprintf("%s/%s/_apis/build/builds/%d/artifacts?api-version=7.1", c.baseURL, c.project, runID)
+	apiURL := fmt.Sprintf("%s/%s/_apis/build/builds/%d/artifacts?%s=%s", c.baseURL, c.project, runID, apiVersionKey, apiVersionValue)
 
 	var result struct {
 		Value []buildArtifact `json:"value"`
@@ -347,14 +352,14 @@ func (c *Client) DownloadAndExtract(ctx context.Context, artifactID int64) ([]by
 	if err != nil {
 		return nil, err
 	}
-	return extractFirstFile(zipData)
+	return ci.ExtractFirstFile(zipData)
 }
 
 func (c *Client) GetRepoFile(ctx context.Context, filePath string) (string, error) {
 	params := url.Values{
 		"path":        {filePath},
 		"$format":     {"text"},
-		apiVersionKey: {"7.1"},
+		apiVersionKey: {apiVersionValue},
 	}
 	apiURL := fmt.Sprintf("%s/%s/_apis/git/repositories/%s/items?%s", c.baseURL, c.project, c.project, params.Encode())
 
@@ -384,7 +389,7 @@ func (c *Client) ListDirectory(ctx context.Context, dirPath string) ([]string, e
 	params := url.Values{
 		"scopePath":      {dirPath},
 		"recursionLevel": {"OneLevel"},
-		apiVersionKey:    {"7.1"},
+		apiVersionKey:    {apiVersionValue},
 	}
 	apiURL := fmt.Sprintf("%s/%s/_apis/git/repositories/%s/items?%s", c.baseURL, c.project, c.project, params.Encode())
 
@@ -412,19 +417,72 @@ func (c *Client) ListDirectory(ctx context.Context, dirPath string) ([]string, e
 }
 
 func (c *Client) GetChangedFiles(ctx context.Context, ref ci.ChangeRef) ([]ci.ChangedFile, error) {
-	base := ref.BaseBranch
+	if ref.PRNumber > 0 {
+		return c.getPRChangedFiles(ctx, ref.PRNumber)
+	}
+
+	if ref.HeadSHA == "" {
+		return nil, fmt.Errorf("no commit SHA or PR number provided")
+	}
+
+	return c.getCommitDiff(ctx, ref.BaseBranch, ref.HeadSHA)
+}
+
+func (c *Client) getPRChangedFiles(ctx context.Context, prID int) ([]ci.ChangedFile, error) {
+	// Get the latest iteration for the PR
+	iterURL := fmt.Sprintf("%s/%s/_apis/git/repositories/%s/pullRequests/%d/iterations?%s",
+		c.baseURL, c.project, c.project, prID, url.Values{apiVersionKey: {apiVersionValue}}.Encode())
+
+	var iterResult struct {
+		Value []struct {
+			ID int `json:"id"`
+		} `json:"value"`
+	}
+	if err := c.doRequest(ctx, iterURL, &iterResult); err != nil {
+		return nil, err
+	}
+	if len(iterResult.Value) == 0 {
+		return nil, fmt.Errorf("no iterations found for PR %d", prID)
+	}
+
+	latestIter := iterResult.Value[len(iterResult.Value)-1].ID
+
+	// Get changes for that iteration
+	changesURL := fmt.Sprintf("%s/%s/_apis/git/repositories/%s/pullRequests/%d/iterations/%d/changes?%s",
+		c.baseURL, c.project, c.project, prID, latestIter, url.Values{apiVersionKey: {apiVersionValue}}.Encode())
+
+	var changesResult struct {
+		ChangeEntries []struct {
+			ChangeType string `json:"changeType"`
+			Item       struct {
+				Path string `json:"path"`
+			} `json:"item"`
+		} `json:"changeEntries"`
+	}
+	if err := c.doRequest(ctx, changesURL, &changesResult); err != nil {
+		return nil, err
+	}
+
+	files := make([]ci.ChangedFile, len(changesResult.ChangeEntries))
+	for i, ch := range changesResult.ChangeEntries {
+		files[i] = ci.ChangedFile{
+			Path:   strings.TrimPrefix(ch.Item.Path, "/"),
+			Status: mapChangeType(ch.ChangeType),
+		}
+	}
+	return files, nil
+}
+
+func (c *Client) getCommitDiff(ctx context.Context, baseBranch, headSHA string) ([]ci.ChangedFile, error) {
+	base := baseBranch
 	if base == "" {
 		base = "main"
-	}
-	target := ref.HeadSHA
-	if target == "" {
-		return nil, fmt.Errorf("no commit SHA provided")
 	}
 
 	params := url.Values{
 		"baseVersion":   {base},
-		"targetVersion": {target},
-		apiVersionKey:   {"7.1"},
+		"targetVersion": {headSHA},
+		apiVersionKey:   {apiVersionValue},
 	}
 	apiURL := fmt.Sprintf("%s/%s/_apis/git/repositories/%s/diffs/commits?%s", c.baseURL, c.project, c.project, params.Encode())
 
@@ -466,7 +524,7 @@ func (c *Client) GetTestRuns(ctx context.Context, buildID int64) ([]ci.TestRun, 
 	buildURI := fmt.Sprintf("vstfs:///Build/Build/%d", buildID)
 	params := url.Values{
 		"buildUri":    {buildURI},
-		apiVersionKey: {"7.1"},
+		apiVersionKey: {apiVersionValue},
 	}
 	apiURL := fmt.Sprintf("%s/%s/_apis/test/runs?%s", c.baseURL, c.project, params.Encode())
 
@@ -493,7 +551,7 @@ func (c *Client) GetTestRuns(ctx context.Context, buildID int64) ([]ci.TestRun, 
 func (c *Client) GetTestResults(ctx context.Context, testRunID int64) ([]ci.TestResult, error) {
 	params := url.Values{
 		"outcomes":    {"Failed"},
-		apiVersionKey: {"7.1"},
+		apiVersionKey: {apiVersionValue},
 	}
 	apiURL := fmt.Sprintf("%s/%s/_apis/test/runs/%d/results?%s", c.baseURL, c.project, testRunID, params.Encode())
 
@@ -552,41 +610,4 @@ func (c *Client) doRequest(ctx context.Context, reqURL string, result interface{
 	}
 
 	return json.NewDecoder(resp.Body).Decode(result)
-}
-
-// ZIP extraction helper (shared logic with github package)
-
-func extractFirstFile(zipData []byte) ([]byte, error) {
-	reader, err := zip.NewReader(bytes.NewReader(zipData), int64(len(zipData)))
-	if err != nil {
-		return nil, err
-	}
-
-	var fallback []byte
-	for _, f := range reader.File {
-		if f.FileInfo().IsDir() {
-			continue
-		}
-		rc, err := f.Open()
-		if err != nil {
-			continue
-		}
-		content, err := io.ReadAll(rc)
-		rc.Close()
-		if err != nil || len(content) == 0 {
-			continue
-		}
-		name := strings.ToLower(f.Name)
-		if strings.HasSuffix(name, ".html") || strings.HasSuffix(name, ".json") {
-			return content, nil
-		}
-		if fallback == nil {
-			fallback = content
-		}
-	}
-
-	if fallback != nil {
-		return fallback, nil
-	}
-	return nil, fmt.Errorf("no files found in artifact")
 }

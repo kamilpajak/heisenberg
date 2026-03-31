@@ -27,11 +27,19 @@ func Load() (*Config, error) {
 // LoadFrom reads a config file from the given path.
 // Returns an empty Config if the file does not exist.
 func LoadFrom(path string) (*Config, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
+	info, statErr := os.Stat(path)
+	if statErr != nil {
+		if errors.Is(statErr, os.ErrNotExist) {
 			return &Config{}, nil
 		}
+		return nil, fmt.Errorf("reading config: %w", statErr)
+	}
+	if info.Mode().Perm()&0o077 != 0 {
+		fmt.Fprintf(os.Stderr, "Warning: %s is readable by other users (mode %o). Consider: chmod 600 %s\n", path, info.Mode().Perm(), path)
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
 		return nil, fmt.Errorf("reading config: %w", err)
 	}
 

@@ -779,7 +779,7 @@ func TestResolveTarget_FromArgs(t *testing.T) {
 	fromEnv = false
 	runURL = ""
 	providerFlag = ""
-	target, err := resolveTarget([]string{"org/repo"})
+	target, err := resolveTarget([]string{"org/repo"}, 0)
 	require.NoError(t, err)
 	assert.Equal(t, "github", target.provider)
 	assert.Equal(t, "org", target.owner)
@@ -790,7 +790,7 @@ func TestResolveTarget_InvalidArgs(t *testing.T) {
 	fromEnv = false
 	runURL = ""
 	providerFlag = ""
-	_, err := resolveTarget([]string{"invalid"})
+	_, err := resolveTarget([]string{"invalid"}, 0)
 	assert.Error(t, err)
 }
 
@@ -800,7 +800,7 @@ func TestResolveTarget_NoArgs(t *testing.T) {
 	providerFlag = ""
 	azureOrg = ""
 	azureProject = ""
-	_, err := resolveTarget(nil)
+	_, err := resolveTarget(nil, runID)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "provide owner/repo")
 }
@@ -814,7 +814,7 @@ func TestResolveTarget_FromGitHubEnv(t *testing.T) {
 	t.Setenv("GITHUB_RUN_ID", "99999")
 	t.Setenv("SYSTEM_TEAMPROJECT", "")
 
-	target, err := resolveTarget(nil)
+	target, err := resolveTarget(nil, runID)
 	require.NoError(t, err)
 	assert.Equal(t, "github", target.provider)
 	assert.Equal(t, "org", target.owner)
@@ -834,7 +834,7 @@ func TestResolveTarget_FromAzureEnv(t *testing.T) {
 	t.Setenv("SYSTEM_TEAMPROJECT", "myproject")
 	t.Setenv("BUILD_BUILDID", "789")
 
-	target, err := resolveTarget(nil)
+	target, err := resolveTarget(nil, runID)
 	require.NoError(t, err)
 	assert.Equal(t, "azure", target.provider)
 	assert.Equal(t, "myorg", target.owner)
@@ -851,7 +851,7 @@ func TestResolveTarget_AmbiguousEnv(t *testing.T) {
 	t.Setenv("GITHUB_REPOSITORY", "org/repo")
 	t.Setenv("SYSTEM_TEAMPROJECT", "myproject")
 
-	_, err := resolveTarget(nil)
+	_, err := resolveTarget(nil, runID)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "ambiguous")
 
@@ -868,7 +868,7 @@ func TestResolveTarget_AmbiguousEnv_Resolved(t *testing.T) {
 	t.Setenv("SYSTEM_TEAMPROJECT", "myproject")
 	t.Setenv("BUILD_BUILDID", "456")
 
-	target, err := resolveTarget(nil)
+	target, err := resolveTarget(nil, runID)
 	require.NoError(t, err)
 	assert.Equal(t, "azure", target.provider)
 	assert.Equal(t, "myorg", target.owner)
@@ -885,7 +885,7 @@ func TestResolveTarget_AzureFlags(t *testing.T) {
 	azureProject = "myproject"
 	runID = 100
 
-	target, err := resolveTarget(nil)
+	target, err := resolveTarget(nil, runID)
 	require.NoError(t, err)
 	assert.Equal(t, "azure", target.provider)
 	assert.Equal(t, "myorg", target.owner)
@@ -905,7 +905,7 @@ func TestResolveTarget_AzureFlags_MissingOrg(t *testing.T) {
 	azureOrg = ""
 	azureProject = "myproject"
 
-	_, err := resolveTarget(nil)
+	_, err := resolveTarget(nil, runID)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "--org")
 
@@ -918,7 +918,7 @@ func TestResolveTarget_FromURL(t *testing.T) {
 	runURL = "https://github.com/microsoft/playwright/actions/runs/12345"
 	runID = 0
 
-	target, err := resolveTarget(nil)
+	target, err := resolveTarget(nil, runID)
 	require.NoError(t, err)
 	assert.Equal(t, "github", target.provider)
 	assert.Equal(t, "microsoft", target.owner)
@@ -1058,7 +1058,7 @@ func TestResolveTarget_FromEnvMissingRepo(t *testing.T) {
 	providerFlag = ""
 	t.Setenv("GITHUB_REPOSITORY", "")
 	t.Setenv("SYSTEM_TEAMPROJECT", "")
-	_, err := resolveTarget(nil)
+	_, err := resolveTarget(nil, runID)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "GITHUB_REPOSITORY not set")
 	fromEnv = false
