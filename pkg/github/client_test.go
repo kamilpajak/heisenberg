@@ -291,3 +291,97 @@ func TestGetRun_PullRequests(t *testing.T) {
 	require.Len(t, run.PRNumbers, 1)
 	assert.Equal(t, 42, run.PRNumbers[0])
 }
+
+func TestName(t *testing.T) {
+	c := NewTestClient("o", "r", "http://localhost", http.DefaultClient)
+	assert.Equal(t, "github", c.Name())
+}
+
+func TestAnalysisHints(t *testing.T) {
+	c := NewTestClient("o", "r", "http://localhost", http.DefaultClient)
+	assert.Contains(t, c.AnalysisHints(), "Playwright")
+}
+
+func TestListRuns(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"workflow_runs":[{"id":1,"name":"CI","conclusion":"failure","head_branch":"main","head_sha":"abc","event":"push"}]}`))
+	}))
+	defer srv.Close()
+	c := NewTestClient("o", "r", srv.URL, srv.Client())
+	runs, err := c.ListRuns(context.Background(), ci.RunFilter{})
+	require.NoError(t, err)
+	assert.Len(t, runs, 1)
+	assert.Equal(t, "failure", runs[0].Conclusion)
+	assert.Equal(t, "main", runs[0].Branch)
+}
+
+func TestListJobs(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"jobs":[{"id":10,"name":"build","status":"completed","conclusion":"success"}]}`))
+	}))
+	defer srv.Close()
+	c := NewTestClient("o", "r", srv.URL, srv.Client())
+	jobs, err := c.ListJobs(context.Background(), 1)
+	require.NoError(t, err)
+	assert.Len(t, jobs, 1)
+	assert.Equal(t, "build", jobs[0].Name)
+}
+
+func TestListArtifacts(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"artifacts":[{"id":5,"name":"report","size_in_bytes":1024,"expired":false}]}`))
+	}))
+	defer srv.Close()
+	c := NewTestClient("o", "r", srv.URL, srv.Client())
+	arts, err := c.ListArtifacts(context.Background(), 1)
+	require.NoError(t, err)
+	assert.Len(t, arts, 1)
+	assert.Equal(t, "report", arts[0].Name)
+	assert.Equal(t, int64(1024), arts[0].SizeBytes)
+}
+
+func TestGetJobLogs(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("line1\nline2\nERROR: something failed"))
+	}))
+	defer srv.Close()
+	c := NewTestClient("o", "r", srv.URL, srv.Client())
+	logs, err := c.GetJobLogs(context.Background(), 10)
+	require.NoError(t, err)
+	assert.Contains(t, logs, "ERROR: something failed")
+}
+
+func TestDownloadArtifact(t *testing.T) {
+	content := []byte("zip-content")
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write(content)
+	}))
+	defer srv.Close()
+	c := NewTestClient("o", "r", srv.URL, srv.Client())
+	data, err := c.DownloadArtifact(context.Background(), 5)
+	require.NoError(t, err)
+	assert.Equal(t, content, data)
+}
+
+func TestDownloadAndExtract(t *testing.T) {
+	zipData := buildZip(t, map[string][]byte{"report.html": []byte("<html>test</html>")})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write(zipData)
+	}))
+	defer srv.Close()
+	c := NewTestClient("o", "r", srv.URL, srv.Client())
+	content, err := c.DownloadAndExtract(context.Background(), 5)
+	require.NoError(t, err)
+	assert.Contains(t, string(content), "<html>")
+}
+
+func TestGetRepoFile(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"content":"aGVsbG8=","encoding":"base64"}`))
+	}))
+	defer srv.Close()
+	c := NewTestClient("o", "r", srv.URL, srv.Client())
+	content, err := c.GetRepoFile(context.Background(), "README.md")
+	require.NoError(t, err)
+	assert.Equal(t, "hello", content)
+}
