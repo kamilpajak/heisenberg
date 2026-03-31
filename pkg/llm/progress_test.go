@@ -413,3 +413,68 @@ func TestCompactMode_ToolNonTTY_HasNewline(t *testing.T) {
 	assert.True(t, strings.HasSuffix(out, "\n"), "non-TTY compact tool output should end with newline")
 	assert.NotContains(t, out, "\033", "non-TTY output should not contain ANSI escapes")
 }
+
+func TestCompactMode_NonTTY_DedupSameStep(t *testing.T) {
+	e, buf := newCompactTestEmitter()
+
+	// Iteration 1: three tool calls (get_job_logs x3) — should emit only one line
+	e.Emit(ProgressEvent{Type: "tool", Step: 1, MaxStep: 30, Tool: "get_job_logs"})
+	e.Emit(ProgressEvent{Type: "tool", Step: 1, MaxStep: 30, Tool: "get_job_logs"})
+	e.Emit(ProgressEvent{Type: "tool", Step: 1, MaxStep: 30, Tool: "get_job_logs"})
+
+	lines := strings.Split(strings.TrimRight(buf.String(), "\n"), "\n")
+	assert.Len(t, lines, 1, "multiple tool calls in same step should produce one line")
+	assert.Contains(t, lines[0], "1/30")
+}
+
+func TestCompactMode_NonTTY_DifferentStepsAllEmit(t *testing.T) {
+	e, buf := newCompactTestEmitter()
+
+	// Each step has one tool call — all should emit
+	e.Emit(ProgressEvent{Type: "tool", Step: 1, MaxStep: 30, Tool: "get_job_logs"})
+	e.Emit(ProgressEvent{Type: "tool", Step: 2, MaxStep: 30, Tool: "get_repo_file"})
+	e.Emit(ProgressEvent{Type: "tool", Step: 3, MaxStep: 30, Tool: "get_repo_file"})
+	e.Emit(ProgressEvent{Type: "tool", Step: 4, MaxStep: 30, Tool: "done"})
+
+	lines := strings.Split(strings.TrimRight(buf.String(), "\n"), "\n")
+	assert.Len(t, lines, 4, "different steps should each produce a line")
+	assert.Contains(t, lines[0], "1/30")
+	assert.Contains(t, lines[1], "2/30")
+	assert.Contains(t, lines[2], "3/30")
+	assert.Contains(t, lines[3], "4/30")
+}
+
+func TestCompactMode_NonTTY_RealisticSequence(t *testing.T) {
+	e, buf := newCompactTestEmitter()
+
+	// Simulates the gridscribe run:
+	// iter 1: 3x get_job_logs
+	// iter 2: model thinking (no tools — step event only)
+	// iter 3: 2x get_repo_file
+	// iter 4: 1x get_repo_file
+	// iter 5: 1x get_repo_file
+	// iter 6: model thinking
+	// iter 7: 1x get_repo_file
+	// iter 8: done
+	e.Emit(ProgressEvent{Type: "tool", Step: 1, MaxStep: 30, Tool: "get_job_logs"})
+	e.Emit(ProgressEvent{Type: "tool", Step: 1, MaxStep: 30, Tool: "get_job_logs"})
+	e.Emit(ProgressEvent{Type: "tool", Step: 1, MaxStep: 30, Tool: "get_job_logs"})
+	e.Emit(ProgressEvent{Type: "tool", Step: 3, MaxStep: 30, Tool: "get_repo_file"})
+	e.Emit(ProgressEvent{Type: "tool", Step: 3, MaxStep: 30, Tool: "get_repo_file"})
+	e.Emit(ProgressEvent{Type: "tool", Step: 4, MaxStep: 30, Tool: "get_repo_file"})
+	e.Emit(ProgressEvent{Type: "tool", Step: 5, MaxStep: 30, Tool: "get_repo_file"})
+	e.Emit(ProgressEvent{Type: "tool", Step: 7, MaxStep: 30, Tool: "get_repo_file"})
+	e.Emit(ProgressEvent{Type: "tool", Step: 8, MaxStep: 30, Tool: "done"})
+
+	lines := strings.Split(strings.TrimRight(buf.String(), "\n"), "\n")
+	// Steps 2 and 6 have no tool calls (model thinking only) — not emitted in non-TTY
+	assert.Len(t, lines, 6, "9 tool events across 6 distinct steps should produce 6 lines")
+	assert.Contains(t, lines[0], "Reading logs")
+	assert.Contains(t, lines[0], "1/30")
+	assert.Contains(t, lines[1], "Reading source")
+	assert.Contains(t, lines[1], "3/30")
+	assert.Contains(t, lines[4], "Reading source")
+	assert.Contains(t, lines[4], "7/30")
+	assert.Contains(t, lines[5], "Finalizing")
+	assert.Contains(t, lines[5], "8/30")
+}
