@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/kamilpajak/heisenberg/pkg/ci"
 	"github.com/kamilpajak/heisenberg/pkg/cluster"
 	gh "github.com/kamilpajak/heisenberg/pkg/github"
 	"github.com/kamilpajak/heisenberg/pkg/llm"
@@ -40,7 +41,7 @@ func TestFormatRunDate_PartialDate(t *testing.T) {
 }
 
 func TestFindRunToAnalyze_LatestIsSuccess(t *testing.T) {
-	runs := []gh.WorkflowRun{
+	runs := []ci.Run{
 		{ID: 3, Conclusion: "success"},
 		{ID: 2, Conclusion: "failure"},
 		{ID: 1, Conclusion: "success"},
@@ -53,7 +54,7 @@ func TestFindRunToAnalyze_LatestIsSuccess(t *testing.T) {
 }
 
 func TestFindRunToAnalyze_LatestIsFailure(t *testing.T) {
-	runs := []gh.WorkflowRun{
+	runs := []ci.Run{
 		{ID: 3, Conclusion: "failure"},
 		{ID: 2, Conclusion: "success"},
 		{ID: 1, Conclusion: "failure"},
@@ -66,7 +67,7 @@ func TestFindRunToAnalyze_LatestIsFailure(t *testing.T) {
 }
 
 func TestFindRunToAnalyze_NoRuns(t *testing.T) {
-	runs := []gh.WorkflowRun{}
+	runs := []ci.Run{}
 
 	runID, skip := findRunToAnalyze(runs)
 
@@ -75,7 +76,7 @@ func TestFindRunToAnalyze_NoRuns(t *testing.T) {
 }
 
 func TestFindRunToAnalyze_AllSuccess(t *testing.T) {
-	runs := []gh.WorkflowRun{
+	runs := []ci.Run{
 		{ID: 3, Conclusion: "success"},
 		{ID: 2, Conclusion: "success"},
 	}
@@ -87,7 +88,7 @@ func TestFindRunToAnalyze_AllSuccess(t *testing.T) {
 }
 
 func TestFindRunToAnalyze_LatestIsCancelled(t *testing.T) {
-	runs := []gh.WorkflowRun{
+	runs := []ci.Run{
 		{ID: 3, Conclusion: "cancelled"},
 		{ID: 2, Conclusion: "failure"},
 		{ID: 1, Conclusion: "success"},
@@ -100,9 +101,9 @@ func TestFindRunToAnalyze_LatestIsCancelled(t *testing.T) {
 }
 
 func TestBuildInitialContext_WithTestArtifacts(t *testing.T) {
-	run := &gh.WorkflowRun{ID: 123, Name: "CI", Conclusion: "failure"}
-	jobs := []gh.Job{{Name: "test", ID: 1, Status: "completed", Conclusion: "failure"}}
-	artifacts := []gh.Artifact{
+	run := &ci.Run{ID: 123, Name: "CI", Conclusion: "failure"}
+	jobs := []ci.Job{{Name: "test", ID: 1, Status: "completed", Conclusion: "failure"}}
+	artifacts := []ci.Artifact{
 		{Name: "playwright-report", SizeBytes: 45000, Expired: false},
 		{Name: "build-cache", SizeBytes: 500000, Expired: false},
 	}
@@ -119,9 +120,9 @@ func TestBuildInitialContext_WithTestArtifacts(t *testing.T) {
 }
 
 func TestBuildInitialContext_WithoutTestArtifacts(t *testing.T) {
-	run := &gh.WorkflowRun{ID: 123, Name: "CI", Conclusion: "failure"}
-	jobs := []gh.Job{{Name: "build", ID: 1, Status: "completed", Conclusion: "failure"}}
-	artifacts := []gh.Artifact{
+	run := &ci.Run{ID: 123, Name: "CI", Conclusion: "failure"}
+	jobs := []ci.Job{{Name: "build", ID: 1, Status: "completed", Conclusion: "failure"}}
+	artifacts := []ci.Artifact{
 		{Name: "build-output", SizeBytes: 100000, Expired: false},
 	}
 
@@ -132,9 +133,9 @@ func TestBuildInitialContext_WithoutTestArtifacts(t *testing.T) {
 }
 
 func TestBuildInitialContext_NoArtifacts(t *testing.T) {
-	run := &gh.WorkflowRun{ID: 123, Name: "CI", Conclusion: "failure"}
-	jobs := []gh.Job{}
-	artifacts := []gh.Artifact{}
+	run := &ci.Run{ID: 123, Name: "CI", Conclusion: "failure"}
+	jobs := []ci.Job{}
+	artifacts := []ci.Artifact{}
 
 	ctx := buildInitialContext(run, jobs, artifacts)
 
@@ -143,7 +144,7 @@ func TestBuildInitialContext_NoArtifacts(t *testing.T) {
 }
 
 func TestFilterFailed(t *testing.T) {
-	jobs := []gh.Job{
+	jobs := []ci.Job{
 		{ID: 1, Name: "Lint", Conclusion: "success"},
 		{ID: 2, Name: "Test 1/4", Conclusion: "failure"},
 		{ID: 3, Name: "Test 2/4", Conclusion: "failure"},
@@ -159,7 +160,7 @@ func TestFilterFailed(t *testing.T) {
 }
 
 func TestFilterFailed_None(t *testing.T) {
-	jobs := []gh.Job{{ID: 1, Conclusion: "success"}}
+	jobs := []ci.Job{{ID: 1, Conclusion: "success"}}
 	assert.Empty(t, filterFailed(jobs))
 }
 
@@ -174,9 +175,9 @@ func TestTruncate(t *testing.T) {
 }
 
 func TestBuildClusterContext(t *testing.T) {
-	run := &gh.WorkflowRun{
-		ID: 12345, Name: "CI", HeadBranch: "main",
-		HeadSHA: "abc123", Conclusion: "failure",
+	run := &ci.Run{
+		ID: 12345, Name: "CI", Branch: "main",
+		CommitSHA: "abc123", Conclusion: "failure",
 	}
 	c := cluster.Cluster{
 		ID:        1,
@@ -190,7 +191,7 @@ func TestBuildClusterContext(t *testing.T) {
 			LogTail: "Error: connection refused at localhost:7745",
 		},
 	}
-	artifacts := []gh.Artifact{{Name: "html-report", SizeBytes: 5000}}
+	artifacts := []ci.Artifact{{Name: "html-report", SizeBytes: 5000}}
 
 	ctx := buildClusterContext(run, c, 1, 3, nil, artifacts)
 
@@ -207,7 +208,7 @@ func TestBuildClusterContext(t *testing.T) {
 }
 
 func TestBuildClusterContext_NoArtifacts(t *testing.T) {
-	run := &gh.WorkflowRun{ID: 1, Conclusion: "failure"}
+	run := &ci.Run{ID: 1, Conclusion: "failure"}
 	c := cluster.Cluster{
 		Failures:       []cluster.FailureInfo{{JobID: 1, JobName: "Test"}},
 		Representative: cluster.FailureInfo{JobName: "Test", LogTail: "error"},
@@ -245,7 +246,7 @@ func TestBuildUnclusteredCluster_Single(t *testing.T) {
 func TestStampRunMeta(t *testing.T) {
 	result := &llm.AnalysisResult{Text: "test"}
 	p := Params{RunID: 12345, Owner: "org", Repo: "repo"}
-	wfRun := &gh.WorkflowRun{HeadBranch: "main", HeadSHA: "abc123", Event: "pull_request"}
+	wfRun := &ci.Run{Branch: "main", CommitSHA: "abc123", Event: "pull_request"}
 	stampRunMeta(result, p, wfRun)
 
 	assert.Equal(t, int64(12345), result.RunID)
@@ -258,7 +259,7 @@ func TestStampRunMeta(t *testing.T) {
 
 func TestStampRunMeta_NilResult(t *testing.T) {
 	// Should not panic
-	stampRunMeta(nil, Params{}, &gh.WorkflowRun{})
+	stampRunMeta(nil, Params{}, &ci.Run{})
 }
 
 func TestEmitInfo_NilEmitter(t *testing.T) {
@@ -282,12 +283,12 @@ func TestEmitInfo_WithEmitter(t *testing.T) {
 }
 
 func TestBuildClusterContext_ExpiredArtifactsSkipped(t *testing.T) {
-	run := &gh.WorkflowRun{ID: 1, Conclusion: "failure"}
+	run := &ci.Run{ID: 1, Conclusion: "failure"}
 	c := cluster.Cluster{
 		Failures:       []cluster.FailureInfo{{JobID: 1, JobName: "Test"}},
 		Representative: cluster.FailureInfo{JobName: "Test", LogTail: "error"},
 	}
-	artifacts := []gh.Artifact{
+	artifacts := []ci.Artifact{
 		{Name: "html-report", SizeBytes: 5000, Expired: true},
 		{Name: "blob-report", SizeBytes: 3000, Expired: false},
 	}
@@ -322,14 +323,14 @@ func TestFetchFailureLogs(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	ghClient := gh.NewTestClient(srv.URL, srv.Client())
-	p := Params{Owner: "owner", Repo: "repo"}
-	jobs := []gh.Job{
+	ghClient := gh.NewTestClient("owner", "repo", srv.URL, srv.Client())
+	p := Params{Owner: "owner", Repo: "repo", CI: ghClient}
+	jobs := []ci.Job{
 		{ID: 101, Name: "E2E 1/2", Conclusion: "failure"},
 		{ID: 102, Name: "E2E 2/2", Conclusion: "failure"},
 	}
 
-	failures := fetchFailureLogs(context.Background(), ghClient, p, jobs)
+	failures := fetchFailureLogs(context.Background(), p, jobs)
 
 	require.Len(t, failures, 2)
 	assert.Equal(t, "E2E 1/2", failures[0].JobName)
@@ -345,13 +346,13 @@ func TestFetchFailureLogs_ErrorFetchingLogs(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	ghClient := gh.NewTestClient(srv.URL, srv.Client())
-	p := Params{Owner: "owner", Repo: "repo"}
-	jobs := []gh.Job{
+	ghClient := gh.NewTestClient("owner", "repo", srv.URL, srv.Client())
+	p := Params{Owner: "owner", Repo: "repo", CI: ghClient}
+	jobs := []ci.Job{
 		{ID: 101, Name: "Test", Conclusion: "failure"},
 	}
 
-	failures := fetchFailureLogs(context.Background(), ghClient, p, jobs)
+	failures := fetchFailureLogs(context.Background(), p, jobs)
 
 	require.Len(t, failures, 1)
 	assert.Contains(t, failures[0].LogTail, "failed to fetch logs")

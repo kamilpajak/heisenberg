@@ -10,6 +10,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/fatih/color"
+	"github.com/kamilpajak/heisenberg/pkg/config"
 	"github.com/kamilpajak/heisenberg/pkg/llm"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -714,87 +715,254 @@ func TestPrintResult_ThreeRCAs_Numbering(t *testing.T) {
 	assert.Contains(t, out, "DNS failure")
 }
 
-func TestParseRunURL(t *testing.T) {
+func TestParseRunURL_GitHub(t *testing.T) {
 	tests := []struct {
 		url       string
 		wantOwner string
 		wantRepo  string
+		wantRunID int64
 		wantErr   bool
 	}{
-		{"https://github.com/org/repo/actions/runs/12345", "org", "repo", false},
-		{"https://github.com/microsoft/playwright/actions/runs/23642131867", "microsoft", "playwright", false},
-		{"https://github.com/bad-url", "", "", true},
-		{"not-a-url", "", "", true},
+		{"https://github.com/org/repo/actions/runs/12345", "org", "repo", 12345, false},
+		{"https://github.com/microsoft/playwright/actions/runs/23642131867", "microsoft", "playwright", 23642131867, false},
+		{"https://github.com/bad-url", "", "", 0, true},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.url, func(t *testing.T) {
-			runID = 0 // reset global
-			owner, repo, err := parseRunURL(tt.url)
+			target, err := parseRunURL(tt.url)
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
 				require.NoError(t, err)
-				assert.Equal(t, tt.wantOwner, owner)
-				assert.Equal(t, tt.wantRepo, repo)
-				assert.Positive(t, runID)
+				assert.Equal(t, "github", target.provider)
+				assert.Equal(t, tt.wantOwner, target.owner)
+				assert.Equal(t, tt.wantRepo, target.repo)
+				assert.Equal(t, tt.wantRunID, target.runID)
 			}
 		})
 	}
 }
 
-func TestResolveRepo_FromArgs(t *testing.T) {
-	fromEnv = false
-	runURL = ""
-	owner, repo, err := resolveRepo([]string{"org/repo"})
+func TestParseRunURL_Azure(t *testing.T) {
+	target, err := parseRunURL("https://dev.azure.com/myorg/myproject/_build/results?buildId=456")
 	require.NoError(t, err)
-	assert.Equal(t, "org", owner)
-	assert.Equal(t, "repo", repo)
+	assert.Equal(t, "azure", target.provider)
+	assert.Equal(t, "myorg", target.owner)
+	assert.Equal(t, "myproject", target.repo)
+	assert.Equal(t, int64(456), target.runID)
 }
 
-func TestResolveRepo_InvalidArgs(t *testing.T) {
+func TestParseRunURL_Azure_ExtraParams(t *testing.T) {
+	target, err := parseRunURL("https://dev.azure.com/myorg/myproject/_build/results?view=results&buildId=789&tab=tests")
+	require.NoError(t, err)
+	assert.Equal(t, "azure", target.provider)
+	assert.Equal(t, int64(789), target.runID)
+}
+
+func TestParseRunURL_Azure_VisualStudio(t *testing.T) {
+	target, err := parseRunURL("https://myorg.visualstudio.com/myproject/_build/results?buildId=321")
+	require.NoError(t, err)
+	assert.Equal(t, "azure", target.provider)
+	assert.Equal(t, "myorg", target.owner)
+	assert.Equal(t, "myproject", target.repo)
+	assert.Equal(t, int64(321), target.runID)
+}
+
+func TestParseRunURL_Invalid(t *testing.T) {
+	_, err := parseRunURL("https://gitlab.com/org/repo/pipelines/123")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "unrecognized CI URL")
+}
+
+func TestResolveTarget_FromArgs(t *testing.T) {
 	fromEnv = false
 	runURL = ""
-	_, _, err := resolveRepo([]string{"invalid"})
+	providerFlag = ""
+	target, err := resolveTarget([]string{"org/repo"}, 0)
+	require.NoError(t, err)
+	assert.Equal(t, "github", target.provider)
+	assert.Equal(t, "org", target.owner)
+	assert.Equal(t, "repo", target.repo)
+}
+
+func TestResolveTarget_InvalidArgs(t *testing.T) {
+	fromEnv = false
+	runURL = ""
+	providerFlag = ""
+	_, err := resolveTarget([]string{"invalid"}, 0)
 	assert.Error(t, err)
 }
 
-func TestResolveRepo_NoArgs(t *testing.T) {
+func TestResolveTarget_NoArgs(t *testing.T) {
 	fromEnv = false
 	runURL = ""
-	_, _, err := resolveRepo(nil)
+	providerFlag = ""
+	azureOrg = ""
+	azureProject = ""
+	_, err := resolveTarget(nil, runID)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "provide owner/repo")
 }
 
-func TestResolveRepo_FromEnv(t *testing.T) {
+func TestResolveTarget_FromGitHubEnv(t *testing.T) {
 	fromEnv = true
 	runURL = ""
 	runID = 0
+	providerFlag = ""
 	t.Setenv("GITHUB_REPOSITORY", "org/repo")
 	t.Setenv("GITHUB_RUN_ID", "99999")
+	t.Setenv("SYSTEM_TEAMPROJECT", "")
 
-	owner, repo, err := resolveRepo(nil)
+	target, err := resolveTarget(nil, runID)
 	require.NoError(t, err)
-	assert.Equal(t, "org", owner)
-	assert.Equal(t, "repo", repo)
-	assert.Equal(t, int64(99999), runID)
+	assert.Equal(t, "github", target.provider)
+	assert.Equal(t, "org", target.owner)
+	assert.Equal(t, "repo", target.repo)
+	assert.Equal(t, int64(99999), target.runID)
 
-	fromEnv = false // cleanup
+	fromEnv = false
 }
 
-func TestResolveRepo_FromURL(t *testing.T) {
+func TestResolveTarget_FromAzureEnv(t *testing.T) {
+	fromEnv = true
+	runURL = ""
+	runID = 0
+	providerFlag = ""
+	t.Setenv("GITHUB_REPOSITORY", "")
+	t.Setenv("SYSTEM_TEAMFOUNDATIONCOLLECTIONURI", "https://dev.azure.com/myorg/")
+	t.Setenv("SYSTEM_TEAMPROJECT", "myproject")
+	t.Setenv("BUILD_BUILDID", "789")
+
+	target, err := resolveTarget(nil, runID)
+	require.NoError(t, err)
+	assert.Equal(t, "azure", target.provider)
+	assert.Equal(t, "myorg", target.owner)
+	assert.Equal(t, "myproject", target.repo)
+	assert.Equal(t, int64(789), target.runID)
+
+	fromEnv = false
+}
+
+func TestResolveTarget_AmbiguousEnv(t *testing.T) {
+	fromEnv = true
+	runURL = ""
+	providerFlag = ""
+	t.Setenv("GITHUB_REPOSITORY", "org/repo")
+	t.Setenv("SYSTEM_TEAMPROJECT", "myproject")
+
+	_, err := resolveTarget(nil, runID)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "ambiguous")
+
+	fromEnv = false
+}
+
+func TestResolveTarget_AmbiguousEnv_Resolved(t *testing.T) {
+	fromEnv = true
+	runURL = ""
+	runID = 0
+	providerFlag = "azure"
+	t.Setenv("GITHUB_REPOSITORY", "org/repo")
+	t.Setenv("SYSTEM_TEAMFOUNDATIONCOLLECTIONURI", "https://dev.azure.com/myorg/")
+	t.Setenv("SYSTEM_TEAMPROJECT", "myproject")
+	t.Setenv("BUILD_BUILDID", "456")
+
+	target, err := resolveTarget(nil, runID)
+	require.NoError(t, err)
+	assert.Equal(t, "azure", target.provider)
+	assert.Equal(t, "myorg", target.owner)
+
+	fromEnv = false
+	providerFlag = ""
+}
+
+func TestResolveTarget_AzureFlags(t *testing.T) {
+	fromEnv = false
+	runURL = ""
+	providerFlag = "azure"
+	azureOrg = "myorg"
+	azureProject = "myproject"
+	runID = 100
+
+	target, err := resolveTarget(nil, runID)
+	require.NoError(t, err)
+	assert.Equal(t, "azure", target.provider)
+	assert.Equal(t, "myorg", target.owner)
+	assert.Equal(t, "myproject", target.repo)
+	assert.Equal(t, int64(100), target.runID)
+
+	providerFlag = ""
+	azureOrg = ""
+	azureProject = ""
+	runID = 0
+}
+
+func TestResolveTarget_AzureFlags_MissingOrg(t *testing.T) {
+	fromEnv = false
+	runURL = ""
+	providerFlag = "azure"
+	azureOrg = ""
+	azureProject = "myproject"
+
+	_, err := resolveTarget(nil, runID)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "--org")
+
+	providerFlag = ""
+	azureProject = ""
+}
+
+func TestResolveTarget_FromURL(t *testing.T) {
 	fromEnv = false
 	runURL = "https://github.com/microsoft/playwright/actions/runs/12345"
 	runID = 0
 
-	owner, repo, err := resolveRepo(nil)
+	target, err := resolveTarget(nil, runID)
 	require.NoError(t, err)
-	assert.Equal(t, "microsoft", owner)
-	assert.Equal(t, "playwright", repo)
-	assert.Equal(t, int64(12345), runID)
+	assert.Equal(t, "github", target.provider)
+	assert.Equal(t, "microsoft", target.owner)
+	assert.Equal(t, "playwright", target.repo)
+	assert.Equal(t, int64(12345), target.runID)
 
-	runURL = "" // cleanup
+	runURL = ""
+}
+
+func TestExtractAzureOrg(t *testing.T) {
+	tests := []struct {
+		uri  string
+		want string
+	}{
+		{"https://dev.azure.com/myorg/", "myorg"},
+		{"https://dev.azure.com/myorg", "myorg"},
+		{"https://dev.azure.com/my-org/", "my-org"},
+		{"", ""},
+		{"not-a-url", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.uri, func(t *testing.T) {
+			assert.Equal(t, tt.want, extractAzureOrg(tt.uri))
+		})
+	}
+}
+
+func TestBuildProvider_GitHub(t *testing.T) {
+	target := &targetInfo{provider: "github", owner: "org", repo: "repo"}
+	p := buildProvider(target, &config.Config{GitHubToken: "ghp_test"})
+	assert.Equal(t, "github", p.Name())
+}
+
+func TestBuildProvider_Azure(t *testing.T) {
+	target := &targetInfo{provider: "azure", owner: "myorg", repo: "myproject"}
+	p := buildProvider(target, &config.Config{AzureDevOpsPAT: "pat_test"})
+	assert.Equal(t, "azure", p.Name())
+}
+
+func TestBuildProvider_AzureFromEnv(t *testing.T) {
+	t.Setenv("AZURE_DEVOPS_PAT", "env-pat")
+	target := &targetInfo{provider: "azure", owner: "myorg", repo: "myproject"}
+	p := buildProvider(target, &config.Config{})
+	assert.Equal(t, "azure", p.Name())
 }
 
 func TestPrintRunHeader(t *testing.T) {
@@ -884,11 +1052,13 @@ func TestIsTerminal_NotTTY(t *testing.T) {
 	assert.False(t, isTerminal(f))
 }
 
-func TestResolveRepo_FromEnvMissingRepo(t *testing.T) {
+func TestResolveTarget_FromEnvMissingRepo(t *testing.T) {
 	fromEnv = true
 	runURL = ""
+	providerFlag = ""
 	t.Setenv("GITHUB_REPOSITORY", "")
-	_, _, err := resolveRepo(nil)
+	t.Setenv("SYSTEM_TEAMPROJECT", "")
+	_, err := resolveTarget(nil, runID)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "GITHUB_REPOSITORY not set")
 	fromEnv = false

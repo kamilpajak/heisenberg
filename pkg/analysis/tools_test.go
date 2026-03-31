@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/kamilpajak/heisenberg/pkg/ci"
 	gh "github.com/kamilpajak/heisenberg/pkg/github"
 	"github.com/kamilpajak/heisenberg/pkg/llm"
 	"github.com/stretchr/testify/assert"
@@ -225,7 +226,7 @@ func TestDoneSkippedCategory(t *testing.T) {
 
 func TestFindArtifactByName(t *testing.T) {
 	h := &ToolHandler{
-		artifacts: []gh.Artifact{
+		artifacts: []ci.Artifact{
 			{ID: 1, Name: "html-report"},
 			{ID: 2, Name: "blob-report-1"},
 			{ID: 3, Name: "test-results"},
@@ -239,7 +240,7 @@ func TestFindArtifactByName(t *testing.T) {
 
 func TestFindArtifactByNameNotFound(t *testing.T) {
 	h := &ToolHandler{
-		artifacts: []gh.Artifact{
+		artifacts: []ci.Artifact{
 			{ID: 1, Name: "html-report"},
 		},
 	}
@@ -256,7 +257,7 @@ func TestFindArtifactByNameEmpty(t *testing.T) {
 
 func TestFindTraceArtifactByName(t *testing.T) {
 	h := &ToolHandler{
-		artifacts: []gh.Artifact{
+		artifacts: []ci.Artifact{
 			{ID: 1, Name: "html-report", Expired: false},
 			{ID: 2, Name: "test-results", Expired: false},
 			{ID: 3, Name: "my-test-results", Expired: false},
@@ -270,8 +271,8 @@ func TestFindTraceArtifactByName(t *testing.T) {
 
 func TestFindTraceArtifactAutoDetect(t *testing.T) {
 	h := &ToolHandler{
-		artifacts: []gh.Artifact{
-			{ID: 1, Name: "html-report", Expired: false},
+		artifacts: []ci.Artifact{
+			{ID: 1, Name: "build-cache", Expired: false},
 			{ID: 2, Name: "test-results", Expired: false},
 		},
 	}
@@ -283,7 +284,7 @@ func TestFindTraceArtifactAutoDetect(t *testing.T) {
 
 func TestFindTraceArtifactSkipsExpired(t *testing.T) {
 	h := &ToolHandler{
-		artifacts: []gh.Artifact{
+		artifacts: []ci.Artifact{
 			{ID: 1, Name: "test-results", Expired: true},
 			{ID: 2, Name: "other-test-results", Expired: false},
 		},
@@ -296,8 +297,8 @@ func TestFindTraceArtifactSkipsExpired(t *testing.T) {
 
 func TestFindTraceArtifactNotFound(t *testing.T) {
 	h := &ToolHandler{
-		artifacts: []gh.Artifact{
-			{ID: 1, Name: "html-report", Expired: false},
+		artifacts: []ci.Artifact{
+			{ID: 1, Name: "build-cache", Expired: false},
 		},
 	}
 
@@ -308,31 +309,31 @@ func TestFindTraceArtifactNotFound(t *testing.T) {
 func TestHasPendingTraces(t *testing.T) {
 	tests := []struct {
 		name         string
-		artifacts    []gh.Artifact
+		artifacts    []ci.Artifact
 		calledTraces bool
 		want         bool
 	}{
 		{
 			name:         "has pending traces",
-			artifacts:    []gh.Artifact{{Name: "test-results", Expired: false}},
+			artifacts:    []ci.Artifact{{Name: "test-results", Expired: false}},
 			calledTraces: false,
 			want:         true,
 		},
 		{
 			name:         "already called traces",
-			artifacts:    []gh.Artifact{{Name: "test-results", Expired: false}},
+			artifacts:    []ci.Artifact{{Name: "test-results", Expired: false}},
 			calledTraces: true,
 			want:         false,
 		},
 		{
 			name:         "no test-results artifact",
-			artifacts:    []gh.Artifact{{Name: "html-report", Expired: false}},
+			artifacts:    []ci.Artifact{{Name: "html-report", Expired: false}},
 			calledTraces: false,
 			want:         false,
 		},
 		{
 			name:         "test-results expired",
-			artifacts:    []gh.Artifact{{Name: "test-results", Expired: true}},
+			artifacts:    []ci.Artifact{{Name: "test-results", Expired: true}},
 			calledTraces: false,
 			want:         false,
 		},
@@ -350,14 +351,14 @@ func TestHasPendingTraces(t *testing.T) {
 }
 
 func TestCacheArtifacts(t *testing.T) {
-	artifacts := []gh.Artifact{{ID: 1, Name: "test"}}
+	artifacts := []ci.Artifact{{ID: 1, Name: "test"}}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(map[string]any{"artifacts": artifacts})
 	}))
 	defer srv.Close()
 
-	ghClient := gh.NewTestClient(srv.URL, srv.Client())
-	h := &ToolHandler{GitHub: ghClient, Owner: "owner", Repo: "repo", RunID: 123}
+	ghClient := gh.NewTestClient("owner", "repo", srv.URL, srv.Client())
+	h := &ToolHandler{CI: ghClient, RunID: 123}
 
 	err := h.cacheArtifacts(context.Background())
 	require.NoError(t, err)
@@ -374,8 +375,8 @@ func TestCacheArtifactsError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	ghClient := gh.NewTestClient(srv.URL, srv.Client())
-	h := &ToolHandler{GitHub: ghClient, Owner: "owner", Repo: "repo", RunID: 123}
+	ghClient := gh.NewTestClient("owner", "repo", srv.URL, srv.Client())
+	h := &ToolHandler{CI: ghClient, RunID: 123}
 
 	err := h.cacheArtifacts(context.Background())
 	assert.Error(t, err)
@@ -389,11 +390,9 @@ func TestFetchHTMLArtifact(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	ghClient := gh.NewTestClient(srv.URL, srv.Client())
+	ghClient := gh.NewTestClient("owner", "repo", srv.URL, srv.Client())
 	h := &ToolHandler{
-		GitHub:       ghClient,
-		Owner:        "owner",
-		Repo:         "repo",
+		CI:           ghClient,
 		SnapshotHTML: func(content []byte) ([]byte, error) { return []byte("snapshot"), nil },
 	}
 
@@ -411,11 +410,9 @@ func TestFetchHTMLArtifactNoSnapshot(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	ghClient := gh.NewTestClient(srv.URL, srv.Client())
+	ghClient := gh.NewTestClient("owner", "repo", srv.URL, srv.Client())
 	h := &ToolHandler{
-		GitHub:       ghClient,
-		Owner:        "owner",
-		Repo:         "repo",
+		CI:           ghClient,
 		SnapshotHTML: nil,
 	}
 
@@ -431,9 +428,9 @@ func TestFetchBlobInfo(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	ghClient := gh.NewTestClient(srv.URL, srv.Client())
-	h := &ToolHandler{GitHub: ghClient, Owner: "owner", Repo: "repo"}
-	artifact := &gh.Artifact{ID: 1, Name: "blob-report"}
+	ghClient := gh.NewTestClient("owner", "repo", srv.URL, srv.Client())
+	h := &ToolHandler{CI: ghClient}
+	artifact := &ci.Artifact{ID: 1, Name: "blob-report"}
 
 	result, isDone, err := h.fetchBlobInfo(context.Background(), artifact)
 	require.NoError(t, err)
@@ -450,8 +447,8 @@ func TestFetchDefaultArtifact(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	ghClient := gh.NewTestClient(srv.URL, srv.Client())
-	h := &ToolHandler{GitHub: ghClient, Owner: "owner", Repo: "repo"}
+	ghClient := gh.NewTestClient("owner", "repo", srv.URL, srv.Client())
+	h := &ToolHandler{CI: ghClient}
 
 	result, isDone, err := h.fetchDefaultArtifact(context.Background(), 1)
 	require.NoError(t, err)
@@ -467,32 +464,30 @@ func TestFetchArtifactContent(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	ghClient := gh.NewTestClient(srv.URL, srv.Client())
+	ghClient := gh.NewTestClient("owner", "repo", srv.URL, srv.Client())
 	h := &ToolHandler{
-		GitHub:       ghClient,
-		Owner:        "owner",
-		Repo:         "repo",
+		CI:           ghClient,
 		SnapshotHTML: func(content []byte) ([]byte, error) { return []byte("html snapshot"), nil },
 	}
 
 	tests := []struct {
 		name     string
-		artifact *gh.Artifact
+		artifact *ci.Artifact
 		wantStr  string
 	}{
 		{
 			name:     "HTML artifact",
-			artifact: &gh.Artifact{ID: 1, Name: "html-report"},
+			artifact: &ci.Artifact{ID: 1, Name: "html-report"},
 			wantStr:  "html snapshot",
 		},
 		{
 			name:     "blob artifact",
-			artifact: &gh.Artifact{ID: 2, Name: "blob-report-1"},
+			artifact: &ci.Artifact{ID: 2, Name: "blob-report-1"},
 			wantStr:  "bytes downloaded",
 		},
 		{
 			name:     "default artifact",
-			artifact: &gh.Artifact{ID: 3, Name: "other"},
+			artifact: &ci.Artifact{ID: 3, Name: "other"},
 			wantStr:  "test",
 		},
 	}
@@ -511,8 +506,8 @@ func TestFetchHTMLArtifactDownloadError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	ghClient := gh.NewTestClient(srv.URL, srv.Client())
-	h := &ToolHandler{GitHub: ghClient, Owner: "owner", Repo: "repo"}
+	ghClient := gh.NewTestClient("owner", "repo", srv.URL, srv.Client())
+	h := &ToolHandler{CI: ghClient}
 
 	result, _, _ := h.fetchHTMLArtifact(context.Background(), 1)
 	assert.Contains(t, result, "error")
@@ -526,11 +521,9 @@ func TestFetchHTMLArtifactSnapshotError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	ghClient := gh.NewTestClient(srv.URL, srv.Client())
+	ghClient := gh.NewTestClient("owner", "repo", srv.URL, srv.Client())
 	h := &ToolHandler{
-		GitHub:       ghClient,
-		Owner:        "owner",
-		Repo:         "repo",
+		CI:           ghClient,
 		SnapshotHTML: func(content []byte) ([]byte, error) { return nil, assert.AnError },
 	}
 
@@ -544,9 +537,9 @@ func TestFetchBlobInfoError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	ghClient := gh.NewTestClient(srv.URL, srv.Client())
-	h := &ToolHandler{GitHub: ghClient, Owner: "owner", Repo: "repo"}
-	artifact := &gh.Artifact{ID: 1, Name: "blob-report"}
+	ghClient := gh.NewTestClient("owner", "repo", srv.URL, srv.Client())
+	h := &ToolHandler{CI: ghClient}
+	artifact := &ci.Artifact{ID: 1, Name: "blob-report"}
 
 	result, _, _ := h.fetchBlobInfo(context.Background(), artifact)
 	assert.Contains(t, result, "error")
@@ -558,8 +551,8 @@ func TestFetchDefaultArtifactError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	ghClient := gh.NewTestClient(srv.URL, srv.Client())
-	h := &ToolHandler{GitHub: ghClient, Owner: "owner", Repo: "repo"}
+	ghClient := gh.NewTestClient("owner", "repo", srv.URL, srv.Client())
+	h := &ToolHandler{CI: ghClient}
 
 	result, _, _ := h.fetchDefaultArtifact(context.Background(), 1)
 	assert.Contains(t, result, "error")
@@ -578,8 +571,8 @@ func TestFetchDefaultArtifactTruncate(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	ghClient := gh.NewTestClient(srv.URL, srv.Client())
-	h := &ToolHandler{GitHub: ghClient, Owner: "owner", Repo: "repo"}
+	ghClient := gh.NewTestClient("owner", "repo", srv.URL, srv.Client())
+	h := &ToolHandler{CI: ghClient}
 
 	result, _, _ := h.fetchDefaultArtifact(context.Background(), 1)
 	assert.Len(t, result, 100000)
@@ -594,8 +587,8 @@ func TestExecuteGetWorkflowFile(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	ghClient := gh.NewTestClient(srv.URL, srv.Client())
-	h := &ToolHandler{GitHub: ghClient, Owner: "owner", Repo: "repo"}
+	ghClient := gh.NewTestClient("owner", "repo", srv.URL, srv.Client())
+	h := &ToolHandler{CI: ghClient}
 
 	result, isDone, err := h.Execute(context.Background(), llm.FunctionCall{
 		Name: "get_workflow_file",
@@ -608,7 +601,7 @@ func TestExecuteGetWorkflowFile(t *testing.T) {
 }
 
 func TestExecuteGetArtifact(t *testing.T) {
-	artifacts := []gh.Artifact{{ID: 1, Name: "test-artifact"}}
+	artifacts := []ci.Artifact{{ID: 1, Name: "test-artifact"}}
 	zipData := buildZip(t, map[string][]byte{"data.txt": []byte("artifact content")})
 
 	requestCount := 0
@@ -624,8 +617,8 @@ func TestExecuteGetArtifact(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	ghClient := gh.NewTestClient(srv.URL, srv.Client())
-	h := &ToolHandler{GitHub: ghClient, Owner: "owner", Repo: "repo", RunID: 123}
+	ghClient := gh.NewTestClient("owner", "repo", srv.URL, srv.Client())
+	h := &ToolHandler{CI: ghClient, RunID: 123}
 
 	result, isDone, err := h.Execute(context.Background(), llm.FunctionCall{
 		Name: "get_artifact",
@@ -638,7 +631,7 @@ func TestExecuteGetArtifact(t *testing.T) {
 }
 
 func TestExecuteGetTestTraces(t *testing.T) {
-	artifacts := []gh.Artifact{{ID: 1, Name: "test-results", Expired: false}}
+	artifacts := []ci.Artifact{{ID: 1, Name: "test-results", Expired: false}}
 
 	// Build a minimal test-results artifact
 	traceZip := buildZip(t, map[string][]byte{
@@ -659,8 +652,8 @@ func TestExecuteGetTestTraces(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	ghClient := gh.NewTestClient(srv.URL, srv.Client())
-	h := &ToolHandler{GitHub: ghClient, Owner: "owner", Repo: "repo", RunID: 123}
+	ghClient := gh.NewTestClient("owner", "repo", srv.URL, srv.Client())
+	h := &ToolHandler{CI: ghClient, RunID: 123}
 
 	result, isDone, err := h.Execute(context.Background(), llm.FunctionCall{
 		Name: "get_test_traces",
@@ -686,14 +679,14 @@ func TestExecuteGetArtifactMissingName(t *testing.T) {
 }
 
 func TestExecuteGetArtifactNotFound(t *testing.T) {
-	artifacts := []gh.Artifact{{ID: 1, Name: "other-artifact"}}
+	artifacts := []ci.Artifact{{ID: 1, Name: "other-artifact"}}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(map[string]any{"artifacts": artifacts})
 	}))
 	defer srv.Close()
 
-	ghClient := gh.NewTestClient(srv.URL, srv.Client())
-	h := &ToolHandler{GitHub: ghClient, Owner: "owner", Repo: "repo", RunID: 123}
+	ghClient := gh.NewTestClient("owner", "repo", srv.URL, srv.Client())
+	h := &ToolHandler{CI: ghClient, RunID: 123}
 
 	result, isDone, err := h.Execute(context.Background(), llm.FunctionCall{
 		Name: "get_artifact",
@@ -711,8 +704,8 @@ func TestExecuteGetArtifactCacheError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	ghClient := gh.NewTestClient(srv.URL, srv.Client())
-	h := &ToolHandler{GitHub: ghClient, Owner: "owner", Repo: "repo", RunID: 123}
+	ghClient := gh.NewTestClient("owner", "repo", srv.URL, srv.Client())
+	h := &ToolHandler{CI: ghClient, RunID: 123}
 
 	result, isDone, err := h.Execute(context.Background(), llm.FunctionCall{
 		Name: "get_artifact",
@@ -725,14 +718,14 @@ func TestExecuteGetArtifactCacheError(t *testing.T) {
 }
 
 func TestExecuteGetTestTracesNotFound(t *testing.T) {
-	artifacts := []gh.Artifact{{ID: 1, Name: "html-report", Expired: false}}
+	artifacts := []ci.Artifact{{ID: 1, Name: "build-cache", Expired: false}}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(map[string]any{"artifacts": artifacts})
 	}))
 	defer srv.Close()
 
-	ghClient := gh.NewTestClient(srv.URL, srv.Client())
-	h := &ToolHandler{GitHub: ghClient, Owner: "owner", Repo: "repo", RunID: 123}
+	ghClient := gh.NewTestClient("owner", "repo", srv.URL, srv.Client())
+	h := &ToolHandler{CI: ghClient, RunID: 123}
 
 	result, _, _ := h.Execute(context.Background(), llm.FunctionCall{
 		Name: "get_test_traces",
@@ -743,14 +736,14 @@ func TestExecuteGetTestTracesNotFound(t *testing.T) {
 }
 
 func TestExecuteGetTestTracesWithNameNotFound(t *testing.T) {
-	artifacts := []gh.Artifact{{ID: 1, Name: "test-results", Expired: false}}
+	artifacts := []ci.Artifact{{ID: 1, Name: "test-results", Expired: false}}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(map[string]any{"artifacts": artifacts})
 	}))
 	defer srv.Close()
 
-	ghClient := gh.NewTestClient(srv.URL, srv.Client())
-	h := &ToolHandler{GitHub: ghClient, Owner: "owner", Repo: "repo", RunID: 123}
+	ghClient := gh.NewTestClient("owner", "repo", srv.URL, srv.Client())
+	h := &ToolHandler{CI: ghClient, RunID: 123}
 
 	result, _, _ := h.Execute(context.Background(), llm.FunctionCall{
 		Name: "get_test_traces",
@@ -766,8 +759,8 @@ func TestExecuteGetTestTracesCacheError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	ghClient := gh.NewTestClient(srv.URL, srv.Client())
-	h := &ToolHandler{GitHub: ghClient, Owner: "owner", Repo: "repo", RunID: 123}
+	ghClient := gh.NewTestClient("owner", "repo", srv.URL, srv.Client())
+	h := &ToolHandler{CI: ghClient, RunID: 123}
 
 	result, _, _ := h.Execute(context.Background(), llm.FunctionCall{
 		Name: "get_test_traces",
@@ -778,7 +771,7 @@ func TestExecuteGetTestTracesCacheError(t *testing.T) {
 }
 
 func TestExecuteGetTestTracesDownloadError(t *testing.T) {
-	artifacts := []gh.Artifact{{ID: 1, Name: "test-results", Expired: false}}
+	artifacts := []ci.Artifact{{ID: 1, Name: "test-results", Expired: false}}
 	requestCount := 0
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requestCount++
@@ -790,8 +783,8 @@ func TestExecuteGetTestTracesDownloadError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	ghClient := gh.NewTestClient(srv.URL, srv.Client())
-	h := &ToolHandler{GitHub: ghClient, Owner: "owner", Repo: "repo", RunID: 123}
+	ghClient := gh.NewTestClient("owner", "repo", srv.URL, srv.Client())
+	h := &ToolHandler{CI: ghClient, RunID: 123}
 
 	result, _, _ := h.Execute(context.Background(), llm.FunctionCall{
 		Name: "get_test_traces",
@@ -802,7 +795,7 @@ func TestExecuteGetTestTracesDownloadError(t *testing.T) {
 }
 
 func TestExecuteGetTestTracesParseError(t *testing.T) {
-	artifacts := []gh.Artifact{{ID: 1, Name: "test-results", Expired: false}}
+	artifacts := []ci.Artifact{{ID: 1, Name: "test-results", Expired: false}}
 	requestCount := 0
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requestCount++
@@ -815,8 +808,8 @@ func TestExecuteGetTestTracesParseError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	ghClient := gh.NewTestClient(srv.URL, srv.Client())
-	h := &ToolHandler{GitHub: ghClient, Owner: "owner", Repo: "repo", RunID: 123}
+	ghClient := gh.NewTestClient("owner", "repo", srv.URL, srv.Client())
+	h := &ToolHandler{CI: ghClient, RunID: 123}
 
 	result, _, _ := h.Execute(context.Background(), llm.FunctionCall{
 		Name: "get_test_traces",
@@ -844,8 +837,8 @@ func TestExecuteGetRepoFileError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	ghClient := gh.NewTestClient(srv.URL, srv.Client())
-	h := &ToolHandler{GitHub: ghClient, Owner: "owner", Repo: "repo"}
+	ghClient := gh.NewTestClient("owner", "repo", srv.URL, srv.Client())
+	h := &ToolHandler{CI: ghClient}
 
 	result, isDone, err := h.Execute(context.Background(), llm.FunctionCall{
 		Name: "get_repo_file",
@@ -897,7 +890,7 @@ func TestStringArgOrDefault(t *testing.T) {
 }
 
 func TestExecuteListJobs(t *testing.T) {
-	jobs := []gh.Job{
+	jobs := []ci.Job{
 		{ID: 1, Name: "build", Status: "completed", Conclusion: "success"},
 		{ID: 2, Name: "test", Status: "completed", Conclusion: "failure"},
 	}
@@ -906,8 +899,8 @@ func TestExecuteListJobs(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	ghClient := gh.NewTestClient(srv.URL, srv.Client())
-	h := &ToolHandler{GitHub: ghClient, Owner: "owner", Repo: "repo", RunID: 123}
+	ghClient := gh.NewTestClient("owner", "repo", srv.URL, srv.Client())
+	h := &ToolHandler{CI: ghClient, RunID: 123}
 
 	result, isDone, err := h.Execute(context.Background(), llm.FunctionCall{
 		Name: "list_jobs",
@@ -927,8 +920,8 @@ func TestExecuteListJobsError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	ghClient := gh.NewTestClient(srv.URL, srv.Client())
-	h := &ToolHandler{GitHub: ghClient, Owner: "owner", Repo: "repo", RunID: 123}
+	ghClient := gh.NewTestClient("owner", "repo", srv.URL, srv.Client())
+	h := &ToolHandler{CI: ghClient, RunID: 123}
 
 	result, isDone, err := h.Execute(context.Background(), llm.FunctionCall{
 		Name: "list_jobs",
@@ -946,8 +939,8 @@ func TestExecuteGetJobLogs(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	ghClient := gh.NewTestClient(srv.URL, srv.Client())
-	h := &ToolHandler{GitHub: ghClient, Owner: "owner", Repo: "repo", RunID: 123}
+	ghClient := gh.NewTestClient("owner", "repo", srv.URL, srv.Client())
+	h := &ToolHandler{CI: ghClient, RunID: 123}
 
 	result, isDone, err := h.Execute(context.Background(), llm.FunctionCall{
 		Name: "get_job_logs",
@@ -989,8 +982,8 @@ func TestExecuteGetJobLogsError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	ghClient := gh.NewTestClient(srv.URL, srv.Client())
-	h := &ToolHandler{GitHub: ghClient, Owner: "owner", Repo: "repo", RunID: 123}
+	ghClient := gh.NewTestClient("owner", "repo", srv.URL, srv.Client())
+	h := &ToolHandler{CI: ghClient, RunID: 123}
 
 	result, isDone, err := h.Execute(context.Background(), llm.FunctionCall{
 		Name: "get_job_logs",
@@ -1016,8 +1009,8 @@ func TestExecuteGetJobLogsTruncate(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	ghClient := gh.NewTestClient(srv.URL, srv.Client())
-	h := &ToolHandler{GitHub: ghClient, Owner: "owner", Repo: "repo", RunID: 123}
+	ghClient := gh.NewTestClient("owner", "repo", srv.URL, srv.Client())
+	h := &ToolHandler{CI: ghClient, RunID: 123}
 
 	result, _, _ := h.Execute(context.Background(), llm.FunctionCall{
 		Name: "get_job_logs",
@@ -1153,7 +1146,7 @@ func TestIntArgOrDefault(t *testing.T) {
 }
 
 func TestToolDeclarations(t *testing.T) {
-	decls := ToolDeclarations()
+	decls := ToolDeclarations(nil)
 
 	// Check we have all expected tools
 	names := make([]string, len(decls))
@@ -1173,7 +1166,7 @@ func TestToolDeclarations(t *testing.T) {
 }
 
 func TestToolDeclarations_DoneAnalysesArrayHasItems(t *testing.T) {
-	decls := ToolDeclarations()
+	decls := ToolDeclarations(nil)
 
 	// Find the done tool
 	var doneDecl *llm.FunctionDeclaration
@@ -1223,7 +1216,7 @@ func buildZip(t *testing.T, files map[string][]byte) []byte {
 
 func TestPrerequisiteGating_BlocksRepoFileBeforeArtifacts(t *testing.T) {
 	h := &ToolHandler{
-		artifacts: []gh.Artifact{{Name: "playwright-report", Expired: false}},
+		artifacts: []ci.Artifact{{Name: "playwright-report", Expired: false}},
 	}
 	result, _, err := h.Execute(context.Background(), llm.FunctionCall{
 		Name: "get_repo_file",
@@ -1247,13 +1240,11 @@ func TestPrerequisiteGating_AllowsAfterJobLogs(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	ghClient := gh.NewTestClient(srv.URL, srv.Client())
+	ghClient := gh.NewTestClient("owner", "repo", srv.URL, srv.Client())
 	h := &ToolHandler{
-		GitHub:    ghClient,
-		Owner:     "owner",
-		Repo:      "repo",
+		CI:        ghClient,
 		RunID:     123,
-		artifacts: []gh.Artifact{{Name: "playwright-report", Expired: false}},
+		artifacts: []ci.Artifact{{Name: "playwright-report", Expired: false}},
 	}
 
 	// Before job logs → blocked
@@ -1286,13 +1277,11 @@ func TestPrerequisiteGating_DisabledWhenNoTestArtifacts(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	ghClient := gh.NewTestClient(srv.URL, srv.Client())
+	ghClient := gh.NewTestClient("owner", "repo", srv.URL, srv.Client())
 	h := &ToolHandler{
-		GitHub:    ghClient,
-		Owner:     "owner",
-		Repo:      "repo",
+		CI:        ghClient,
 		RunID:     123,
-		artifacts: []gh.Artifact{}, // no artifacts
+		artifacts: []ci.Artifact{}, // no artifacts
 	}
 
 	// No artifacts → get_repo_file allowed immediately
@@ -1307,18 +1296,18 @@ func TestPrerequisiteGating_DisabledWhenNoTestArtifacts(t *testing.T) {
 func TestHasTestArtifacts(t *testing.T) {
 	tests := []struct {
 		name      string
-		artifacts []gh.Artifact
+		artifacts []ci.Artifact
 		want      bool
 	}{
-		{"with playwright report", []gh.Artifact{{Name: "playwright-report", Expired: false}}, true},
-		{"with blob report", []gh.Artifact{{Name: "blob-report-1", Expired: false}}, true},
-		{"with test results", []gh.Artifact{{Name: "test-results", Expired: false}}, true},
-		{"with html report", []gh.Artifact{{Name: "html-report--attempt-1", Expired: false}}, true},
-		{"build cache only", []gh.Artifact{{Name: "build-cache", Expired: false}}, false},
-		{"docker image only", []gh.Artifact{{Name: "docker-image.tar", Expired: false}}, false},
-		{"expired report", []gh.Artifact{{Name: "playwright-report", Expired: true}}, false},
-		{"empty", []gh.Artifact{}, false},
-		{"mixed", []gh.Artifact{
+		{"with playwright report", []ci.Artifact{{Name: "playwright-report", Expired: false}}, true},
+		{"with blob report", []ci.Artifact{{Name: "blob-report-1", Expired: false}}, true},
+		{"with test results", []ci.Artifact{{Name: "test-results", Expired: false}}, true},
+		{"with html report", []ci.Artifact{{Name: "html-report--attempt-1", Expired: false}}, true},
+		{"build cache only", []ci.Artifact{{Name: "build-cache", Expired: false}}, false},
+		{"docker image only", []ci.Artifact{{Name: "docker-image.tar", Expired: false}}, false},
+		{"expired report", []ci.Artifact{{Name: "playwright-report", Expired: true}}, false},
+		{"empty", []ci.Artifact{}, false},
+		{"mixed", []ci.Artifact{
 			{Name: "build-cache", Expired: false},
 			{Name: "playwright-report", Expired: false},
 		}, true},
@@ -1348,11 +1337,9 @@ func TestSmartNotFound_ReturnsDirectoryListing(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	ghClient := gh.NewTestClient(srv.URL, srv.Client())
+	ghClient := gh.NewTestClient("owner", "repo", srv.URL, srv.Client())
 	h := &ToolHandler{
-		GitHub:              ghClient,
-		Owner:               "owner",
-		Repo:                "repo",
+		CI:                  ghClient,
 		RunID:               123,
 		hasReadErrorContext: true, // bypass prerequisite gating
 	}
@@ -1384,11 +1371,9 @@ func TestSmartNotFound_RootDirectory(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	ghClient := gh.NewTestClient(srv.URL, srv.Client())
+	ghClient := gh.NewTestClient("owner", "repo", srv.URL, srv.Client())
 	h := &ToolHandler{
-		GitHub:              ghClient,
-		Owner:               "owner",
-		Repo:                "repo",
+		CI:                  ghClient,
 		RunID:               123,
 		hasReadErrorContext: true,
 	}
@@ -1447,9 +1432,7 @@ func TestGetPRDiff_WithPR(t *testing.T) {
 	defer srv.Close()
 
 	h := &ToolHandler{
-		GitHub:   gh.NewTestClient(srv.URL, srv.Client()),
-		Owner:    "owner",
-		Repo:     "repo",
+		CI:       gh.NewTestClient("owner", "repo", srv.URL, srv.Client()),
 		PRNumber: 42,
 	}
 
@@ -1483,9 +1466,9 @@ func TestGetPRDiff_WithPR(t *testing.T) {
 }
 
 func TestGetPRDiff_NoPR(t *testing.T) {
+	// CI provider is needed but will return error since PRNumber=0 and HeadSHA=""
 	h := &ToolHandler{
-		Owner:    "owner",
-		Repo:     "repo",
+		CI:       gh.NewTestClient("owner", "repo", "http://unused", http.DefaultClient),
 		PRNumber: 0,
 	}
 
@@ -1501,4 +1484,109 @@ func TestGetPRDiff_NoPR(t *testing.T) {
 	}
 	require.NoError(t, json.Unmarshal([]byte(result), &diff))
 	assert.Equal(t, "none", diff.Kind)
+}
+
+func TestGetTestResults_NotSupported(t *testing.T) {
+	// GitHub client does not implement TestResultsProvider
+	ghClient := gh.NewTestClient("owner", "repo", "http://localhost", http.DefaultClient)
+	h := &ToolHandler{CI: ghClient, RunID: 1}
+	result, isDone, err := h.Execute(context.Background(), llm.FunctionCall{Name: "get_test_results"})
+	require.NoError(t, err)
+	assert.False(t, isDone)
+	assert.Contains(t, result, "not available")
+}
+
+func TestFormatFailedResults(t *testing.T) {
+	results := []ci.TestResult{
+		{ID: 1, TestName: "test_add", Outcome: "Failed", ErrorMessage: "expected 3 got 2", StackTrace: "at add.go:10", DurationMs: 100},
+		{ID: 2, TestName: "test_ok", Outcome: "Passed", DurationMs: 50},
+		{ID: 3, TestName: "test_nil", Outcome: "Failed", ErrorMessage: "nil pointer", DurationMs: 200},
+	}
+	var b strings.Builder
+	formatFailedResults(&b, results)
+	out := b.String()
+	assert.Contains(t, out, "test_add")
+	assert.Contains(t, out, "expected 3 got 2")
+	assert.Contains(t, out, "at add.go:10")
+	assert.NotContains(t, out, "test_ok") // Passed results skipped
+	assert.Contains(t, out, "test_nil")
+}
+
+func TestToolDeclarations_GitHub(t *testing.T) {
+	ghClient := gh.NewTestClient("owner", "repo", "http://localhost", http.DefaultClient)
+	decls := ToolDeclarations(ghClient)
+	names := make([]string, len(decls))
+	for i, d := range decls {
+		names[i] = d.Name
+	}
+	assert.NotContains(t, names, "get_test_results")
+	assert.Contains(t, names, "done")
+}
+
+// mockTestResultsProvider implements ci.Provider + ci.TestResultsProvider for testing.
+type mockTestResultsProvider struct {
+	ci.Provider // embed to satisfy interface
+	testRuns    []ci.TestRun
+	testResults []ci.TestResult
+	testRunsErr error
+}
+
+func (m *mockTestResultsProvider) Name() string          { return "mock" }
+func (m *mockTestResultsProvider) AnalysisHints() string { return "" }
+func (m *mockTestResultsProvider) GetTestRuns(_ context.Context, _ int64) ([]ci.TestRun, error) {
+	return m.testRuns, m.testRunsErr
+}
+func (m *mockTestResultsProvider) GetTestResults(_ context.Context, _ int64) ([]ci.TestResult, error) {
+	return m.testResults, nil
+}
+
+func TestGetTestResults_Success(t *testing.T) {
+	mock := &mockTestResultsProvider{
+		testRuns: []ci.TestRun{
+			{ID: 1, Name: "Unit Tests", TotalTests: 10, PassedTests: 8, FailedTests: 2},
+		},
+		testResults: []ci.TestResult{
+			{ID: 1, TestName: "test_login", Outcome: "Failed", ErrorMessage: "timeout", StackTrace: "at login.go:5", DurationMs: 500},
+			{ID: 2, TestName: "test_ok", Outcome: "Passed", DurationMs: 10},
+		},
+	}
+	h := &ToolHandler{CI: mock, RunID: 100}
+	result, isDone, err := h.Execute(context.Background(), llm.FunctionCall{Name: "get_test_results"})
+	require.NoError(t, err)
+	assert.False(t, isDone)
+	assert.Contains(t, result, "Unit Tests")
+	assert.Contains(t, result, "test_login")
+	assert.Contains(t, result, "timeout")
+	assert.NotContains(t, result, "test_ok")
+}
+
+func TestGetTestResults_NoRuns(t *testing.T) {
+	mock := &mockTestResultsProvider{testRuns: []ci.TestRun{}}
+	h := &ToolHandler{CI: mock, RunID: 100}
+	result, _, err := h.Execute(context.Background(), llm.FunctionCall{Name: "get_test_results"})
+	require.NoError(t, err)
+	assert.Contains(t, result, "no test runs found")
+}
+
+func TestGetTestResults_AllPassing(t *testing.T) {
+	mock := &mockTestResultsProvider{
+		testRuns: []ci.TestRun{
+			{ID: 1, Name: "Tests", TotalTests: 5, PassedTests: 5, FailedTests: 0},
+		},
+	}
+	h := &ToolHandler{CI: mock, RunID: 100}
+	result, _, err := h.Execute(context.Background(), llm.FunctionCall{Name: "get_test_results"})
+	require.NoError(t, err)
+	assert.Contains(t, result, "Tests")
+	assert.Contains(t, result, "Failed: 0")
+}
+
+func TestToolDeclarations_Azure(t *testing.T) {
+	mock := &mockTestResultsProvider{}
+	decls := ToolDeclarations(mock)
+	names := make([]string, len(decls))
+	for i, d := range decls {
+		names[i] = d.Name
+	}
+	assert.Contains(t, names, "get_test_results")
 }

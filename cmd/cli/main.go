@@ -14,10 +14,15 @@ import (
 	"strings"
 	"time"
 
+	"net/url"
+
 	"github.com/fatih/color"
 	"github.com/kamilpajak/heisenberg/internal/dashboard"
 	"github.com/kamilpajak/heisenberg/pkg/analysis"
+	"github.com/kamilpajak/heisenberg/pkg/azure"
+	"github.com/kamilpajak/heisenberg/pkg/ci"
 	"github.com/kamilpajak/heisenberg/pkg/config"
+	"github.com/kamilpajak/heisenberg/pkg/github"
 	"github.com/kamilpajak/heisenberg/pkg/llm"
 	"github.com/kamilpajak/heisenberg/pkg/saas"
 	"github.com/kamilpajak/heisenberg/pkg/trace"
@@ -39,20 +44,23 @@ const (
 )
 
 var (
-	verbose    bool
-	jsonOutput bool
-	format     string
-	fromEnv    bool
-	runURL     string
-	runID      int64
-	modelName  string
-	port       int
+	verbose      bool
+	jsonOutput   bool
+	format       string
+	fromEnv      bool
+	runURL       string
+	runID        int64
+	modelName    string
+	port         int
+	providerFlag string
+	azureOrg     string
+	azureProject string
 )
 
 var rootCmd = &cobra.Command{
 	Use:           "heisenberg <owner/repo>",
 	Short:         "AI-powered test failure analysis",
-	Long:          `Analyzes test artifacts from GitHub repos using AI to identify root causes.`,
+	Long:          `Analyzes CI test failures using AI to identify root causes. Supports GitHub Actions and Azure Pipelines.`,
 	Args:          cobra.MaximumNArgs(1),
 	RunE:          run,
 	SilenceUsage:  true,
@@ -79,10 +87,13 @@ func init() {
 	rootCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Show detailed tool call info")
 	rootCmd.Flags().StringVar(&format, "format", "", "Output format: human or json (default: auto-detect from TTY)")
 	rootCmd.Flags().BoolVar(&jsonOutput, "json", false, "Output result as JSON (alias for --format json)")
-	rootCmd.Flags().BoolVar(&fromEnv, "from-env", false, "Read owner/repo from GITHUB_REPOSITORY and run ID from GITHUB_RUN_ID")
-	rootCmd.Flags().StringVar(&runURL, "run", "", "GitHub Actions run URL (e.g. https://github.com/org/repo/actions/runs/123)")
+	rootCmd.Flags().BoolVar(&fromEnv, "from-env", false, "Read repo/run from CI environment variables (GitHub Actions or Azure Pipelines)")
+	rootCmd.Flags().StringVar(&runURL, "run", "", "CI run URL (GitHub Actions or Azure Pipelines)")
 	rootCmd.Flags().Int64Var(&runID, "run-id", 0, "Specific workflow run ID to analyze")
 	rootCmd.Flags().StringVar(&modelName, "model", "", "Gemini model name (env: HEISENBERG_MODEL, default: "+llm.DefaultModel+")")
+	rootCmd.Flags().StringVar(&providerFlag, "provider", "", "CI provider: github or azure (default: auto-detect)")
+	rootCmd.Flags().StringVar(&azureOrg, "org", "", "Azure DevOps organization")
+	rootCmd.Flags().StringVar(&azureProject, "project", "", "Azure DevOps project")
 	_ = rootCmd.Flags().MarkHidden("json") // backward compat alias
 
 	serveCmd.Flags().IntVarP(&port, "port", "p", 8080, "Port to listen on")
@@ -161,7 +172,7 @@ func printError(w io.Writer, err error) int {
 }
 
 func run(cmd *cobra.Command, args []string) error {
-	owner, repoName, err := resolveRepo(args)
+	target, err := resolveTarget(args, runID)
 	if err != nil {
 		return err
 	}
@@ -178,15 +189,17 @@ func run(cmd *cobra.Command, args []string) error {
 
 	emitter := llm.NewTextEmitter(os.Stderr, verbose)
 
+	ciProvider := buildProvider(target, cfg)
+
 	result, err := analysis.Run(context.Background(), analysis.Params{
-		Owner:        owner,
-		Repo:         repoName,
-		RunID:        runID,
+		Owner:        target.owner,
+		Repo:         target.repo,
+		RunID:        target.runID,
 		Verbose:      verbose,
 		Emitter:      emitter,
 		SnapshotHTML: trace.SnapshotHTML,
 		Model:        modelName,
-		GitHubToken:  cfg.GitHubToken,
+		CI:           ciProvider,
 		GoogleAPIKey: cfg.GoogleAPIKey,
 	})
 	if err != nil {
@@ -201,8 +214,8 @@ func run(cmd *cobra.Command, args []string) error {
 	if client := saas.NewClient(); client != nil {
 		id, err := client.SubmitAnalysis(context.Background(), saas.SubmitParams{
 			OrgID:     os.Getenv("HEISENBERG_ORG_ID"),
-			Owner:     owner,
-			Repo:      repoName,
+			Owner:     target.owner,
+			Repo:      target.repo,
 			RunID:     result.RunID,
 			Branch:    result.Branch,
 			CommitSHA: result.CommitSHA,
@@ -226,50 +239,221 @@ func run(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-// resolveRepo determines owner/repo from args, --from-env, or --run URL.
-func resolveRepo(args []string) (owner, repo string, err error) {
-	switch {
-	case runURL != "":
+// targetInfo holds the resolved CI target (provider, identifiers, run ID).
+type targetInfo struct {
+	provider string // "github" or "azure"
+	owner    string // GitHub owner or Azure org
+	repo     string // GitHub repo or Azure project
+	runID    int64
+}
+
+// resolveTarget determines the CI target from args, --from-env, --run URL, or explicit flags.
+// flagRunID is the value of the --run-id flag.
+func resolveTarget(args []string, flagRunID int64) (*targetInfo, error) {
+	// 1. --run URL (auto-detects provider)
+	if runURL != "" {
 		return parseRunURL(runURL)
-	case fromEnv:
-		ghRepo := os.Getenv("GITHUB_REPOSITORY")
-		if ghRepo == "" {
-			return "", "", fmt.Errorf("--from-env: GITHUB_REPOSITORY not set")
+	}
+
+	// 2. --from-env (detect from CI environment variables)
+	if fromEnv {
+		return resolveFromEnv(flagRunID)
+	}
+
+	// 3. Explicit Azure flags
+	if providerFlag == "azure" || azureOrg != "" || azureProject != "" {
+		if azureOrg == "" || azureProject == "" {
+			return nil, fmt.Errorf("azure requires both --org and --project flags")
 		}
-		parts := strings.SplitN(ghRepo, "/", 2)
-		if len(parts) != 2 {
-			return "", "", fmt.Errorf("--from-env: invalid GITHUB_REPOSITORY: %s", ghRepo)
-		}
-		if ghRunID := os.Getenv("GITHUB_RUN_ID"); ghRunID != "" && runID == 0 {
-			if id, err := strconv.ParseInt(ghRunID, 10, 64); err == nil {
-				runID = id
-			}
-		}
-		return parts[0], parts[1], nil
-	case len(args) > 0:
+		return &targetInfo{
+			provider: "azure",
+			owner:    azureOrg,
+			repo:     azureProject,
+			runID:    flagRunID,
+		}, nil
+	}
+
+	// 4. Positional arg: owner/repo → GitHub
+	if len(args) > 0 {
 		parts := strings.SplitN(args[0], "/", 2)
 		if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
-			return "", "", fmt.Errorf("invalid repo format, use: owner/repo")
+			return nil, fmt.Errorf("invalid repo format, use: owner/repo")
 		}
-		return parts[0], parts[1], nil
-	default:
-		return "", "", fmt.Errorf("provide owner/repo, --from-env, or --run <URL>")
+		return &targetInfo{
+			provider: "github",
+			owner:    parts[0],
+			repo:     parts[1],
+			runID:    flagRunID,
+		}, nil
 	}
+
+	return nil, fmt.Errorf("provide owner/repo, --from-env, or --run <URL>")
+}
+
+func resolveFromEnv(flagRunID int64) (*targetInfo, error) {
+	hasGitHub := os.Getenv("GITHUB_REPOSITORY") != ""
+	hasAzure := os.Getenv("SYSTEM_TEAMPROJECT") != ""
+
+	// Ambiguous: both present without explicit --provider
+	if hasGitHub && hasAzure && providerFlag == "" {
+		return nil, fmt.Errorf("--from-env: ambiguous environment — both GitHub and Azure variables found. Use --provider to specify")
+	}
+
+	// Explicit provider override or single env
+	if providerFlag == "azure" || (hasAzure && !hasGitHub) {
+		return resolveAzureEnv(flagRunID)
+	}
+
+	return resolveGitHubEnv(flagRunID)
+}
+
+func resolveGitHubEnv(flagRunID int64) (*targetInfo, error) {
+	ghRepo := os.Getenv("GITHUB_REPOSITORY")
+	if ghRepo == "" {
+		return nil, fmt.Errorf("--from-env: GITHUB_REPOSITORY not set")
+	}
+	parts := strings.SplitN(ghRepo, "/", 2)
+	if len(parts) != 2 {
+		return nil, fmt.Errorf("--from-env: invalid GITHUB_REPOSITORY: %s", ghRepo)
+	}
+
+	target := &targetInfo{
+		provider: "github",
+		owner:    parts[0],
+		repo:     parts[1],
+		runID:    flagRunID,
+	}
+
+	if ghRunID := os.Getenv("GITHUB_RUN_ID"); ghRunID != "" && target.runID == 0 {
+		if id, err := strconv.ParseInt(ghRunID, 10, 64); err == nil {
+			target.runID = id
+		}
+	}
+	return target, nil
+}
+
+func resolveAzureEnv(flagRunID int64) (*targetInfo, error) {
+	project := os.Getenv("SYSTEM_TEAMPROJECT")
+	if project == "" {
+		return nil, fmt.Errorf("--from-env: SYSTEM_TEAMPROJECT not set")
+	}
+
+	collectionURI := os.Getenv("SYSTEM_TEAMFOUNDATIONCOLLECTIONURI")
+	org := extractAzureOrg(collectionURI)
+	if org == "" {
+		return nil, fmt.Errorf("--from-env: could not extract organization from SYSTEM_TEAMFOUNDATIONCOLLECTIONURI: %s", collectionURI)
+	}
+
+	target := &targetInfo{
+		provider: "azure",
+		owner:    org,
+		repo:     project,
+		runID:    flagRunID,
+	}
+
+	if buildID := os.Getenv("BUILD_BUILDID"); buildID != "" && target.runID == 0 {
+		if id, err := strconv.ParseInt(buildID, 10, 64); err == nil {
+			target.runID = id
+		}
+	}
+	return target, nil
+}
+
+// extractAzureOrg extracts the organization name from an Azure DevOps collection URI.
+// e.g., "https://dev.azure.com/myorg/" → "myorg"
+func extractAzureOrg(uri string) string {
+	u, err := url.Parse(strings.TrimRight(uri, "/"))
+	if err != nil || u.Host == "" {
+		return ""
+	}
+	parts := strings.Split(strings.Trim(u.Path, "/"), "/")
+	if len(parts) > 0 && parts[0] != "" {
+		return parts[0]
+	}
+	return ""
 }
 
 // runURLRe matches GitHub Actions run URLs.
 var runURLRe = regexp.MustCompile(`github\.com/([^/]+)/([^/]+)/actions/runs/(\d+)`)
 
-// parseRunURL extracts owner, repo, and run ID from a GitHub Actions URL.
-func parseRunURL(url string) (owner, repo string, err error) {
-	m := runURLRe.FindStringSubmatch(url)
-	if m == nil {
-		return "", "", fmt.Errorf("invalid GitHub Actions URL: %s\nExpected: https://github.com/owner/repo/actions/runs/123", url)
+// parseRunURL extracts target info from a GitHub Actions or Azure Pipelines URL.
+func parseRunURL(rawURL string) (*targetInfo, error) {
+	// Try GitHub regex first (path-based URL)
+	if m := runURLRe.FindStringSubmatch(rawURL); m != nil {
+		target := &targetInfo{provider: "github", owner: m[1], repo: m[2]}
+		if id, err := strconv.ParseInt(m[3], 10, 64); err == nil {
+			target.runID = id
+		}
+		return target, nil
 	}
-	if id, parseErr := strconv.ParseInt(m[3], 10, 64); parseErr == nil {
-		runID = id
+
+	// Try Azure DevOps URL parsing
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return nil, fmt.Errorf("invalid URL: %s", rawURL)
 	}
-	return m[1], m[2], nil
+
+	if strings.Contains(u.Host, "dev.azure.com") {
+		return parseAzureDevURL(u)
+	}
+	if strings.HasSuffix(u.Host, ".visualstudio.com") {
+		return parseAzureVSURL(u)
+	}
+
+	return nil, fmt.Errorf("unrecognized CI URL: %s\nSupported: GitHub Actions (github.com) or Azure Pipelines (dev.azure.com)", rawURL)
+}
+
+// parseAzureDevURL parses https://dev.azure.com/{org}/{project}/_build/results?buildId=123
+func parseAzureDevURL(u *url.URL) (*targetInfo, error) {
+	parts := strings.Split(strings.Trim(u.Path, "/"), "/")
+	if len(parts) < 2 {
+		return nil, fmt.Errorf("invalid Azure DevOps URL: expected dev.azure.com/{org}/{project}")
+	}
+	buildID := u.Query().Get("buildId")
+	if buildID == "" {
+		return nil, fmt.Errorf("invalid Azure DevOps URL: missing buildId parameter")
+	}
+	target := &targetInfo{provider: "azure", owner: parts[0], repo: parts[1]}
+	if id, err := strconv.ParseInt(buildID, 10, 64); err == nil {
+		target.runID = id
+	}
+	return target, nil
+}
+
+// parseAzureVSURL parses https://{org}.visualstudio.com/{project}/_build/results?buildId=123
+func parseAzureVSURL(u *url.URL) (*targetInfo, error) {
+	org := strings.TrimSuffix(u.Host, ".visualstudio.com")
+	parts := strings.Split(strings.Trim(u.Path, "/"), "/")
+	if len(parts) < 1 || parts[0] == "" {
+		return nil, fmt.Errorf("invalid Azure DevOps URL: expected {org}.visualstudio.com/{project}")
+	}
+	buildID := u.Query().Get("buildId")
+	if buildID == "" {
+		return nil, fmt.Errorf("invalid Azure DevOps URL: missing buildId parameter")
+	}
+	target := &targetInfo{provider: "azure", owner: org, repo: parts[0]}
+	if id, err := strconv.ParseInt(buildID, 10, 64); err == nil {
+		target.runID = id
+	}
+	return target, nil
+}
+
+// buildProvider constructs the appropriate CI provider from target info and config.
+func buildProvider(target *targetInfo, cfg *config.Config) ci.Provider {
+	switch target.provider {
+	case "azure":
+		pat := os.Getenv("AZURE_DEVOPS_PAT")
+		if pat == "" && cfg != nil {
+			pat = cfg.AzureDevOpsPAT
+		}
+		return azure.NewClient(target.owner, target.repo, pat)
+	default:
+		token := ""
+		if cfg != nil {
+			token = cfg.GitHubToken
+		}
+		return github.NewClient(target.owner, target.repo, token)
+	}
 }
 
 // isTerminal returns true if the file is a TTY.

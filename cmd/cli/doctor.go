@@ -64,7 +64,7 @@ func defaultChecks() []doctorCheck {
 		googleKey = cfg.GoogleAPIKey
 	}
 
-	return []doctorCheck{
+	checks := []doctorCheck{
 		{"GITHUB_TOKEN", checkGitHubTokenWith(ghToken)},
 		{"GOOGLE_API_KEY", checkGoogleAPIKeyWith(googleKey)},
 		{"Network: api.github.com", checkNetworkFunc("api.github.com:443")},
@@ -73,6 +73,20 @@ func defaultChecks() []doctorCheck {
 		{"Config file", checkConfigFile},
 		{"Version", checkVersion},
 	}
+
+	// Azure checks — only shown when Azure PAT is configured
+	azurePAT := os.Getenv("AZURE_DEVOPS_PAT")
+	if azurePAT == "" && cfg != nil {
+		azurePAT = cfg.AzureDevOpsPAT
+	}
+	if azurePAT != "" {
+		checks = append(checks,
+			doctorCheck{"AZURE_DEVOPS_PAT", checkAzurePATWith(azurePAT)},
+			doctorCheck{"Network: dev.azure.com", checkNetworkFunc("dev.azure.com:443")},
+		)
+	}
+
+	return checks
 }
 
 func runDoctor(cmd *cobra.Command, args []string) error {
@@ -214,6 +228,25 @@ func checkGoogleAPIKeyWithURL(key, apiURL string) func(ctx context.Context) chec
 		}
 
 		return checkResult{status: statusOK, message: "GOOGLE_API_KEY is set (validated)"}
+	}
+}
+
+// checkAzurePATWith returns a check that validates the Azure DevOps PAT.
+func checkAzurePATWith(pat string) func(ctx context.Context) checkResult {
+	return func(_ context.Context) checkResult {
+		if pat == "" {
+			return checkResult{
+				status:  statusFail,
+				message: "AZURE_DEVOPS_PAT is not set",
+				detail:  "Set AZURE_DEVOPS_PAT environment variable or azure_devops_pat in config file",
+			}
+		}
+
+		masked := pat[:4] + "..." + pat[len(pat)-4:]
+		if len(pat) < 10 {
+			masked = "***"
+		}
+		return checkResult{status: statusOK, message: fmt.Sprintf("AZURE_DEVOPS_PAT is set (%s)", masked)}
 	}
 }
 

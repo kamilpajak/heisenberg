@@ -1,8 +1,6 @@
 package github
 
 import (
-	"archive/zip"
-	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -11,6 +9,8 @@ import (
 	"net/http"
 	"os"
 	"strings"
+
+	"github.com/kamilpajak/heisenberg/pkg/ci"
 )
 
 const (
@@ -18,20 +18,24 @@ const (
 	githubAcceptType = "application/vnd.github+json"
 )
 
-// Client handles GitHub API interactions
+// Client handles GitHub API interactions and implements ci.Provider.
 type Client struct {
+	owner      string
+	repo       string
 	token      string
 	httpClient *http.Client
 	baseURL    string
 }
 
-// NewClient creates a new GitHub client.
+// NewClient creates a new GitHub client bound to a specific repository.
 // If token is empty, falls back to the GITHUB_TOKEN environment variable.
-func NewClient(token string) *Client {
+func NewClient(owner, repo, token string) *Client {
 	if token == "" {
 		token = os.Getenv("GITHUB_TOKEN")
 	}
 	return &Client{
+		owner:      owner,
+		repo:       repo,
 		token:      token,
 		httpClient: &http.Client{},
 		baseURL:    "https://api.github.com",
@@ -39,65 +43,45 @@ func NewClient(token string) *Client {
 }
 
 // NewTestClient creates a client for testing with custom baseURL and httpClient.
-func NewTestClient(baseURL string, httpClient *http.Client) *Client {
+func NewTestClient(owner, repo, baseURL string, httpClient *http.Client) *Client {
 	return &Client{
+		owner:      owner,
+		repo:       repo,
 		token:      "test-token",
 		httpClient: httpClient,
 		baseURL:    baseURL,
 	}
 }
 
-// ArtifactType represents the format of a test artifact
-type ArtifactType string
+// Name returns the provider identifier.
+func (c *Client) Name() string { return "github" }
 
-const (
-	ArtifactHTML ArtifactType = "html"
-	ArtifactJSON ArtifactType = "json"
-	ArtifactBlob ArtifactType = "blob"
-)
-
-// ArtifactResult contains fetched artifact data
-type ArtifactResult struct {
-	Type    ArtifactType
-	Content []byte   // Extracted content for html/json
-	Blobs   [][]byte // Raw zips for blob reports (need merging)
-	Name    string
+// AnalysisHints returns GitHub-specific strategy hints for the LLM.
+func (c *Client) AnalysisHints() string {
+	return `GitHub Actions specific notes:
+- For Playwright test failures, fetch the HTML report artifact first using get_artifact
+- Use get_test_traces on test-results artifacts to get browser actions, console errors, and failed HTTP requests from Playwright trace recordings
+- Workflow files are in .github/workflows/`
 }
 
-// Artifact represents a GitHub Actions artifact
-type Artifact struct {
-	ID        int64  `json:"id"`
-	Name      string `json:"name"`
-	SizeBytes int64  `json:"size_in_bytes"`
-	Expired   bool   `json:"expired"`
-}
-
-// ArtifactStatus describes the availability of artifacts for a run.
-type ArtifactStatus struct {
-	Total      int
-	Expired    int
-	Available  int
-	HasUsable  bool
-	AllExpired bool
-}
-
-// CheckArtifacts analyzes artifact availability.
-func CheckArtifacts(artifacts []Artifact) ArtifactStatus {
-	status := ArtifactStatus{Total: len(artifacts)}
-	for _, a := range artifacts {
-		if a.Expired {
-			status.Expired++
-		} else {
-			status.Available++
-		}
+// ClassifyArtifact returns the artifact type based on its name.
+func ClassifyArtifact(name string) ci.ArtifactType {
+	n := strings.ToLower(name)
+	switch {
+	case strings.Contains(n, "html-report") || n == "playwright-report":
+		return ci.ArtifactHTML
+	case strings.HasSuffix(n, ".json") || strings.Contains(n, "json"):
+		return ci.ArtifactJSON
+	case strings.Contains(n, "blob-report"):
+		return ci.ArtifactBlob
+	default:
+		return ""
 	}
-	status.HasUsable = status.Available > 0
-	status.AllExpired = status.Total > 0 && status.Expired == status.Total
-	return status
 }
 
-// WorkflowRun represents a GitHub Actions workflow run
-type WorkflowRun struct {
+// Internal types for JSON deserialization of GitHub API responses.
+
+type workflowRun struct {
 	ID           int64  `json:"id"`
 	Name         string `json:"name"`
 	Conclusion   string `json:"conclusion"`
@@ -112,8 +96,57 @@ type WorkflowRun struct {
 	} `json:"pull_requests"`
 }
 
-// PRFile represents a file changed in a pull request or commit comparison.
-type PRFile struct {
+func (r *workflowRun) toCIRun() ci.Run {
+	run := ci.Run{
+		ID:           r.ID,
+		Name:         r.Name,
+		Conclusion:   r.Conclusion,
+		Branch:       r.HeadBranch,
+		CommitSHA:    r.HeadSHA,
+		Event:        r.Event,
+		Path:         r.Path,
+		DisplayTitle: r.DisplayTitle,
+		CreatedAt:    r.CreatedAt,
+	}
+	for _, pr := range r.PullRequests {
+		run.PRNumbers = append(run.PRNumbers, pr.Number)
+	}
+	return run
+}
+
+type job struct {
+	ID         int64  `json:"id"`
+	Name       string `json:"name"`
+	Status     string `json:"status"`
+	Conclusion string `json:"conclusion"`
+}
+
+func (j *job) toCIJob() ci.Job {
+	return ci.Job{
+		ID:         j.ID,
+		Name:       j.Name,
+		Status:     j.Status,
+		Conclusion: j.Conclusion,
+	}
+}
+
+type artifact struct {
+	ID        int64  `json:"id"`
+	Name      string `json:"name"`
+	SizeBytes int64  `json:"size_in_bytes"`
+	Expired   bool   `json:"expired"`
+}
+
+func (a *artifact) toCIArtifact() ci.Artifact {
+	return ci.Artifact{
+		ID:        a.ID,
+		Name:      a.Name,
+		SizeBytes: a.SizeBytes,
+		Expired:   a.Expired,
+	}
+}
+
+type prFile struct {
 	Path      string `json:"filename"`
 	Status    string `json:"status"`
 	Additions int    `json:"additions"`
@@ -121,279 +154,97 @@ type PRFile struct {
 	Patch     string `json:"patch"`
 }
 
-// Job represents a GitHub Actions job within a workflow run
-type Job struct {
-	ID         int64  `json:"id"`
-	Name       string `json:"name"`
-	Status     string `json:"status"`
-	Conclusion string `json:"conclusion"`
-}
-
-// FetchTestArtifact finds and downloads test artifacts from a repo.
-// If runID > 0, fetches from that specific run. Otherwise scans recent runs.
-// Priority: html-report > json > blob-report.
-func (c *Client) FetchTestArtifact(ctx context.Context, owner, repo string, runID int64) (*ArtifactResult, error) {
-	if runID > 0 {
-		return c.fetchFromRun(ctx, owner, repo, runID)
-	}
-
-	runs, err := c.ListWorkflowRuns(ctx, owner, repo)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list workflow runs: %w", err)
-	}
-
-	for _, run := range runs {
-		artifacts, err := c.ListArtifacts(ctx, owner, repo, run.ID)
-		if err != nil {
-			continue
-		}
-
-		result := c.selectAndFetch(ctx, owner, repo, artifacts)
-		if result != nil {
-			return result, nil
-		}
-	}
-
-	return nil, fmt.Errorf("no test artifacts found")
-}
-
-func (c *Client) fetchFromRun(ctx context.Context, owner, repo string, runID int64) (*ArtifactResult, error) {
-	artifacts, err := c.ListArtifacts(ctx, owner, repo, runID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list artifacts for run %d: %w", runID, err)
-	}
-
-	result := c.selectAndFetch(ctx, owner, repo, artifacts)
-	if result != nil {
-		return result, nil
-	}
-
-	// Found artifacts but none are Playwright reports
-	var names []string
-	for _, a := range artifacts {
-		if !a.Expired {
-			names = append(names, a.Name)
-		}
-	}
-	if len(names) > 0 {
-		return nil, fmt.Errorf("no Playwright reports found in run %d (found: %s)", runID, strings.Join(names, ", "))
-	}
-	return nil, fmt.Errorf("no artifacts found in run %d", runID)
-}
-
-// ClassifyArtifact returns the artifact type based on its name.
-func ClassifyArtifact(name string) ArtifactType {
-	n := strings.ToLower(name)
-	switch {
-	case strings.Contains(n, "html-report") || n == "playwright-report":
-		return ArtifactHTML
-	case strings.HasSuffix(n, ".json") || strings.Contains(n, "json"):
-		return ArtifactJSON
-	case strings.Contains(n, "blob-report"):
-		return ArtifactBlob
-	default:
-		return ""
+func (f *prFile) toCIChangedFile() ci.ChangedFile {
+	return ci.ChangedFile{
+		Path:      f.Path,
+		Status:    f.Status,
+		Additions: f.Additions,
+		Deletions: f.Deletions,
+		Patch:     f.Patch,
 	}
 }
 
-type classifiedArtifacts struct {
-	html []Artifact
-	json []Artifact
-	blob []Artifact
-}
-
-func classifyAll(artifacts []Artifact) classifiedArtifacts {
-	var c classifiedArtifacts
-	for _, a := range artifacts {
-		if a.Expired {
-			continue
-		}
-		switch ClassifyArtifact(a.Name) {
-		case ArtifactHTML:
-			c.html = append(c.html, a)
-		case ArtifactJSON:
-			c.json = append(c.json, a)
-		case ArtifactBlob:
-			c.blob = append(c.blob, a)
-		}
+// ListRuns returns recent completed workflow runs.
+func (c *Client) ListRuns(ctx context.Context, filter ci.RunFilter) ([]ci.Run, error) {
+	status := filter.Status
+	if status == "" {
+		status = "completed"
 	}
-	return c
-}
-
-func (c *Client) selectAndFetch(ctx context.Context, owner, repo string, artifacts []Artifact) *ArtifactResult {
-	classified := classifyAll(artifacts)
-	if r := c.fetchFirstContent(ctx, owner, repo, classified.html, ArtifactHTML); r != nil {
-		return r
+	perPage := filter.PerPage
+	if perPage <= 0 {
+		perPage = 10
 	}
-	if r := c.fetchFirstContent(ctx, owner, repo, classified.json, ArtifactJSON); r != nil {
-		return r
-	}
-	return c.fetchBlobs(ctx, owner, repo, classified.blob)
-}
-
-func (c *Client) fetchFirstContent(ctx context.Context, owner, repo string, artifacts []Artifact, typ ArtifactType) *ArtifactResult {
-	for _, a := range artifacts {
-		content, err := c.DownloadAndExtract(ctx, owner, repo, a.ID)
-		if err == nil && len(content) > 0 {
-			return &ArtifactResult{Type: typ, Content: content, Name: a.Name}
-		}
-	}
-	return nil
-}
-
-func (c *Client) fetchBlobs(ctx context.Context, owner, repo string, artifacts []Artifact) *ArtifactResult {
-	var blobs [][]byte
-	for _, a := range artifacts {
-		zipData, err := c.DownloadRawZip(ctx, owner, repo, a.ID)
-		if err == nil && len(zipData) > 0 {
-			blobs = append(blobs, zipData)
-		}
-	}
-	if len(blobs) == 0 {
-		return nil
-	}
-	return &ArtifactResult{
-		Type:  ArtifactBlob,
-		Blobs: blobs,
-		Name:  fmt.Sprintf("%d blob-report(s)", len(blobs)),
-	}
-}
-
-// ListWorkflowRuns returns recent completed workflow runs.
-func (c *Client) ListWorkflowRuns(ctx context.Context, owner, repo string) ([]WorkflowRun, error) {
-	url := fmt.Sprintf("%s/repos/%s/%s/actions/runs?per_page=10&status=completed", c.baseURL, owner, repo)
+	url := fmt.Sprintf("%s/repos/%s/%s/actions/runs?per_page=%d&status=%s", c.baseURL, c.owner, c.repo, perPage, status)
 
 	var result struct {
-		WorkflowRuns []WorkflowRun `json:"workflow_runs"`
+		WorkflowRuns []workflowRun `json:"workflow_runs"`
 	}
 
 	if err := c.doRequest(ctx, url, &result); err != nil {
 		return nil, err
 	}
 
-	return result.WorkflowRuns, nil
+	runs := make([]ci.Run, len(result.WorkflowRuns))
+	for i := range result.WorkflowRuns {
+		runs[i] = result.WorkflowRuns[i].toCIRun()
+	}
+	return runs, nil
 }
 
-// ListArtifacts returns artifacts for a workflow run.
-func (c *Client) ListArtifacts(ctx context.Context, owner, repo string, runID int64) ([]Artifact, error) {
-	url := fmt.Sprintf("%s/repos/%s/%s/actions/runs/%d/artifacts", c.baseURL, owner, repo, runID)
+// GetRun fetches a single workflow run by ID.
+func (c *Client) GetRun(ctx context.Context, runID int64) (*ci.Run, error) {
+	url := fmt.Sprintf("%s/repos/%s/%s/actions/runs/%d", c.baseURL, c.owner, c.repo, runID)
 
-	var result struct {
-		Artifacts []Artifact `json:"artifacts"`
-	}
-
-	if err := c.doRequest(ctx, url, &result); err != nil {
-		return nil, err
-	}
-
-	return result.Artifacts, nil
-}
-
-// DownloadRawZip downloads an artifact as a raw ZIP.
-func (c *Client) DownloadRawZip(ctx context.Context, owner, repo string, artifactID int64) ([]byte, error) {
-	url := fmt.Sprintf("%s/repos/%s/%s/actions/artifacts/%d/zip", c.baseURL, owner, repo, artifactID)
-
-	req, err := c.newAPIRequest(ctx, url)
-	if err != nil {
-		return nil, err
-	}
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("download failed: %s", resp.Status)
-	}
-
-	return io.ReadAll(resp.Body)
-}
-
-// DownloadAndExtract downloads an artifact ZIP and extracts its first file.
-func (c *Client) DownloadAndExtract(ctx context.Context, owner, repo string, artifactID int64) ([]byte, error) {
-	zipData, err := c.DownloadRawZip(ctx, owner, repo, artifactID)
-	if err != nil {
-		return nil, err
-	}
-
-	return extractFirstFile(zipData)
-}
-
-func readZipEntry(f *zip.File) []byte {
-	rc, err := f.Open()
-	if err != nil {
-		return nil
-	}
-	content, err := io.ReadAll(rc)
-	rc.Close()
-	if err != nil || len(content) == 0 {
-		return nil
-	}
-	return content
-}
-
-func extractFirstFile(zipData []byte) ([]byte, error) {
-	reader, err := zip.NewReader(bytes.NewReader(zipData), int64(len(zipData)))
-	if err != nil {
-		return nil, err
-	}
-
-	var fallback []byte
-	for _, f := range reader.File {
-		if f.FileInfo().IsDir() {
-			continue
-		}
-		content := readZipEntry(f)
-		if content == nil {
-			continue
-		}
-		name := strings.ToLower(f.Name)
-		if strings.HasSuffix(name, ".html") || strings.HasSuffix(name, ".json") {
-			return content, nil
-		}
-		if fallback == nil {
-			fallback = content
-		}
-	}
-
-	if fallback != nil {
-		return fallback, nil
-	}
-	return nil, fmt.Errorf("no files found in artifact")
-}
-
-// GetWorkflowRun fetches a single workflow run by ID.
-func (c *Client) GetWorkflowRun(ctx context.Context, owner, repo string, runID int64) (*WorkflowRun, error) {
-	url := fmt.Sprintf("%s/repos/%s/%s/actions/runs/%d", c.baseURL, owner, repo, runID)
-
-	var run WorkflowRun
+	var run workflowRun
 	if err := c.doRequest(ctx, url, &run); err != nil {
 		return nil, err
 	}
 
-	return &run, nil
+	r := run.toCIRun()
+	return &r, nil
 }
 
 // ListJobs returns jobs for a workflow run.
-func (c *Client) ListJobs(ctx context.Context, owner, repo string, runID int64) ([]Job, error) {
-	url := fmt.Sprintf("%s/repos/%s/%s/actions/runs/%d/jobs", c.baseURL, owner, repo, runID)
+func (c *Client) ListJobs(ctx context.Context, runID int64) ([]ci.Job, error) {
+	url := fmt.Sprintf("%s/repos/%s/%s/actions/runs/%d/jobs", c.baseURL, c.owner, c.repo, runID)
 
 	var result struct {
-		Jobs []Job `json:"jobs"`
+		Jobs []job `json:"jobs"`
 	}
 
 	if err := c.doRequest(ctx, url, &result); err != nil {
 		return nil, err
 	}
 
-	return result.Jobs, nil
+	jobs := make([]ci.Job, len(result.Jobs))
+	for i := range result.Jobs {
+		jobs[i] = result.Jobs[i].toCIJob()
+	}
+	return jobs, nil
+}
+
+// ListArtifacts returns artifacts for a workflow run.
+func (c *Client) ListArtifacts(ctx context.Context, runID int64) ([]ci.Artifact, error) {
+	url := fmt.Sprintf("%s/repos/%s/%s/actions/runs/%d/artifacts", c.baseURL, c.owner, c.repo, runID)
+
+	var result struct {
+		Artifacts []artifact `json:"artifacts"`
+	}
+
+	if err := c.doRequest(ctx, url, &result); err != nil {
+		return nil, err
+	}
+
+	artifacts := make([]ci.Artifact, len(result.Artifacts))
+	for i := range result.Artifacts {
+		artifacts[i] = result.Artifacts[i].toCIArtifact()
+	}
+	return artifacts, nil
 }
 
 // GetJobLogs fetches the plain-text logs for a job.
-func (c *Client) GetJobLogs(ctx context.Context, owner, repo string, jobID int64) (string, error) {
-	url := fmt.Sprintf("%s/repos/%s/%s/actions/jobs/%d/logs", c.baseURL, owner, repo, jobID)
+func (c *Client) GetJobLogs(ctx context.Context, jobID int64) (string, error) {
+	url := fmt.Sprintf("%s/repos/%s/%s/actions/jobs/%d/logs", c.baseURL, c.owner, c.repo, jobID)
 
 	req, err := c.newAPIRequest(ctx, url)
 	if err != nil {
@@ -418,9 +269,41 @@ func (c *Client) GetJobLogs(ctx context.Context, owner, repo string, jobID int64
 	return string(body), nil
 }
 
+// DownloadArtifact downloads an artifact as a raw ZIP.
+func (c *Client) DownloadArtifact(ctx context.Context, artifactID int64) ([]byte, error) {
+	url := fmt.Sprintf("%s/repos/%s/%s/actions/artifacts/%d/zip", c.baseURL, c.owner, c.repo, artifactID)
+
+	req, err := c.newAPIRequest(ctx, url)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("download failed: %s", resp.Status)
+	}
+
+	return io.ReadAll(resp.Body)
+}
+
+// DownloadAndExtract downloads an artifact ZIP and extracts its first file.
+func (c *Client) DownloadAndExtract(ctx context.Context, artifactID int64) ([]byte, error) {
+	zipData, err := c.DownloadArtifact(ctx, artifactID)
+	if err != nil {
+		return nil, err
+	}
+
+	return ci.ExtractFirstFile(zipData)
+}
+
 // GetRepoFile fetches a file from the repo's default branch via the contents API.
-func (c *Client) GetRepoFile(ctx context.Context, owner, repo, path string) (string, error) {
-	url := fmt.Sprintf("%s/repos/%s/%s/contents/%s", c.baseURL, owner, repo, path)
+func (c *Client) GetRepoFile(ctx context.Context, path string) (string, error) {
+	url := fmt.Sprintf("%s/repos/%s/%s/contents/%s", c.baseURL, c.owner, c.repo, path)
 
 	var result struct {
 		Content  string `json:"content"`
@@ -443,43 +326,10 @@ func (c *Client) GetRepoFile(ctx context.Context, owner, repo, path string) (str
 	return string(decoded), nil
 }
 
-func (c *Client) newAPIRequest(ctx context.Context, url string) (*http.Request, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	if c.token != "" {
-		req.Header.Set("Authorization", authHeaderPrefix+c.token)
-	}
-	req.Header.Set("Accept", githubAcceptType)
-	return req, nil
-}
-
-func (c *Client) doRequest(ctx context.Context, url string, result interface{}) error {
-	req, err := c.newAPIRequest(ctx, url)
-	if err != nil {
-		return err
-	}
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("GitHub API error: %s - %s", resp.Status, string(body))
-	}
-
-	return json.NewDecoder(resp.Body).Decode(result)
-}
-
 // ListDirectory returns the names of files and directories at the given path.
 // Directory names have a trailing "/".
-func (c *Client) ListDirectory(ctx context.Context, owner, repo, path string) ([]string, error) {
-	url := fmt.Sprintf("%s/repos/%s/%s/contents/%s", c.baseURL, owner, repo, path)
+func (c *Client) ListDirectory(ctx context.Context, path string) ([]string, error) {
+	url := fmt.Sprintf("%s/repos/%s/%s/contents/%s", c.baseURL, c.owner, c.repo, path)
 
 	req, err := c.newAPIRequest(ctx, url)
 	if err != nil {
@@ -515,26 +365,85 @@ func (c *Client) ListDirectory(ctx context.Context, owner, repo, path string) ([
 	return names, nil
 }
 
-// GetPRFiles returns the list of files changed in a pull request.
-func (c *Client) GetPRFiles(ctx context.Context, owner, repo string, prNumber int) ([]PRFile, error) {
-	url := fmt.Sprintf("%s/repos/%s/%s/pulls/%d/files", c.baseURL, owner, repo, prNumber)
-	var files []PRFile
+// GetChangedFiles returns files changed in a PR or commit comparison.
+func (c *Client) GetChangedFiles(ctx context.Context, ref ci.ChangeRef) ([]ci.ChangedFile, error) {
+	if ref.PRNumber > 0 {
+		files, err := c.getPRFiles(ctx, ref.PRNumber)
+		if err == nil {
+			return files, nil
+		}
+	}
+	if ref.HeadSHA != "" {
+		base := ref.BaseBranch
+		if base == "" {
+			base = "main"
+		}
+		return c.compareCommits(ctx, base, ref.HeadSHA)
+	}
+	return nil, fmt.Errorf("no PR number or commit SHA provided")
+}
+
+func (c *Client) getPRFiles(ctx context.Context, prNumber int) ([]ci.ChangedFile, error) {
+	url := fmt.Sprintf("%s/repos/%s/%s/pulls/%d/files", c.baseURL, c.owner, c.repo, prNumber)
+	var files []prFile
 	if err := c.doRequest(ctx, url, &files); err != nil {
 		return nil, err
 	}
-	return files, nil
+	result := make([]ci.ChangedFile, len(files))
+	for i := range files {
+		result[i] = files[i].toCIChangedFile()
+	}
+	return result, nil
 }
 
-// CompareCommits returns files changed between two refs (branches, tags, or SHAs).
-func (c *Client) CompareCommits(ctx context.Context, owner, repo, base, head string) ([]PRFile, error) {
-	url := fmt.Sprintf("%s/repos/%s/%s/compare/%s...%s", c.baseURL, owner, repo, base, head)
+func (c *Client) compareCommits(ctx context.Context, base, head string) ([]ci.ChangedFile, error) {
+	url := fmt.Sprintf("%s/repos/%s/%s/compare/%s...%s", c.baseURL, c.owner, c.repo, base, head)
 	var result struct {
-		Files []PRFile `json:"files"`
+		Files []prFile `json:"files"`
 	}
 	if err := c.doRequest(ctx, url, &result); err != nil {
 		return nil, err
 	}
-	return result.Files, nil
+	files := make([]ci.ChangedFile, len(result.Files))
+	for i := range result.Files {
+		files[i] = result.Files[i].toCIChangedFile()
+	}
+	return files, nil
+}
+
+// HTTP helpers
+
+func (c *Client) newAPIRequest(ctx context.Context, url string) (*http.Request, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if c.token != "" {
+		req.Header.Set("Authorization", authHeaderPrefix+c.token)
+	}
+	req.Header.Set("Accept", githubAcceptType)
+	return req, nil
+}
+
+func (c *Client) doRequest(ctx context.Context, url string, result interface{}) error {
+	req, err := c.newAPIRequest(ctx, url)
+	if err != nil {
+		return err
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("GitHub API error: %s - %s", resp.Status, string(body))
+	}
+
+	return json.NewDecoder(resp.Body).Decode(result)
 }
 
 func base64Decode(s string) ([]byte, error) {

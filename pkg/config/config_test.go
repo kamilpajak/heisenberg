@@ -47,6 +47,16 @@ func TestLoadFrom_PartialConfig(t *testing.T) {
 	assert.Empty(t, cfg.GoogleAPIKey)
 }
 
+func TestLoadFrom_AzureDevOpsPAT(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	content := "azure_devops_pat: test-pat-123\n"
+	require.NoError(t, os.WriteFile(path, []byte(content), 0o644))
+
+	cfg, err := LoadFrom(path)
+	require.NoError(t, err)
+	assert.Equal(t, "test-pat-123", cfg.AzureDevOpsPAT)
+}
+
 func TestPath(t *testing.T) {
 	path := Path()
 	assert.Contains(t, path, "heisenberg")
