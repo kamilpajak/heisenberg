@@ -552,19 +552,7 @@ func (h *ToolHandler) getTestResults(ctx context.Context, args map[string]any) (
 			continue
 		}
 
-		for _, r := range results {
-			if r.Outcome == "Passed" {
-				continue
-			}
-			fmt.Fprintf(&b, "### FAILED: %s\n", r.TestName)
-			if r.ErrorMessage != "" {
-				fmt.Fprintf(&b, "Error: %s\n", r.ErrorMessage)
-			}
-			if r.StackTrace != "" {
-				fmt.Fprintf(&b, "Stack trace:\n```\n%s\n```\n", r.StackTrace)
-			}
-			fmt.Fprintf(&b, "Duration: %.0fms\n\n", r.DurationMs)
-		}
+		formatFailedResults(&b, results)
 	}
 
 	result := b.String()
@@ -574,6 +562,22 @@ func (h *ToolHandler) getTestResults(ctx context.Context, args map[string]any) (
 	}
 
 	return result, false, nil
+}
+
+func formatFailedResults(b *strings.Builder, results []ci.TestResult) {
+	for _, r := range results {
+		if r.Outcome == "Passed" {
+			continue
+		}
+		fmt.Fprintf(b, "### FAILED: %s\n", r.TestName)
+		if r.ErrorMessage != "" {
+			fmt.Fprintf(b, "Error: %s\n", r.ErrorMessage)
+		}
+		if r.StackTrace != "" {
+			fmt.Fprintf(b, "Stack trace:\n```\n%s\n```\n", r.StackTrace)
+		}
+		fmt.Fprintf(b, "Duration: %.0fms\n\n", r.DurationMs)
+	}
 }
 
 // ToolDeclarations returns the function declarations for all available tools.
