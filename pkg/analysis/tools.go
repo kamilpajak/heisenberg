@@ -652,102 +652,7 @@ func ToolDeclarations(provider ci.Provider) []llm.FunctionDeclaration {
 				},
 			},
 		},
-		{
-			Name:        "done",
-			Description: "Signal that you have gathered enough information and provide structured Root Cause Analysis. Provide one entry in 'analyses' for each distinct failing test. After calling this, provide your final analysis as text.",
-			Parameters: &llm.Schema{
-				Type: "object",
-				Properties: map[string]llm.Schema{
-					"category": {
-						Type:        "string",
-						Description: "The type of conclusion reached. diagnosis: a specific failure root cause was identified. no_failures: all tests are passing, no failures to diagnose. not_supported: the test framework or artifact format is not supported for analysis.",
-						Enum:        []string{"diagnosis", "no_failures", "not_supported"},
-					},
-					"analyses": {
-						Type:        "array",
-						Description: "One structured RCA per distinct failing test. Required for diagnosis category. Group tests that share the same root cause into one entry.",
-						Items: &llm.Schema{
-							Type: "object",
-							Properties: map[string]llm.Schema{
-								"title": {
-									Type:        "string",
-									Description: "Short summary of the failure (e.g., 'Timeout waiting for Submit Button').",
-								},
-								"failure_type": {
-									Type:        "string",
-									Description: "Type of failure: timeout (test timed out), assertion (assertion failed), network (HTTP/API error), infra (CI/environment issue), flake (intermittent/race condition).",
-									Enum:        []string{"timeout", "assertion", "network", "infra", "flake"},
-								},
-								"file_path": {
-									Type:        "string",
-									Description: "Path to the test file where failure occurred (e.g., 'tests/checkout.spec.ts').",
-								},
-								"line_number": {
-									Type:        "number",
-									Description: "Line number in the test file where failure occurred.",
-								},
-								"bug_location": {
-									Type:        "string",
-									Description: "Where the underlying defect lives. 'test': bug in test code/fixtures/mocks. 'production': test correctly detected a regression in application code. 'infrastructure': CI environment issue. 'unknown': not enough evidence.",
-									Enum:        []string{"test", "production", "infrastructure", "unknown"},
-								},
-								"bug_location_confidence": {
-									Type:        "string",
-									Description: "Confidence in bug_location. 'high': strong evidence. 'medium': probable. 'low': mostly guessing.",
-									Enum:        []string{"high", "medium", "low"},
-								},
-								"bug_code_file_path": {
-									Type:        "string",
-									Description: "When bug_location is 'production' or 'infrastructure', the suspected defect file path (e.g., 'src/pricing.ts'). Leave empty if unclear.",
-								},
-								"bug_code_line_number": {
-									Type:        "number",
-									Description: "Line number in the suspected bug file. Leave empty if unclear.",
-								},
-								"symptom": {
-									Type:        "string",
-									Description: "What failed - the observable error message or behavior.",
-								},
-								"root_cause": {
-									Type:        "string",
-									Description: "Why it failed - the underlying issue that caused the failure.",
-								},
-								"evidence": {
-									Type:        "array",
-									Description: "Supporting data points. Each item has 'type' (screenshot/trace/log/network/code) and 'content' (description).",
-									Items: &llm.Schema{
-										Type: "object",
-										Properties: map[string]llm.Schema{
-											"type":    {Type: "string", Description: "Evidence type: screenshot, trace, log, network, or code"},
-											"content": {Type: "string", Description: "Description of the evidence"},
-										},
-									},
-								},
-								"remediation": {
-									Type:        "string",
-									Description: "How to fix it - actionable guidance for resolving the issue.",
-								},
-								"fix_confidence": {
-									Type:        "string",
-									Description: "How actionable the remediation is. high: inspected source, specific fix. medium: correct direction, details may vary. low: general suggestion without source inspection.",
-									Enum:        []string{"high", "medium", "low"},
-								},
-							},
-						},
-					},
-					"confidence": {
-						Type:        "number",
-						Description: "Diagnosis confidence score from 0 to 100. 80-100: clear root cause. 40-79: likely cause with ambiguity. 0-39: uncertain.",
-					},
-					"missing_information_sensitivity": {
-						Type:        "string",
-						Description: "How much additional data would improve the diagnosis. high: backend logs would help. medium: might help. low: sufficient evidence.",
-						Enum:        []string{"high", "medium", "low"},
-					},
-				},
-				Required: []string{"category"},
-			},
-		},
+		doneToolDeclaration(),
 	}
 
 	// Add provider-specific tools
@@ -759,4 +664,110 @@ func ToolDeclarations(provider ci.Provider) []llm.FunctionDeclaration {
 	}
 
 	return decls
+}
+
+// doneToolDeclaration returns the FunctionDeclaration for the "done" tool,
+// which signals completion and collects structured RCA data.
+func doneToolDeclaration() llm.FunctionDeclaration {
+	return llm.FunctionDeclaration{
+		Name:        "done",
+		Description: "Signal that you have gathered enough information and provide structured Root Cause Analysis. Provide one entry in 'analyses' for each distinct failing test. After calling this, provide your final analysis as text.",
+		Parameters: &llm.Schema{
+			Type: "object",
+			Properties: map[string]llm.Schema{
+				"category": {
+					Type:        "string",
+					Description: "The type of conclusion reached. diagnosis: a specific failure root cause was identified. no_failures: all tests are passing, no failures to diagnose. not_supported: the test framework or artifact format is not supported for analysis.",
+					Enum:        []string{"diagnosis", "no_failures", "not_supported"},
+				},
+				"analyses": analysesSchema(),
+				"confidence": {
+					Type:        "number",
+					Description: "Diagnosis confidence score from 0 to 100. 80-100: clear root cause. 40-79: likely cause with ambiguity. 0-39: uncertain.",
+				},
+				"missing_information_sensitivity": {
+					Type:        "string",
+					Description: "How much additional data would improve the diagnosis. high: backend logs would help. medium: might help. low: sufficient evidence.",
+					Enum:        []string{"high", "medium", "low"},
+				},
+			},
+			Required: []string{"category"},
+		},
+	}
+}
+
+// analysesSchema returns the schema for the "analyses" array in the done tool.
+func analysesSchema() llm.Schema {
+	return llm.Schema{
+		Type:        "array",
+		Description: "One structured RCA per distinct failing test. Required for diagnosis category. Group tests that share the same root cause into one entry.",
+		Items: &llm.Schema{
+			Type: "object",
+			Properties: map[string]llm.Schema{
+				"title": {
+					Type:        "string",
+					Description: "Short summary of the failure (e.g., 'Timeout waiting for Submit Button').",
+				},
+				"failure_type": {
+					Type:        "string",
+					Description: "Type of failure: timeout (test timed out), assertion (assertion failed), network (HTTP/API error), infra (CI/environment issue), flake (intermittent/race condition).",
+					Enum:        []string{"timeout", "assertion", "network", "infra", "flake"},
+				},
+				"file_path": {
+					Type:        "string",
+					Description: "Path to the test file where failure occurred (e.g., 'tests/checkout.spec.ts').",
+				},
+				"line_number": {
+					Type:        "number",
+					Description: "Line number in the test file where failure occurred.",
+				},
+				"bug_location": {
+					Type:        "string",
+					Description: "Where the underlying defect lives. 'test': bug in test code/fixtures/mocks. 'production': test correctly detected a regression in application code. 'infrastructure': CI environment issue. 'unknown': not enough evidence.",
+					Enum:        []string{"test", "production", "infrastructure", "unknown"},
+				},
+				"bug_location_confidence": {
+					Type:        "string",
+					Description: "Confidence in bug_location. 'high': strong evidence. 'medium': probable. 'low': mostly guessing.",
+					Enum:        []string{"high", "medium", "low"},
+				},
+				"bug_code_file_path": {
+					Type:        "string",
+					Description: "When bug_location is 'production' or 'infrastructure', the suspected defect file path (e.g., 'src/pricing.ts'). Leave empty if unclear.",
+				},
+				"bug_code_line_number": {
+					Type:        "number",
+					Description: "Line number in the suspected bug file. Leave empty if unclear.",
+				},
+				"symptom": {
+					Type:        "string",
+					Description: "What failed - the observable error message or behavior.",
+				},
+				"root_cause": {
+					Type:        "string",
+					Description: "Why it failed - the underlying issue that caused the failure.",
+				},
+				"evidence": {
+					Type:        "array",
+					Description: "Supporting data points. Each item has 'type' (screenshot/trace/log/network/code) and 'content' (description).",
+					Items: &llm.Schema{
+						Type: "object",
+						Properties: map[string]llm.Schema{
+							"type":    {Type: "string", Description: "Evidence type: screenshot, trace, log, network, or code"},
+							"content": {Type: "string", Description: "Description of the evidence"},
+						},
+					},
+				},
+				"remediation": {
+					Type:        "string",
+					Description: "How to fix it - actionable guidance for resolving the issue.",
+				},
+				"fix_confidence": {
+					Type:        "string",
+					Description: "How actionable the remediation is. high: inspected source, specific fix. medium: correct direction, details may vary. low: general suggestion without source inspection.",
+					Enum:        []string{"high", "medium", "low"},
+				},
+			},
+		},
+	}
 }

@@ -276,6 +276,20 @@ type loopState struct {
 	iterationsUsed       int             // final iteration count
 }
 
+// injectSoftLimitWarning appends a warning message to the conversation history
+// when the agent loop reaches the soft limit iteration.
+func (s *loopState) injectSoftLimitWarning(iteration int) {
+	if iteration != softLimitIteration || s.softWarned {
+		return
+	}
+	s.softWarned = true
+	remaining := maxIterations - iteration
+	s.history = append(s.history, Content{
+		Role:  "user",
+		Parts: []Part{{Text: fmt.Sprintf("Note: You have %d iterations remaining. Please consolidate your findings and move toward a final diagnosis soon.", remaining)}},
+	})
+}
+
 // RunAgentLoop runs the agentic conversation loop. The model can call tools
 // iteratively until it produces a text response or hits the iteration limit.
 func (c *Client) RunAgentLoop(ctx context.Context, handler ToolExecutor, toolDecls []FunctionDeclaration, initialContext string, verbose bool, providerHints ...string) (*AnalysisResult, error) {
@@ -297,15 +311,7 @@ func (c *Client) RunAgentLoop(ctx context.Context, handler ToolExecutor, toolDec
 	for i := range maxIterations {
 		si := &stepInfo{step: i + 1, iteration: i, verbose: verbose}
 
-		// Inject soft limit warning at iteration 15
-		if i == softLimitIteration && !s.softWarned {
-			s.softWarned = true
-			remaining := maxIterations - i
-			s.history = append(s.history, Content{
-				Role:  "user",
-				Parts: []Part{{Text: fmt.Sprintf("Note: You have %d iterations remaining. Please consolidate your findings and move toward a final diagnosis soon.", remaining)}},
-			})
-		}
+		s.injectSoftLimitWarning(i)
 
 		stepMsg := "Calling model..."
 		if s.pendingDone {

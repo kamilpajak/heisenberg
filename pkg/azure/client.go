@@ -20,6 +20,8 @@ import (
 	"github.com/kamilpajak/heisenberg/pkg/ci"
 )
 
+const apiVersionKey = "api-version"
+
 // Client handles Azure DevOps API interactions and implements ci.Provider
 // and ci.TestResultsProvider.
 type Client struct {
@@ -184,7 +186,7 @@ type testResult struct {
 
 func (c *Client) ListRuns(ctx context.Context, filter ci.RunFilter) ([]ci.Run, error) {
 	params := url.Values{
-		"api-version":  {"7.1"},
+		apiVersionKey:  {"7.1"},
 		"statusFilter": {"completed"},
 	}
 	if filter.PerPage > 0 {
@@ -352,7 +354,7 @@ func (c *Client) GetRepoFile(ctx context.Context, filePath string) (string, erro
 	params := url.Values{
 		"path":        {filePath},
 		"$format":     {"text"},
-		"api-version": {"7.1"},
+		apiVersionKey: {"7.1"},
 	}
 	apiURL := fmt.Sprintf("%s/%s/_apis/git/repositories/%s/items?%s", c.baseURL, c.project, c.project, params.Encode())
 
@@ -382,7 +384,7 @@ func (c *Client) ListDirectory(ctx context.Context, dirPath string) ([]string, e
 	params := url.Values{
 		"scopePath":      {dirPath},
 		"recursionLevel": {"OneLevel"},
-		"api-version":    {"7.1"},
+		apiVersionKey:    {"7.1"},
 	}
 	apiURL := fmt.Sprintf("%s/%s/_apis/git/repositories/%s/items?%s", c.baseURL, c.project, c.project, params.Encode())
 
@@ -422,7 +424,7 @@ func (c *Client) GetChangedFiles(ctx context.Context, ref ci.ChangeRef) ([]ci.Ch
 	params := url.Values{
 		"baseVersion":   {base},
 		"targetVersion": {target},
-		"api-version":   {"7.1"},
+		apiVersionKey:   {"7.1"},
 	}
 	apiURL := fmt.Sprintf("%s/%s/_apis/git/repositories/%s/diffs/commits?%s", c.baseURL, c.project, c.project, params.Encode())
 
@@ -464,7 +466,7 @@ func (c *Client) GetTestRuns(ctx context.Context, buildID int64) ([]ci.TestRun, 
 	buildURI := fmt.Sprintf("vstfs:///Build/Build/%d", buildID)
 	params := url.Values{
 		"buildUri":    {buildURI},
-		"api-version": {"7.1"},
+		apiVersionKey: {"7.1"},
 	}
 	apiURL := fmt.Sprintf("%s/%s/_apis/test/runs?%s", c.baseURL, c.project, params.Encode())
 
@@ -491,7 +493,7 @@ func (c *Client) GetTestRuns(ctx context.Context, buildID int64) ([]ci.TestRun, 
 func (c *Client) GetTestResults(ctx context.Context, testRunID int64) ([]ci.TestResult, error) {
 	params := url.Values{
 		"outcomes":    {"Failed"},
-		"api-version": {"7.1"},
+		apiVersionKey: {"7.1"},
 	}
 	apiURL := fmt.Sprintf("%s/%s/_apis/test/runs/%d/results?%s", c.baseURL, c.project, testRunID, params.Encode())
 
