@@ -47,10 +47,11 @@ type TextEmitter struct {
 	verbose bool
 
 	// Compact mode state (non-verbose TTY)
-	lastStep int
-	lastMax  int
-	lastTool string
-	failed   bool
+	lastStep        int
+	lastMax         int
+	lastTool        string
+	lastEmittedStep int // last step number emitted to non-TTY output (dedup)
+	failed          bool
 }
 
 // MarkFailed signals that the analysis ended with an error.
@@ -236,8 +237,12 @@ func (e *TextEmitter) Emit(ev ProgressEvent) {
 		e.lastTool = ev.Tool
 		if e.verbose {
 			e.emitToolVerbose(ev)
-		} else {
+		} else if e.tty {
 			e.stopSpinner()
+			e.compactProgress()
+		} else if ev.Step != e.lastEmittedStep {
+			// Non-TTY: emit one line per step (dedup multiple tool calls in same iteration)
+			e.lastEmittedStep = ev.Step
 			e.compactProgress()
 		}
 
