@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/kamilpajak/heisenberg/pkg/ci"
 	gh "github.com/kamilpajak/heisenberg/pkg/github"
 	"github.com/kamilpajak/heisenberg/pkg/llm"
 	"github.com/kamilpajak/heisenberg/pkg/trace"
@@ -15,16 +16,14 @@ const testResultsArtifact = "test-results"
 
 // ToolHandler executes tool calls on behalf of the agent loop.
 type ToolHandler struct {
-	GitHub       *gh.Client
-	Owner        string
-	Repo         string
+	CI           ci.Provider
 	RunID        int64
 	PRNumber     int    // detected PR number (0 = none)
 	HeadSHA      string // commit SHA for compare fallback
 	SnapshotHTML func([]byte) ([]byte, error)
 	Emitter      llm.ProgressEmitter
 
-	artifacts           []gh.Artifact           // cached after first list
+	artifacts           []ci.Artifact           // cached after first list
 	calledTraces        bool                    // whether get_test_traces has been called
 	hasReadErrorContext bool                    // set after fetching logs/artifacts/traces
 	category            string                  // set by done tool
@@ -51,6 +50,8 @@ func (h *ToolHandler) Execute(ctx context.Context, call llm.FunctionCall) (strin
 		return h.getTestTraces(ctx, call.Args)
 	case "get_pr_diff":
 		return h.getPRDiff(ctx, call.Args)
+	case "get_test_results":
+		return h.getTestResults(ctx, call.Args)
 	case "done":
 		return h.handleDone(call.Args)
 	default:
@@ -83,7 +84,7 @@ func (h *ToolHandler) handleDone(args map[string]any) (string, bool, error) {
 }
 
 func (h *ToolHandler) listJobs(ctx context.Context) (string, bool, error) {
-	jobs, err := h.GitHub.ListJobs(ctx, h.Owner, h.Repo, h.RunID)
+	jobs, err := h.CI.ListJobs(ctx, h.RunID)
 	if err != nil {
 		return errorResult(err), false, nil
 	}
@@ -104,7 +105,7 @@ func (h *ToolHandler) getJobLogs(ctx context.Context, args map[string]any) (stri
 		return errorResult(err), false, nil
 	}
 
-	logs, err := h.GitHub.GetJobLogs(ctx, h.Owner, h.Repo, jobID)
+	logs, err := h.CI.GetJobLogs(ctx, jobID)
 	if err != nil {
 		return errorResult(err), false, nil
 	}
@@ -122,7 +123,7 @@ func (h *ToolHandler) cacheArtifacts(ctx context.Context) error {
 	if h.artifacts != nil {
 		return nil
 	}
-	artifacts, err := h.GitHub.ListArtifacts(ctx, h.Owner, h.Repo, h.RunID)
+	artifacts, err := h.CI.ListArtifacts(ctx, h.RunID)
 	if err != nil {
 		return err
 	}
@@ -130,7 +131,7 @@ func (h *ToolHandler) cacheArtifacts(ctx context.Context) error {
 	return nil
 }
 
-func (h *ToolHandler) findArtifactByName(name string) *gh.Artifact {
+func (h *ToolHandler) findArtifactByName(name string) *ci.Artifact {
 	for i, a := range h.artifacts {
 		if a.Name == name {
 			return &h.artifacts[i]
@@ -159,11 +160,11 @@ func (h *ToolHandler) getArtifact(ctx context.Context, args map[string]any) (str
 	return h.fetchArtifactContent(ctx, artifact)
 }
 
-func (h *ToolHandler) fetchArtifactContent(ctx context.Context, artifact *gh.Artifact) (string, bool, error) {
+func (h *ToolHandler) fetchArtifactContent(ctx context.Context, artifact *ci.Artifact) (string, bool, error) {
 	switch gh.ClassifyArtifact(artifact.Name) {
-	case gh.ArtifactHTML:
+	case ci.ArtifactHTML:
 		return h.fetchHTMLArtifact(ctx, artifact.ID)
-	case gh.ArtifactBlob:
+	case ci.ArtifactBlob:
 		return h.fetchBlobInfo(ctx, artifact)
 	default:
 		return h.fetchDefaultArtifact(ctx, artifact.ID)
@@ -171,7 +172,7 @@ func (h *ToolHandler) fetchArtifactContent(ctx context.Context, artifact *gh.Art
 }
 
 func (h *ToolHandler) fetchHTMLArtifact(ctx context.Context, artifactID int64) (string, bool, error) {
-	content, err := h.GitHub.DownloadAndExtract(ctx, h.Owner, h.Repo, artifactID)
+	content, err := h.CI.DownloadAndExtract(ctx, artifactID)
 	if err != nil {
 		return errorResult(err), false, nil
 	}
@@ -185,8 +186,8 @@ func (h *ToolHandler) fetchHTMLArtifact(ctx context.Context, artifactID int64) (
 	return string(snapshot), false, nil
 }
 
-func (h *ToolHandler) fetchBlobInfo(ctx context.Context, artifact *gh.Artifact) (string, bool, error) {
-	zipData, err := h.GitHub.DownloadRawZip(ctx, h.Owner, h.Repo, artifact.ID)
+func (h *ToolHandler) fetchBlobInfo(ctx context.Context, artifact *ci.Artifact) (string, bool, error) {
+	zipData, err := h.CI.DownloadArtifact(ctx, artifact.ID)
 	if err != nil {
 		return errorResult(err), false, nil
 	}
@@ -194,7 +195,7 @@ func (h *ToolHandler) fetchBlobInfo(ctx context.Context, artifact *gh.Artifact) 
 }
 
 func (h *ToolHandler) fetchDefaultArtifact(ctx context.Context, artifactID int64) (string, bool, error) {
-	content, err := h.GitHub.DownloadAndExtract(ctx, h.Owner, h.Repo, artifactID)
+	content, err := h.CI.DownloadAndExtract(ctx, artifactID)
 	if err != nil {
 		return errorResult(err), false, nil
 	}
@@ -215,7 +216,7 @@ func (h *ToolHandler) getRepoFile(ctx context.Context, args map[string]any) (str
 		return errorResult(fmt.Errorf("path is required")), false, nil
 	}
 
-	content, err := h.GitHub.GetRepoFile(ctx, h.Owner, h.Repo, path)
+	content, err := h.CI.GetRepoFile(ctx, path)
 	if err != nil {
 		// Smart 404: if file not found, return directory listing of parent
 		if strings.Contains(err.Error(), "404") {
@@ -234,7 +235,7 @@ func (h *ToolHandler) smartNotFound(ctx context.Context, path string) string {
 		dir = path[:idx]
 	}
 
-	entries, err := h.GitHub.ListDirectory(ctx, h.Owner, h.Repo, dir)
+	entries, err := h.CI.ListDirectory(ctx, dir)
 	if err != nil || len(entries) == 0 {
 		return errorResult(fmt.Errorf("file not found: %s", path))
 	}
@@ -253,7 +254,7 @@ func (h *ToolHandler) smartNotFound(ctx context.Context, path string) string {
 	return string(b)
 }
 
-func (h *ToolHandler) findTraceArtifact(name string) *gh.Artifact {
+func (h *ToolHandler) findTraceArtifact(name string) *ci.Artifact {
 	for i, a := range h.artifacts {
 		if a.Expired {
 			continue
@@ -285,7 +286,7 @@ func (h *ToolHandler) getTestTraces(ctx context.Context, args map[string]any) (s
 		return errorResult(fmt.Errorf("no %s artifact found", testResultsArtifact)), false, nil
 	}
 
-	zipData, err := h.GitHub.DownloadRawZip(ctx, h.Owner, h.Repo, artifact.ID)
+	zipData, err := h.CI.DownloadArtifact(ctx, artifact.ID)
 	if err != nil {
 		return errorResult(err), false, nil
 	}
@@ -453,7 +454,20 @@ type diffFile struct {
 }
 
 func (h *ToolHandler) getPRDiff(ctx context.Context, args map[string]any) (string, bool, error) {
-	files, kind := h.fetchDiffFiles(ctx)
+	ref := ci.ChangeRef{
+		PRNumber: h.PRNumber,
+		HeadSHA:  h.HeadSHA,
+	}
+	files, err := h.CI.GetChangedFiles(ctx, ref)
+
+	kind := "pull_request"
+	if h.PRNumber == 0 {
+		kind = "commit_range"
+	}
+	if err != nil {
+		kind = "none"
+		files = nil
+	}
 
 	resp := prDiffResponse{Kind: kind, PRNumber: h.PRNumber}
 	suspectedFiles := parseSuspectedFiles(args)
@@ -462,22 +476,6 @@ func (h *ToolHandler) getPRDiff(ctx context.Context, args map[string]any) (strin
 
 	data, _ := json.Marshal(resp)
 	return string(data), false, nil
-}
-
-func (h *ToolHandler) fetchDiffFiles(ctx context.Context) ([]gh.PRFile, string) {
-	if h.PRNumber > 0 {
-		files, err := h.GitHub.GetPRFiles(ctx, h.Owner, h.Repo, h.PRNumber)
-		if err == nil {
-			return files, "pull_request"
-		}
-	}
-	if h.HeadSHA != "" {
-		files, err := h.GitHub.CompareCommits(ctx, h.Owner, h.Repo, "main", h.HeadSHA)
-		if err == nil {
-			return files, "commit_range"
-		}
-	}
-	return nil, "none"
 }
 
 func parseSuspectedFiles(args map[string]any) map[string]bool {
@@ -492,7 +490,7 @@ func parseSuspectedFiles(args map[string]any) map[string]bool {
 	return result
 }
 
-func buildDiffFiles(files []gh.PRFile, suspected map[string]bool) []diffFile {
+func buildDiffFiles(files []ci.ChangedFile, suspected map[string]bool) []diffFile {
 	const maxPatchTokens = 4000
 	budget := maxPatchTokens
 	var result []diffFile
@@ -520,9 +518,68 @@ func buildDiffFiles(files []gh.PRFile, suspected map[string]bool) []diffFile {
 	return result
 }
 
+// getTestResults handles the get_test_results tool for providers that support
+// structured test results (e.g., Azure DevOps).
+func (h *ToolHandler) getTestResults(ctx context.Context, args map[string]any) (string, bool, error) {
+	h.hasReadErrorContext = true
+
+	trp, ok := h.CI.(ci.TestResultsProvider)
+	if !ok {
+		return errorResult(fmt.Errorf("structured test results are not available for %s", h.CI.Name())), false, nil
+	}
+
+	testRuns, err := trp.GetTestRuns(ctx, h.RunID)
+	if err != nil {
+		return errorResult(err), false, nil
+	}
+
+	if len(testRuns) == 0 {
+		return errorResult(fmt.Errorf("no test runs found for build %d", h.RunID)), false, nil
+	}
+
+	var b strings.Builder
+	for _, tr := range testRuns {
+		fmt.Fprintf(&b, "## Test Run: %s\n", tr.Name)
+		fmt.Fprintf(&b, "Total: %d | Passed: %d | Failed: %d\n\n", tr.TotalTests, tr.PassedTests, tr.FailedTests)
+
+		if tr.FailedTests == 0 {
+			continue
+		}
+
+		results, err := trp.GetTestResults(ctx, tr.ID)
+		if err != nil {
+			fmt.Fprintf(&b, "Error fetching results: %s\n\n", err)
+			continue
+		}
+
+		for _, r := range results {
+			if r.Outcome == "Passed" {
+				continue
+			}
+			fmt.Fprintf(&b, "### FAILED: %s\n", r.TestName)
+			if r.ErrorMessage != "" {
+				fmt.Fprintf(&b, "Error: %s\n", r.ErrorMessage)
+			}
+			if r.StackTrace != "" {
+				fmt.Fprintf(&b, "Stack trace:\n```\n%s\n```\n", r.StackTrace)
+			}
+			fmt.Fprintf(&b, "Duration: %.0fms\n\n", r.DurationMs)
+		}
+	}
+
+	result := b.String()
+	const maxLen = 100000
+	if len(result) > maxLen {
+		result = result[:maxLen] + "\n... (truncated)"
+	}
+
+	return result, false, nil
+}
+
 // ToolDeclarations returns the function declarations for all available tools.
-func ToolDeclarations() []llm.FunctionDeclaration {
-	return []llm.FunctionDeclaration{
+// The provider parameter is used to conditionally include provider-specific tools.
+func ToolDeclarations(provider ci.Provider) []llm.FunctionDeclaration {
+	decls := []llm.FunctionDeclaration{
 		{
 			Name:        "list_jobs",
 			Description: "List all jobs in the workflow run with their status and conclusion.",
@@ -692,4 +749,14 @@ func ToolDeclarations() []llm.FunctionDeclaration {
 			},
 		},
 	}
+
+	// Add provider-specific tools
+	if _, ok := provider.(ci.TestResultsProvider); ok {
+		decls = append(decls, llm.FunctionDeclaration{
+			Name:        "get_test_results",
+			Description: "Fetch structured test results with pass/fail status, error messages, and stack traces. Use this first to understand which tests failed and why.",
+		})
+	}
+
+	return decls
 }

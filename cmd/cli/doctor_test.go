@@ -225,9 +225,40 @@ func TestCheckConfigFile_Invalid(t *testing.T) {
 }
 
 func TestDefaultChecks_ConfigFallback(t *testing.T) {
-	// Verify defaultChecks returns the expected number of checks
+	t.Setenv("AZURE_DEVOPS_PAT", "")
+	// Verify defaultChecks returns the expected number of checks (no Azure PAT → 7)
 	checks := defaultChecks()
 	require.Len(t, checks, 7)
 	assert.Equal(t, "GITHUB_TOKEN", checks[0].name)
 	assert.Equal(t, "GOOGLE_API_KEY", checks[1].name)
+}
+
+func TestDefaultChecks_WithAzurePAT(t *testing.T) {
+	t.Setenv("AZURE_DEVOPS_PAT", "test-pat-12345678")
+	checks := defaultChecks()
+	require.Len(t, checks, 9)
+	assert.Equal(t, "AZURE_DEVOPS_PAT", checks[7].name)
+	assert.Equal(t, "Network: dev.azure.com", checks[8].name)
+}
+
+func TestCheckAzurePAT_Missing(t *testing.T) {
+	check := checkAzurePATWith("")
+	result := check(context.Background())
+	assert.Equal(t, statusFail, result.status)
+	assert.Contains(t, result.message, "not set")
+}
+
+func TestCheckAzurePAT_Valid(t *testing.T) {
+	check := checkAzurePATWith("abcdefghij1234567890")
+	result := check(context.Background())
+	assert.Equal(t, statusOK, result.status)
+	assert.Contains(t, result.message, "abcd")
+	assert.Contains(t, result.message, "7890")
+}
+
+func TestCheckAzurePAT_Short(t *testing.T) {
+	check := checkAzurePATWith("short")
+	result := check(context.Background())
+	assert.Equal(t, statusOK, result.status)
+	assert.Contains(t, result.message, "***")
 }

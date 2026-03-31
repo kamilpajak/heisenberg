@@ -131,19 +131,23 @@ func NewClient(model, apiKey string) (*Client, error) {
 	}, nil
 }
 
-func systemPrompt() *Content {
-	return &Content{
-		Parts: []Part{{Text: `You are an expert CI/CD failure analyst. You have access to tools that let you inspect a GitHub Actions workflow run.
-
-Your goal: determine the root cause of test failures and provide actionable guidance.
-
-Strategy:
+func systemPrompt(providerHints string) *Content {
+	strategy := `Strategy:
 1. Review the initial context (run info, jobs, artifacts)
 2. Use tools to gather more data — fetch artifacts, read logs, inspect config files
 3. Focus on FAILED jobs and their logs
-4. For Playwright test failures, fetch the HTML report artifact first
-5. Use get_test_traces on test-results artifacts to get browser actions, console errors, and failed HTTP requests from Playwright trace recordings
-6. When you have enough information, you MUST call the "done" tool with structured RCA data, then provide your analysis text.
+4. When you have enough information, you MUST call the "done" tool with structured RCA data, then provide your analysis text.`
+
+	if providerHints != "" {
+		strategy += "\n\n" + providerHints
+	}
+
+	return &Content{
+		Parts: []Part{{Text: `You are an expert CI/CD failure analyst. You have access to tools that let you inspect a CI pipeline run.
+
+Your goal: determine the root cause of test failures and provide actionable guidance.
+
+` + strategy + `
 
 When calling the "done" tool, classify your conclusion:
 - category "diagnosis": you identified specific failure root causes. Include the "analyses" array with one entry per distinct failing test (group tests sharing the same root cause into one entry).
@@ -274,10 +278,14 @@ type loopState struct {
 
 // RunAgentLoop runs the agentic conversation loop. The model can call tools
 // iteratively until it produces a text response or hits the iteration limit.
-func (c *Client) RunAgentLoop(ctx context.Context, handler ToolExecutor, toolDecls []FunctionDeclaration, initialContext string, verbose bool) (*AnalysisResult, error) {
+func (c *Client) RunAgentLoop(ctx context.Context, handler ToolExecutor, toolDecls []FunctionDeclaration, initialContext string, verbose bool, providerHints ...string) (*AnalysisResult, error) {
 	startTime := time.Now()
 	tools := []Tool{{FunctionDeclarations: toolDecls}}
-	system := systemPrompt()
+	var hints string
+	if len(providerHints) > 0 {
+		hints = providerHints[0]
+	}
+	system := systemPrompt(hints)
 
 	s := &loopState{
 		history: []Content{

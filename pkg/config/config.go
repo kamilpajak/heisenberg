@@ -11,9 +11,10 @@ import (
 
 // Config holds optional user configuration loaded from a YAML file.
 type Config struct {
-	Model        string `yaml:"model"`
-	GitHubToken  string `yaml:"github_token"`
-	GoogleAPIKey string `yaml:"google_api_key"`
+	Model          string `yaml:"model"`
+	GitHubToken    string `yaml:"github_token"`
+	GoogleAPIKey   string `yaml:"google_api_key"`
+	AzureDevOpsPAT string `yaml:"azure_devops_pat"`
 }
 
 // Load reads the config file from the default path and returns the parsed config.

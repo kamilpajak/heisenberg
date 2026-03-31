@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/kamilpajak/heisenberg/pkg/ci"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -15,16 +16,16 @@ import (
 func TestClassifyArtifact(t *testing.T) {
 	tests := []struct {
 		name string
-		want ArtifactType
+		want ci.ArtifactType
 	}{
-		{"html-report--attempt-1", ArtifactHTML},
-		{"html-report--attempt-2", ArtifactHTML},
-		{"playwright-report", ArtifactHTML},
-		{"test-results.json", ArtifactJSON},
-		{"playwright_report.json", ArtifactJSON},
-		{"blob-report-1", ArtifactBlob},
-		{"blob-report-2", ArtifactBlob},
-		{"blob-report-10", ArtifactBlob},
+		{"html-report--attempt-1", ci.ArtifactHTML},
+		{"html-report--attempt-2", ci.ArtifactHTML},
+		{"playwright-report", ci.ArtifactHTML},
+		{"test-results.json", ci.ArtifactJSON},
+		{"playwright_report.json", ci.ArtifactJSON},
+		{"blob-report-1", ci.ArtifactBlob},
+		{"blob-report-2", ci.ArtifactBlob},
+		{"blob-report-10", ci.ArtifactBlob},
 		{"test-results", ""},
 		{"e2e-coverage", ""},
 		{"combined-test-catalog", ""},
@@ -36,36 +37,6 @@ func TestClassifyArtifact(t *testing.T) {
 			assert.Equal(t, tt.want, ClassifyArtifact(tt.name))
 		})
 	}
-}
-
-func TestClassifyAll(t *testing.T) {
-	artifacts := []Artifact{
-		{ID: 1, Name: "html-report--attempt-1", Expired: false},
-		{ID: 2, Name: "blob-report-1", Expired: false},
-		{ID: 3, Name: "blob-report-2", Expired: false},
-		{ID: 4, Name: "test-results.json", Expired: false},
-		{ID: 5, Name: "expired-html-report", Expired: true},
-		{ID: 6, Name: "coverage", Expired: false}, // unknown type
-	}
-
-	c := classifyAll(artifacts)
-
-	assert.Len(t, c.html, 1)
-	assert.Equal(t, int64(1), c.html[0].ID)
-
-	assert.Len(t, c.blob, 2)
-	assert.Equal(t, int64(2), c.blob[0].ID)
-	assert.Equal(t, int64(3), c.blob[1].ID)
-
-	assert.Len(t, c.json, 1)
-	assert.Equal(t, int64(4), c.json[0].ID)
-}
-
-func TestClassifyAllEmpty(t *testing.T) {
-	c := classifyAll(nil)
-	assert.Empty(t, c.html)
-	assert.Empty(t, c.json)
-	assert.Empty(t, c.blob)
 }
 
 func TestReadZipEntry(t *testing.T) {
@@ -169,90 +140,13 @@ func buildZip(t *testing.T, files map[string][]byte) []byte {
 	return buf.Bytes()
 }
 
-func TestFetchFirstContent(t *testing.T) {
-	zipData := buildZip(t, map[string][]byte{
-		"report.html": []byte("<html>test</html>"),
-	})
-
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write(zipData)
-	}))
-	defer srv.Close()
-
-	c := &Client{httpClient: srv.Client(), baseURL: srv.URL}
-	artifacts := []Artifact{{ID: 1, Name: "html-report"}}
-
-	result := c.fetchFirstContent(context.Background(), "owner", "repo", artifacts, ArtifactHTML)
-	require.NotNil(t, result)
-	assert.Equal(t, ArtifactHTML, result.Type)
-	assert.Equal(t, []byte("<html>test</html>"), result.Content)
-}
-
-func TestFetchFirstContentEmpty(t *testing.T) {
-	c := &Client{}
-	result := c.fetchFirstContent(context.Background(), "owner", "repo", nil, ArtifactHTML)
-	assert.Nil(t, result)
-}
-
-func TestFetchFirstContentAllFail(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusNotFound)
-	}))
-	defer srv.Close()
-
-	c := &Client{httpClient: srv.Client(), baseURL: srv.URL}
-	artifacts := []Artifact{{ID: 1, Name: "html-report"}}
-
-	result := c.fetchFirstContent(context.Background(), "owner", "repo", artifacts, ArtifactHTML)
-	assert.Nil(t, result)
-}
-
-func TestFetchBlobs(t *testing.T) {
-	zipData := buildZip(t, map[string][]byte{"data.bin": []byte("blob data")})
-
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write(zipData)
-	}))
-	defer srv.Close()
-
-	c := &Client{httpClient: srv.Client(), baseURL: srv.URL}
-	artifacts := []Artifact{
-		{ID: 1, Name: "blob-report-1"},
-		{ID: 2, Name: "blob-report-2"},
-	}
-
-	result := c.fetchBlobs(context.Background(), "owner", "repo", artifacts)
-	require.NotNil(t, result)
-	assert.Equal(t, ArtifactBlob, result.Type)
-	assert.Len(t, result.Blobs, 2)
-}
-
-func TestFetchBlobsEmpty(t *testing.T) {
-	c := &Client{}
-	result := c.fetchBlobs(context.Background(), "owner", "repo", nil)
-	assert.Nil(t, result)
-}
-
-func TestFetchBlobsAllFail(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusNotFound)
-	}))
-	defer srv.Close()
-
-	c := &Client{httpClient: srv.Client(), baseURL: srv.URL}
-	artifacts := []Artifact{{ID: 1, Name: "blob-report"}}
-
-	result := c.fetchBlobs(context.Background(), "owner", "repo", artifacts)
-	assert.Nil(t, result)
-}
-
 func TestCheckArtifacts_AllExpired(t *testing.T) {
-	artifacts := []Artifact{
+	artifacts := []ci.Artifact{
 		{ID: 1, Name: "html-report", Expired: true},
 		{ID: 2, Name: "blob-report", Expired: true},
 	}
 
-	status := CheckArtifacts(artifacts)
+	status := ci.CheckArtifacts(artifacts)
 
 	assert.Equal(t, 2, status.Total)
 	assert.Equal(t, 2, status.Expired)
@@ -262,12 +156,12 @@ func TestCheckArtifacts_AllExpired(t *testing.T) {
 }
 
 func TestCheckArtifacts_SomeExpired(t *testing.T) {
-	artifacts := []Artifact{
+	artifacts := []ci.Artifact{
 		{ID: 1, Name: "html-report", Expired: true},
 		{ID: 2, Name: "blob-report", Expired: false},
 	}
 
-	status := CheckArtifacts(artifacts)
+	status := ci.CheckArtifacts(artifacts)
 
 	assert.Equal(t, 2, status.Total)
 	assert.Equal(t, 1, status.Expired)
@@ -277,12 +171,12 @@ func TestCheckArtifacts_SomeExpired(t *testing.T) {
 }
 
 func TestCheckArtifacts_NoneExpired(t *testing.T) {
-	artifacts := []Artifact{
+	artifacts := []ci.Artifact{
 		{ID: 1, Name: "html-report", Expired: false},
 		{ID: 2, Name: "blob-report", Expired: false},
 	}
 
-	status := CheckArtifacts(artifacts)
+	status := ci.CheckArtifacts(artifacts)
 
 	assert.Equal(t, 2, status.Total)
 	assert.Equal(t, 0, status.Expired)
@@ -292,34 +186,13 @@ func TestCheckArtifacts_NoneExpired(t *testing.T) {
 }
 
 func TestCheckArtifacts_Empty(t *testing.T) {
-	status := CheckArtifacts(nil)
+	status := ci.CheckArtifacts(nil)
 
 	assert.Equal(t, 0, status.Total)
 	assert.Equal(t, 0, status.Expired)
 	assert.Equal(t, 0, status.Available)
 	assert.False(t, status.HasUsable)
 	assert.False(t, status.AllExpired)
-}
-
-func TestSelectAndFetch(t *testing.T) {
-	zipData := buildZip(t, map[string][]byte{
-		"report.html": []byte("<html>test</html>"),
-	})
-
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write(zipData)
-	}))
-	defer srv.Close()
-
-	c := &Client{httpClient: srv.Client(), baseURL: srv.URL}
-	artifacts := []Artifact{
-		{ID: 1, Name: "html-report", Expired: false},
-		{ID: 2, Name: "blob-report-1", Expired: false},
-	}
-
-	result := c.selectAndFetch(context.Background(), "owner", "repo", artifacts)
-	require.NotNil(t, result)
-	assert.Equal(t, ArtifactHTML, result.Type)
 }
 
 func TestListDirectory(t *testing.T) {
@@ -333,8 +206,8 @@ func TestListDirectory(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := NewTestClient(srv.URL, srv.Client())
-	entries, err := c.ListDirectory(context.Background(), "owner", "repo", "tests")
+	c := NewTestClient("owner", "repo", srv.URL, srv.Client())
+	entries, err := c.ListDirectory(context.Background(), "tests")
 	require.NoError(t, err)
 	assert.Len(t, entries, 3)
 	assert.Equal(t, "e2e/", entries[0])
@@ -347,12 +220,12 @@ func TestListDirectory_NotFound(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := NewTestClient(srv.URL, srv.Client())
-	_, err := c.ListDirectory(context.Background(), "owner", "repo", "nonexistent")
+	c := NewTestClient("owner", "repo", srv.URL, srv.Client())
+	_, err := c.ListDirectory(context.Background(), "nonexistent")
 	assert.Error(t, err)
 }
 
-func TestGetPRFiles(t *testing.T) {
+func TestGetChangedFiles_PR(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/repos/owner/repo/pulls/42/files", r.URL.Path)
 		w.Header().Set("Content-Type", "application/json")
@@ -363,8 +236,8 @@ func TestGetPRFiles(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := NewTestClient(srv.URL, srv.Client())
-	files, err := c.GetPRFiles(context.Background(), "owner", "repo", 42)
+	c := NewTestClient("owner", "repo", srv.URL, srv.Client())
+	files, err := c.GetChangedFiles(context.Background(), ci.ChangeRef{PRNumber: 42})
 
 	require.NoError(t, err)
 	require.Len(t, files, 2)
@@ -376,7 +249,7 @@ func TestGetPRFiles(t *testing.T) {
 	assert.Equal(t, "tests/checkout.spec.ts", files[1].Path)
 }
 
-func TestCompareCommits(t *testing.T) {
+func TestGetChangedFiles_Compare(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/repos/owner/repo/compare/main...abc123", r.URL.Path)
 		w.Header().Set("Content-Type", "application/json")
@@ -388,8 +261,8 @@ func TestCompareCommits(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := NewTestClient(srv.URL, srv.Client())
-	files, err := c.CompareCommits(context.Background(), "owner", "repo", "main", "abc123")
+	c := NewTestClient("owner", "repo", srv.URL, srv.Client())
+	files, err := c.GetChangedFiles(context.Background(), ci.ChangeRef{HeadSHA: "abc123", BaseBranch: "main"})
 
 	require.NoError(t, err)
 	require.Len(t, files, 1)
@@ -398,7 +271,7 @@ func TestCompareCommits(t *testing.T) {
 	assert.Equal(t, 50, files[0].Additions)
 }
 
-func TestWorkflowRun_PullRequests(t *testing.T) {
+func TestGetRun_PullRequests(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(`{
@@ -411,10 +284,10 @@ func TestWorkflowRun_PullRequests(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := NewTestClient(srv.URL, srv.Client())
-	run, err := c.GetWorkflowRun(context.Background(), "owner", "repo", 123)
+	c := NewTestClient("owner", "repo", srv.URL, srv.Client())
+	run, err := c.GetRun(context.Background(), 123)
 
 	require.NoError(t, err)
-	require.Len(t, run.PullRequests, 1)
-	assert.Equal(t, 42, run.PullRequests[0].Number)
+	require.Len(t, run.PRNumbers, 1)
+	assert.Equal(t, 42, run.PRNumbers[0])
 }
