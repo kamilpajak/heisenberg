@@ -1,6 +1,8 @@
 package azure
 
 import (
+	"archive/zip"
+	"bytes"
 	"context"
 	"net/http"
 	"net/http/httptest"
@@ -444,4 +446,79 @@ func TestGetTestResults_Empty(t *testing.T) {
 	results, err := c.GetTestResults(context.Background(), 501)
 	require.NoError(t, err)
 	assert.Empty(t, results)
+}
+
+func TestDownloadAndExtract(t *testing.T) {
+	zipData := buildTestZip(t, "report.html", []byte("<html><body>test</body></html>"))
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/myproject/_apis/build/builds/100/artifacts" {
+			w.Write([]byte(`{"count":1,"value":[{"id":1,"name":"report","resource":{"downloadUrl":"http://` + r.Host + `/dl"}}]}`))
+			return
+		}
+		if r.URL.Path == "/dl" {
+			w.Write(zipData)
+			return
+		}
+		w.WriteHeader(404)
+	}))
+	defer srv.Close()
+
+	c := NewTestClient("myorg", "myproject", srv.URL, srv.Client())
+	_, _ = c.ListArtifacts(context.Background(), 100)
+	content, err := c.DownloadAndExtract(context.Background(), 1)
+	require.NoError(t, err)
+	assert.Contains(t, string(content), "<html>")
+}
+
+func TestExtractFirstFile(t *testing.T) {
+	data := buildTestZip(t, "data.json", []byte(`{"key":"value"}`))
+	content, err := extractFirstFile(data)
+	require.NoError(t, err)
+	assert.Equal(t, `{"key":"value"}`, string(content))
+}
+
+func TestExtractFirstFile_Empty(t *testing.T) {
+	data := buildTestZip(t, "", nil)
+	_, err := extractFirstFile(data)
+	assert.Error(t, err)
+}
+
+func TestMapResult(t *testing.T) {
+	tests := []struct{ in, want string }{
+		{"succeeded", "success"},
+		{"failed", "failure"},
+		{"canceled", "cancelled"},
+		{"partiallySucceeded", "failure"},
+		{"other", "other"},
+	}
+	for _, tt := range tests {
+		assert.Equal(t, tt.want, mapResult(tt.in))
+	}
+}
+
+func TestMapChangeType(t *testing.T) {
+	tests := []struct{ in, want string }{
+		{"add", "added"},
+		{"edit", "modified"},
+		{"delete", "removed"},
+		{"rename", "renamed"},
+		{"other", "other"},
+	}
+	for _, tt := range tests {
+		assert.Equal(t, tt.want, mapChangeType(tt.in))
+	}
+}
+
+func buildTestZip(t *testing.T, name string, content []byte) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	w := zip.NewWriter(&buf)
+	if name != "" && content != nil {
+		fw, err := w.Create(name)
+		require.NoError(t, err)
+		_, err = fw.Write(content)
+		require.NoError(t, err)
+	}
+	require.NoError(t, w.Close())
+	return buf.Bytes()
 }

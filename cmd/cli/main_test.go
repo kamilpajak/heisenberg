@@ -10,6 +10,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/fatih/color"
+	"github.com/kamilpajak/heisenberg/pkg/config"
 	"github.com/kamilpajak/heisenberg/pkg/llm"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -943,6 +944,25 @@ func TestExtractAzureOrg(t *testing.T) {
 			assert.Equal(t, tt.want, extractAzureOrg(tt.uri))
 		})
 	}
+}
+
+func TestBuildProvider_GitHub(t *testing.T) {
+	target := &targetInfo{provider: "github", owner: "org", repo: "repo"}
+	p := buildProvider(target, &config.Config{GitHubToken: "ghp_test"})
+	assert.Equal(t, "github", p.Name())
+}
+
+func TestBuildProvider_Azure(t *testing.T) {
+	target := &targetInfo{provider: "azure", owner: "myorg", repo: "myproject"}
+	p := buildProvider(target, &config.Config{AzureDevOpsPAT: "pat_test"})
+	assert.Equal(t, "azure", p.Name())
+}
+
+func TestBuildProvider_AzureFromEnv(t *testing.T) {
+	t.Setenv("AZURE_DEVOPS_PAT", "env-pat")
+	target := &targetInfo{provider: "azure", owner: "myorg", repo: "myproject"}
+	p := buildProvider(target, &config.Config{})
+	assert.Equal(t, "azure", p.Name())
 }
 
 func TestPrintRunHeader(t *testing.T) {

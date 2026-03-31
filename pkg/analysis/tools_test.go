@@ -1485,3 +1485,40 @@ func TestGetPRDiff_NoPR(t *testing.T) {
 	require.NoError(t, json.Unmarshal([]byte(result), &diff))
 	assert.Equal(t, "none", diff.Kind)
 }
+
+func TestGetTestResults_NotSupported(t *testing.T) {
+	// GitHub client does not implement TestResultsProvider
+	ghClient := gh.NewTestClient("owner", "repo", "http://localhost", http.DefaultClient)
+	h := &ToolHandler{CI: ghClient, RunID: 1}
+	result, isDone, err := h.Execute(context.Background(), llm.FunctionCall{Name: "get_test_results"})
+	require.NoError(t, err)
+	assert.False(t, isDone)
+	assert.Contains(t, result, "not available")
+}
+
+func TestFormatFailedResults(t *testing.T) {
+	results := []ci.TestResult{
+		{ID: 1, TestName: "test_add", Outcome: "Failed", ErrorMessage: "expected 3 got 2", StackTrace: "at add.go:10", DurationMs: 100},
+		{ID: 2, TestName: "test_ok", Outcome: "Passed", DurationMs: 50},
+		{ID: 3, TestName: "test_nil", Outcome: "Failed", ErrorMessage: "nil pointer", DurationMs: 200},
+	}
+	var b strings.Builder
+	formatFailedResults(&b, results)
+	out := b.String()
+	assert.Contains(t, out, "test_add")
+	assert.Contains(t, out, "expected 3 got 2")
+	assert.Contains(t, out, "at add.go:10")
+	assert.NotContains(t, out, "test_ok") // Passed results skipped
+	assert.Contains(t, out, "test_nil")
+}
+
+func TestToolDeclarations_GitHub(t *testing.T) {
+	ghClient := gh.NewTestClient("owner", "repo", "http://localhost", http.DefaultClient)
+	decls := ToolDeclarations(ghClient)
+	names := make([]string, len(decls))
+	for i, d := range decls {
+		names[i] = d.Name
+	}
+	assert.NotContains(t, names, "get_test_results")
+	assert.Contains(t, names, "done")
+}
