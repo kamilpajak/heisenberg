@@ -9,10 +9,10 @@ CMD=("heisenberg" "$REPO" "--format" "json")
 [[ -n "$RUN_ID" ]] && CMD+=("--run-id" "$RUN_ID")
 
 # Run and capture JSON (allow non-zero exit — structured errors are still valid JSON)
-OUTPUT=$("${CMD[@]}" 2>/dev/stderr) || true
+OUTPUT=$("${CMD[@]}") || true
 
 if [[ -z "$OUTPUT" ]]; then
-  echo "::error::Heisenberg produced no output. Check stderr above for details."
+  echo "::error::Heisenberg produced no output. Check stderr above for details." >&2
   exit 1
 fi
 
@@ -20,7 +20,7 @@ fi
 ERROR_MSG=$(echo "$OUTPUT" | jq -r '.error // empty')
 if [[ -n "$ERROR_MSG" ]]; then
   EXIT_CODE=$(echo "$OUTPUT" | jq -r '.exit_code // 1')
-  echo "::error::$ERROR_MSG"
+  echo "::error::$ERROR_MSG" >&2
   {
     echo "## 🔬 Heisenberg Error"
     echo ""

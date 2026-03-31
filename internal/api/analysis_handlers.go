@@ -10,6 +10,8 @@ import (
 	"github.com/kamilpajak/heisenberg/pkg/llm"
 )
 
+const errDatabase = "database error"
+
 // handleListAnalyses returns analyses for a repository.
 func (s *Server) handleListAnalyses(w http.ResponseWriter, r *http.Request) {
 	oc, ok := s.requireOrgMember(w, r)
@@ -26,7 +28,7 @@ func (s *Server) handleListAnalyses(w http.ResponseWriter, r *http.Request) {
 	// Verify repo belongs to org
 	repo, err := s.db.GetRepositoryByID(r.Context(), repoID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "database error")
+		writeError(w, http.StatusInternalServerError, errDatabase)
 		return
 	}
 	if repo == nil || repo.OrgID != oc.OrgID {
@@ -81,7 +83,7 @@ func (s *Server) handleGetAnalysis(w http.ResponseWriter, r *http.Request) {
 
 	analysis, err := s.db.GetAnalysisByID(r.Context(), analysisID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "database error")
+		writeError(w, http.StatusInternalServerError, errDatabase)
 		return
 	}
 	if analysis == nil {
@@ -92,7 +94,7 @@ func (s *Server) handleGetAnalysis(w http.ResponseWriter, r *http.Request) {
 	// Verify analysis belongs to a repo in this org
 	repo, err := s.db.GetRepositoryByID(r.Context(), analysis.RepoID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "database error")
+		writeError(w, http.StatusInternalServerError, errDatabase)
 		return
 	}
 	if repo == nil || repo.OrgID != oc.OrgID {

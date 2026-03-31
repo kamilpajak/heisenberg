@@ -549,41 +549,15 @@ func (c *Client) executeCalls(ctx context.Context, s *loopState, handler ToolExe
 		}
 		emit(handler, toolEvent)
 
-		// Check for duplicate calls (same tool + args)
-		key := callKey(call)
-		if call.Name != "done" && s.calledTools[key] {
-			// Return error to model instead of re-executing
-			result := `{"error": "You already called this tool with these exact arguments. Analyze the data you have or try different arguments."}`
-			emitToolResult(handler, si, ci, len(calls), 0, result)
-			responseParts = append(responseParts, Part{
-				FunctionResponse: &FunctionResponse{
-					Name:     call.Name,
-					Response: map[string]any{"result": result},
-				},
-			})
+		if intercepted := s.interceptDuplicate(call); intercepted != "" {
+			emitToolResult(handler, si, ci, len(calls), 0, intercepted)
+			responseParts = append(responseParts, toolResponse(call.Name, intercepted))
 			continue
 		}
-		s.calledTools[key] = true
 
-		// Circuit breaker: track consecutive file reads
-		isFileRead := call.Name == "get_repo_file" || call.Name == "get_workflow_file"
-		if isFileRead {
-			s.consecutiveFileReads++
-		} else {
-			s.consecutiveFileReads = 0
-		}
-
-		// Intercept after 3 consecutive file reads when test artifacts exist
-		if isFileRead && s.consecutiveFileReads > circuitBreakerThreshold && handler.HasTestArtifacts() {
-			s.fileToolsHiddenUntil = si.iteration + circuitBreakerCooldown
-			result := `{"error": "CIRCUIT_BREAKER: You have fetched multiple source files consecutively. File reading is temporarily disabled. Use get_artifact, get_job_logs, or get_test_traces to analyze test failures, then call done with your diagnosis."}`
-			emitToolResult(handler, si, ci, len(calls), 0, result)
-			responseParts = append(responseParts, Part{
-				FunctionResponse: &FunctionResponse{
-					Name:     call.Name,
-					Response: map[string]any{"result": result},
-				},
-			})
+		if intercepted := s.interceptCircuitBreaker(call, handler, si); intercepted != "" {
+			emitToolResult(handler, si, ci, len(calls), 0, intercepted)
+			responseParts = append(responseParts, toolResponse(call.Name, intercepted))
 			continue
 		}
 
@@ -599,15 +573,44 @@ func (c *Client) executeCalls(ctx context.Context, s *loopState, handler ToolExe
 		}
 
 		emitToolResult(handler, si, ci, len(calls), toolMs, result)
-
-		responseParts = append(responseParts, Part{
-			FunctionResponse: &FunctionResponse{
-				Name:     call.Name,
-				Response: map[string]any{"result": result},
-			},
-		})
+		responseParts = append(responseParts, toolResponse(call.Name, result))
 	}
 	return responseParts, done, nil
+}
+
+func toolResponse(name, result string) Part {
+	return Part{
+		FunctionResponse: &FunctionResponse{
+			Name:     name,
+			Response: map[string]any{"result": result},
+		},
+	}
+}
+
+// interceptDuplicate returns an error message if the call was already made, or "" to proceed.
+func (s *loopState) interceptDuplicate(call FunctionCall) string {
+	key := callKey(call)
+	if call.Name != "done" && s.calledTools[key] {
+		return `{"error": "You already called this tool with these exact arguments. Analyze the data you have or try different arguments."}`
+	}
+	s.calledTools[key] = true
+	return ""
+}
+
+// interceptCircuitBreaker returns an error message if file reads should be blocked, or "" to proceed.
+func (s *loopState) interceptCircuitBreaker(call FunctionCall, handler ToolExecutor, si *stepInfo) string {
+	isFileRead := call.Name == "get_repo_file" || call.Name == "get_workflow_file"
+	if isFileRead {
+		s.consecutiveFileReads++
+	} else {
+		s.consecutiveFileReads = 0
+	}
+
+	if isFileRead && s.consecutiveFileReads > circuitBreakerThreshold && handler.HasTestArtifacts() {
+		s.fileToolsHiddenUntil = si.iteration + circuitBreakerCooldown
+		return `{"error": "CIRCUIT_BREAKER: You have fetched multiple source files consecutively. File reading is temporarily disabled. Use get_artifact, get_job_logs, or get_test_traces to analyze test failures, then call done with your diagnosis."}`
+	}
+	return ""
 }
 
 // activeTools returns the tool list for the current iteration,

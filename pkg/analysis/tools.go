@@ -11,6 +11,8 @@ import (
 	"github.com/kamilpajak/heisenberg/pkg/trace"
 )
 
+const testResultsArtifact = "test-results"
+
 // ToolHandler executes tool calls on behalf of the agent loop.
 type ToolHandler struct {
 	GitHub       *gh.Client
@@ -259,7 +261,7 @@ func (h *ToolHandler) findTraceArtifact(name string) *gh.Artifact {
 		if name != "" && a.Name == name {
 			return &h.artifacts[i]
 		}
-		if name == "" && strings.Contains(strings.ToLower(a.Name), "test-results") {
+		if name == "" && strings.Contains(strings.ToLower(a.Name), testResultsArtifact) {
 			return &h.artifacts[i]
 		}
 	}
@@ -280,7 +282,7 @@ func (h *ToolHandler) getTestTraces(ctx context.Context, args map[string]any) (s
 		if name != "" {
 			return errorResult(fmt.Errorf("artifact %q not found", name)), false, nil
 		}
-		return errorResult(fmt.Errorf("no test-results artifact found")), false, nil
+		return errorResult(fmt.Errorf("no %s artifact found", testResultsArtifact)), false, nil
 	}
 
 	zipData, err := h.GitHub.DownloadRawZip(ctx, h.Owner, h.Repo, artifact.ID)
@@ -310,7 +312,7 @@ func (h *ToolHandler) HasPendingTraces() bool {
 		return false
 	}
 	for _, a := range h.artifacts {
-		if !a.Expired && strings.Contains(strings.ToLower(a.Name), "test-results") {
+		if !a.Expired && strings.Contains(strings.ToLower(a.Name), testResultsArtifact) {
 			return true
 		}
 	}
@@ -339,7 +341,7 @@ func (h *ToolHandler) HasTestArtifacts() bool {
 			continue
 		}
 		name := strings.ToLower(a.Name)
-		if strings.Contains(name, "report") || strings.Contains(name, "test-results") ||
+		if strings.Contains(name, "report") || strings.Contains(name, testResultsArtifact) ||
 			strings.Contains(name, "blob") {
 			return true
 		}
