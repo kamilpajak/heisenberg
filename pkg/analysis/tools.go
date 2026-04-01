@@ -245,14 +245,21 @@ func (h *ToolHandler) tryOtherRepos(ctx context.Context, path string) (string, b
 		h.otherReposResolved = true
 		repos, err := crp.DiscoverRepos(ctx, h.RunID)
 		if err != nil || len(repos) == 0 {
+			emitInfo(h.Emitter, "No additional repositories discovered")
 			return "", false
 		}
 		h.otherRepos = repos
+		names := make([]string, len(repos))
+		for i, r := range repos {
+			names[i] = r.Project + "/" + r.Repo
+		}
+		emitInfo(h.Emitter, fmt.Sprintf("Discovered %d additional repo(s): %s", len(repos), strings.Join(names, ", ")))
 	}
 
 	for _, repo := range h.otherRepos {
 		content, err := crp.GetFileFromRepo(ctx, repo, path)
 		if err == nil {
+			emitInfo(h.Emitter, fmt.Sprintf("Found %s in %s/%s", path, repo.Project, repo.Repo))
 			return content, true
 		}
 	}

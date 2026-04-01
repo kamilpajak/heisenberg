@@ -76,8 +76,7 @@ func (c *Client) Name() string { return "azure" }
 // AnalysisHints returns Azure-specific strategy hints for the LLM.
 func (c *Client) AnalysisHints() string {
 	return `Azure Pipelines specific notes:
-- IMPORTANT: Call get_test_results FIRST before reading any logs. It returns structured test failures with error messages and stack traces directly from Azure's Test Results API.
-- Use job logs only for additional context after reviewing structured test results.
+- Try get_test_results early to check for structured test failures with error messages and stack traces. If it returns no results, the pipeline does not publish test results — use job logs instead.
 - Pipeline definition files are typically in the repo root or a pipelines/ directory.
 - If a test file path from stack traces is not found in this repository, the tool will automatically search additional repositories used by this pipeline.`
 }

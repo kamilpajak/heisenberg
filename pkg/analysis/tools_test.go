@@ -1626,7 +1626,9 @@ func TestGetRepoFile_CrossRepoFallback(t *testing.T) {
 			"tests-project/e2e-tests:com/test/MyTest.java": "public class MyTest {}",
 		},
 	}
-	h := &ToolHandler{CI: mock, RunID: 100, hasReadErrorContext: true}
+	var emitted []string
+	emitter := &testEmitter{messages: &emitted}
+	h := &ToolHandler{CI: mock, RunID: 100, hasReadErrorContext: true, Emitter: emitter}
 	result, isDone, err := h.Execute(context.Background(), llm.FunctionCall{
 		Name: "get_repo_file",
 		Args: map[string]any{"path": "com/test/MyTest.java"},
@@ -1634,6 +1636,21 @@ func TestGetRepoFile_CrossRepoFallback(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, isDone)
 	assert.Equal(t, "public class MyTest {}", result)
+	// Verify logging
+	assert.True(t, len(emitted) >= 2, "expected discovery + found messages")
+	assert.Contains(t, emitted[0], "Discovered 1 additional repo")
+	assert.Contains(t, emitted[1], "Found com/test/MyTest.java in tests-project/e2e-tests")
+}
+
+// testEmitter captures emitted info messages for test assertions.
+type testEmitter struct {
+	messages *[]string
+}
+
+func (e *testEmitter) Emit(ev llm.ProgressEvent) {
+	if ev.Type == "info" {
+		*e.messages = append(*e.messages, ev.Message)
+	}
 }
 
 func TestGetRepoFile_CrossRepoAllFail(t *testing.T) {
