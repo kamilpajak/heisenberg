@@ -531,6 +531,23 @@ func TestMapResult(t *testing.T) {
 	}
 }
 
+func TestStripBranchPrefix(t *testing.T) {
+	tests := []struct {
+		in, want string
+	}{
+		{"refs/heads/main", "main"},
+		{"refs/heads/feat/FA-209", "feat/FA-209"},
+		{"refs/pull/21507/merge", "pull/21507"},
+		{"refs/tags/v1.0", "v1.0"},
+		{"main", "main"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.in, func(t *testing.T) {
+			assert.Equal(t, tt.want, stripBranchPrefix(tt.in))
+		})
+	}
+}
+
 func TestMapChangeType(t *testing.T) {
 	tests := []struct{ in, want string }{
 		{"add", "added"},
