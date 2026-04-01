@@ -55,22 +55,54 @@ var (
 	providerFlag string
 	azureOrg     string
 	azureProject string
+	testRepo     string
+	debug        bool
 )
 
 var rootCmd = &cobra.Command{
-	Use:           "heisenberg <owner/repo>",
-	Short:         "AI-powered test failure analysis",
-	Long:          `Analyzes CI test failures using AI to identify root causes. Supports GitHub Actions and Azure Pipelines.`,
-	Args:          cobra.MaximumNArgs(1),
-	RunE:          run,
+	Use:   "heisenberg",
+	Short: "AI-powered test failure analysis",
+	Long:  `Analyzes CI test failures using AI to identify root causes. Supports GitHub Actions and Azure Pipelines.`,
+	Args:  cobra.MaximumNArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if len(args) == 0 && !fromEnv && runURL == "" && azureOrg == "" && azureProject == "" && providerFlag == "" {
+			return cmd.Help()
+		}
+		return run(cmd, args)
+	},
 	SilenceUsage:  true,
 	SilenceErrors: true,
 }
 
+var analyzeCmd = &cobra.Command{
+	Use:   "analyze [owner/repo]",
+	Short: "Analyze CI test failures",
+	Long: `Analyzes CI test failures using AI to identify root causes.
+Supports GitHub Actions and Azure Pipelines. Auto-detects provider from
+repository URL or CI environment variables.`,
+	Args:          cobra.MaximumNArgs(1),
+	RunE:          run,
+	SilenceUsage:  true,
+	SilenceErrors: true,
+	Example: `  # Analyze the latest failing run
+  $ heisenberg analyze owner/repo
+
+  # Analyze a specific CI run by URL
+  $ heisenberg analyze -r "https://github.com/owner/repo/actions/runs/123"
+
+  # Auto-detect from CI environment
+  $ heisenberg analyze --from-env
+
+  # JSON output for CI integration
+  $ heisenberg analyze --from-env -f json`,
+}
+
 var serveCmd = &cobra.Command{
-	Use:   "serve",
-	Short: "Start the local web dashboard",
-	RunE:  serve,
+	Use:           "serve",
+	Short:         "Start the local web dashboard",
+	RunE:          serve,
+	SilenceUsage:  true,
+	SilenceErrors: true,
 }
 
 var versionCmd = &cobra.Command{
@@ -84,22 +116,61 @@ var versionCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Show detailed tool call info")
-	rootCmd.Flags().StringVar(&format, "format", "", "Output format: human or json (default: auto-detect from TTY)")
-	rootCmd.Flags().BoolVar(&jsonOutput, "json", false, "Output result as JSON (alias for --format json)")
-	rootCmd.Flags().BoolVar(&fromEnv, "from-env", false, "Read repo/run from CI environment variables (GitHub Actions or Azure Pipelines)")
-	rootCmd.Flags().StringVar(&runURL, "run", "", "CI run URL (GitHub Actions or Azure Pipelines)")
-	rootCmd.Flags().Int64Var(&runID, "run-id", 0, "Specific workflow run ID to analyze")
-	rootCmd.Flags().StringVar(&modelName, "model", "", "Gemini model name (env: HEISENBERG_MODEL, default: "+llm.DefaultModel+")")
-	rootCmd.Flags().StringVar(&providerFlag, "provider", "", "CI provider: github or azure (default: auto-detect)")
-	rootCmd.Flags().StringVar(&azureOrg, "org", "", "Azure DevOps organization")
-	rootCmd.Flags().StringVar(&azureProject, "project", "", "Azure DevOps project")
-	_ = rootCmd.Flags().MarkHidden("json") // backward compat alias
+	// Global flags (available to all subcommands via PersistentFlags)
+	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Show detailed tool call info")
+	rootCmd.PersistentFlags().StringVarP(&format, "format", "f", "", "Output format: human or json (default: auto-detect from TTY)")
+	rootCmd.PersistentFlags().BoolVar(&jsonOutput, "json", false, "Output result as JSON (alias for --format json)")
+	rootCmd.PersistentFlags().BoolVar(&debug, "debug", false, "Write full agent conversation trace to a debug file")
+	_ = rootCmd.PersistentFlags().MarkHidden("json") // backward compat alias
+
+	// Analyze-specific flags (on analyzeCmd)
+	analyzeCmd.Flags().BoolVar(&fromEnv, "from-env", false, "Read repo/run from CI environment variables (GitHub Actions or Azure Pipelines)")
+	analyzeCmd.Flags().StringVarP(&runURL, "run", "r", "", "CI run URL (GitHub Actions or Azure Pipelines)")
+	analyzeCmd.Flags().Int64Var(&runID, "run-id", 0, "Specific workflow run ID to analyze")
+	analyzeCmd.Flags().StringVar(&modelName, "model", "", "Gemini model name (env: HEISENBERG_MODEL, default: "+llm.DefaultModel+")")
+	analyzeCmd.Flags().StringVar(&providerFlag, "provider", "", "CI provider: github or azure (default: auto-detect)")
+	analyzeCmd.Flags().StringVar(&azureOrg, "azure-org", "", "Azure DevOps organization")
+	analyzeCmd.Flags().StringVar(&azureProject, "azure-project", "", "Azure DevOps project")
+	analyzeCmd.Flags().StringVar(&testRepo, "azure-test-repo", "", "Additional repository for test code (project/repo)")
+
+	// Deprecated aliases for renamed flags (on analyzeCmd)
+	analyzeCmd.Flags().StringVar(&azureOrg, "org", "", "Azure DevOps organization")
+	analyzeCmd.Flags().StringVar(&azureProject, "project", "", "Azure DevOps project")
+	analyzeCmd.Flags().StringVar(&testRepo, "test-repo", "", "Additional repository for test code (project/repo)")
+	_ = analyzeCmd.Flags().MarkDeprecated("org", "use --azure-org instead")
+	_ = analyzeCmd.Flags().MarkDeprecated("project", "use --azure-project instead")
+	_ = analyzeCmd.Flags().MarkDeprecated("test-repo", "use --azure-test-repo instead")
+
+	// Hidden copies on rootCmd for backward compat (heisenberg owner/repo --from-env etc.)
+	rootCmd.Flags().BoolVar(&fromEnv, "from-env", false, "")
+	rootCmd.Flags().StringVarP(&runURL, "run", "r", "", "")
+	rootCmd.Flags().Int64Var(&runID, "run-id", 0, "")
+	rootCmd.Flags().StringVar(&modelName, "model", "", "")
+	rootCmd.Flags().StringVar(&providerFlag, "provider", "", "")
+	rootCmd.Flags().StringVar(&azureOrg, "azure-org", "", "")
+	rootCmd.Flags().StringVar(&azureProject, "azure-project", "", "")
+	rootCmd.Flags().StringVar(&testRepo, "azure-test-repo", "", "")
+	rootCmd.Flags().StringVar(&azureOrg, "org", "", "")
+	rootCmd.Flags().StringVar(&azureProject, "project", "", "")
+	rootCmd.Flags().StringVar(&testRepo, "test-repo", "", "")
+	_ = rootCmd.Flags().MarkDeprecated("org", "use --azure-org instead")
+	_ = rootCmd.Flags().MarkDeprecated("project", "use --azure-project instead")
+	_ = rootCmd.Flags().MarkDeprecated("test-repo", "use --azure-test-repo instead")
+	hideRootFlags("from-env", "run", "run-id", "model", "provider",
+		"azure-org", "azure-project", "azure-test-repo")
 
 	serveCmd.Flags().IntVarP(&port, "port", "p", 8080, "Port to listen on")
+	rootCmd.AddCommand(analyzeCmd)
 	rootCmd.AddCommand(serveCmd)
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(doctorCmd)
+}
+
+// hideRootFlags marks flags as hidden on rootCmd (backward compat only, not shown in help).
+func hideRootFlags(names ...string) {
+	for _, name := range names {
+		_ = rootCmd.Flags().MarkHidden(name)
+	}
 }
 
 func main() {
@@ -172,12 +243,12 @@ func printError(w io.Writer, err error) int {
 }
 
 func run(cmd *cobra.Command, args []string) error {
+	format = resolveFormat(format, jsonOutput, isTerminal(os.Stdout))
+
 	target, err := resolveTarget(args, runID)
 	if err != nil {
 		return err
 	}
-
-	format = resolveFormat(format, jsonOutput, isTerminal(os.Stdout))
 
 	cfg, err := config.Load()
 	if err != nil {
@@ -187,7 +258,21 @@ func run(cmd *cobra.Command, args []string) error {
 
 	modelName = resolveModel(modelName, cfg.Model)
 
-	emitter := llm.NewTextEmitter(os.Stderr, verbose)
+	var emitter llm.ProgressEmitter
+	textEmitter := llm.NewTextEmitter(os.Stderr, verbose)
+	if debug {
+		debugEmitter, debugErr := llm.NewDebugEmitter(textEmitter)
+		if debugErr != nil {
+			return debugErr
+		}
+		defer func() {
+			debugEmitter.Close()
+			fmt.Fprintf(os.Stderr, "  Debug log: %s\n", debugEmitter.Path())
+		}()
+		emitter = debugEmitter
+	} else {
+		emitter = textEmitter
+	}
 
 	ciProvider := buildProvider(target, cfg)
 
@@ -203,12 +288,12 @@ func run(cmd *cobra.Command, args []string) error {
 		GoogleAPIKey: cfg.GoogleAPIKey,
 	})
 	if err != nil {
-		emitter.MarkFailed()
-		emitter.Close()
+		textEmitter.MarkFailed()
+		textEmitter.Close()
 		return err
 	}
 
-	emitter.Close()
+	textEmitter.Close()
 
 	// Persist to SaaS dashboard (if configured)
 	if client := saas.NewClient(); client != nil {
@@ -263,7 +348,7 @@ func resolveTarget(args []string, flagRunID int64) (*targetInfo, error) {
 	// 3. Explicit Azure flags
 	if providerFlag == "azure" || azureOrg != "" || azureProject != "" {
 		if azureOrg == "" || azureProject == "" {
-			return nil, fmt.Errorf("azure requires both --org and --project flags")
+			return nil, fmt.Errorf("azure requires both --azure-org and --azure-project flags")
 		}
 		return &targetInfo{
 			provider: "azure",
@@ -360,11 +445,17 @@ func resolveAzureEnv(flagRunID int64) (*targetInfo, error) {
 }
 
 // extractAzureOrg extracts the organization name from an Azure DevOps collection URI.
-// e.g., "https://dev.azure.com/myorg/" → "myorg"
+// Supports both formats:
+//
+//	"https://dev.azure.com/myorg/"       → "myorg"
+//	"https://myorg.visualstudio.com/"    → "myorg"
 func extractAzureOrg(uri string) string {
 	u, err := url.Parse(strings.TrimRight(uri, "/"))
 	if err != nil || u.Host == "" {
 		return ""
+	}
+	if strings.HasSuffix(u.Host, ".visualstudio.com") {
+		return strings.TrimSuffix(u.Host, ".visualstudio.com")
 	}
 	parts := strings.Split(strings.Trim(u.Path, "/"), "/")
 	if len(parts) > 0 && parts[0] != "" {
@@ -446,7 +537,21 @@ func buildProvider(target *targetInfo, cfg *config.Config) ci.Provider {
 		if pat == "" && cfg != nil {
 			pat = cfg.AzureDevOpsPAT
 		}
-		return azure.NewClient(target.owner, target.repo, pat)
+		client := azure.NewClient(target.owner, target.repo, pat)
+		if testRepo != "" {
+			parts := strings.SplitN(testRepo, "/", 2)
+			var project, repo string
+			if len(parts) == 2 {
+				project = parts[0]
+				repo = parts[1]
+			} else {
+				// Single name: use as both project and repo (Azure DevOps convention)
+				project = parts[0]
+				repo = parts[0]
+			}
+			client.ExtraRepos = []ci.RepoRef{{Project: project, Repo: repo}}
+		}
+		return client
 	default:
 		token := ""
 		if cfg != nil {

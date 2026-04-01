@@ -30,6 +30,8 @@ type ToolHandler struct {
 	confidence          int                     // 0-100, set by done tool
 	sensitivity         string                  // "high", "medium", "low", set by done tool
 	rcas                []llm.RootCauseAnalysis // structured RCAs, set by done tool
+	otherRepos          []ci.RepoRef            // cached discovered repos for cross-repo lookups
+	otherReposResolved  bool                    // true after first discovery attempt
 }
 
 // Execute dispatches a function call, returning the result string and whether
@@ -218,14 +220,50 @@ func (h *ToolHandler) getRepoFile(ctx context.Context, args map[string]any) (str
 
 	content, err := h.CI.GetRepoFile(ctx, path)
 	if err != nil {
-		// Smart 404: if file not found, return directory listing of parent
 		if strings.Contains(err.Error(), "404") {
+			// Try cross-repo lookup before falling back to smartNotFound
+			if crossContent, ok := h.tryOtherRepos(ctx, path); ok {
+				return crossContent, false, nil
+			}
 			return h.smartNotFound(ctx, path), false, nil
 		}
 		return errorResult(err), false, nil
 	}
 
 	return content, false, nil
+}
+
+// tryOtherRepos attempts to find a file in additional repositories discovered
+// from the pipeline definition. Returns the file content and true if found.
+func (h *ToolHandler) tryOtherRepos(ctx context.Context, path string) (string, bool) {
+	crp, ok := h.CI.(ci.CrossRepoProvider)
+	if !ok {
+		return "", false
+	}
+
+	if !h.otherReposResolved {
+		h.otherReposResolved = true
+		repos, err := crp.DiscoverRepos(ctx, h.RunID)
+		if err != nil || len(repos) == 0 {
+			emitInfo(h.Emitter, "No additional repositories discovered")
+			return "", false
+		}
+		h.otherRepos = repos
+		names := make([]string, len(repos))
+		for i, r := range repos {
+			names[i] = r.Project + "/" + r.Repo
+		}
+		emitInfo(h.Emitter, fmt.Sprintf("Discovered %d additional repo(s): %s", len(repos), strings.Join(names, ", ")))
+	}
+
+	for _, repo := range h.otherRepos {
+		content, err := crp.GetFileFromRepo(ctx, repo, path)
+		if err == nil {
+			emitInfo(h.Emitter, fmt.Sprintf("Found %s in %s/%s", path, repo.Project, repo.Repo))
+			return content, true
+		}
+	}
+	return "", false
 }
 
 // smartNotFound returns an error with a directory listing of the parent folder.

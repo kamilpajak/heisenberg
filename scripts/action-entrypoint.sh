@@ -5,7 +5,7 @@ REPO="${INPUT_REPOSITORY:-$GITHUB_REPOSITORY}"
 # Docker actions set INPUT_RUN-ID (with hyphen), bash can't reference that directly
 RUN_ID=$(printenv 'INPUT_RUN-ID' 2>/dev/null || echo "")
 
-CMD=("heisenberg" "$REPO" "--format" "json")
+CMD=("heisenberg" "analyze" "$REPO" "--format" "json")
 [[ -n "$RUN_ID" ]] && CMD+=("--run-id" "$RUN_ID")
 
 # Run and capture JSON (allow non-zero exit — structured errors are still valid JSON)

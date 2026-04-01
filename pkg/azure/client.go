@@ -35,6 +35,13 @@ type Client struct {
 	// Cached artifact download URLs, populated by ListArtifacts.
 	// Key: artifact ID, Value: download URL.
 	artifactURLs map[int64]string
+
+	// Cached discovered repos from pipeline definition.
+	discoveredRepos []ci.RepoRef
+	reposDiscovered bool
+
+	// Extra repos pre-seeded via --test-repo flag.
+	ExtraRepos []ci.RepoRef
 }
 
 // NewClient creates a new Azure DevOps client bound to a specific org/project.
@@ -69,9 +76,9 @@ func (c *Client) Name() string { return "azure" }
 // AnalysisHints returns Azure-specific strategy hints for the LLM.
 func (c *Client) AnalysisHints() string {
 	return `Azure Pipelines specific notes:
-- IMPORTANT: Call get_test_results FIRST before reading any logs. It returns structured test failures with error messages and stack traces directly from Azure's Test Results API.
-- Use job logs only for additional context after reviewing structured test results.
-- Pipeline definition files are typically in the repo root or a pipelines/ directory.`
+- Try get_test_results early to check for structured test failures with error messages and stack traces. If it returns no results, the pipeline does not publish test results — use job logs instead.
+- Pipeline definition files are typically in the repo root or a pipelines/ directory.
+- If a test file path from stack traces is not found in this repository, the tool will automatically search additional repositories used by this pipeline.`
 }
 
 // Internal types for JSON deserialization of Azure DevOps API responses.
@@ -86,6 +93,7 @@ type build struct {
 	Reason        string `json:"reason"`
 	QueueTime     string `json:"queueTime"`
 	Definition    struct {
+		ID   int    `json:"id"`
 		Name string `json:"name"`
 		Path string `json:"path"`
 	} `json:"definition"`
@@ -612,4 +620,114 @@ func (c *Client) doRequest(ctx context.Context, reqURL string, result interface{
 	}
 
 	return json.NewDecoder(resp.Body).Decode(result)
+}
+
+// CrossRepoProvider implementation
+
+// GetFileFromRepo fetches a file from a specific repository, potentially
+// in a different project than the client's primary project.
+func (c *Client) GetFileFromRepo(ctx context.Context, repo ci.RepoRef, filePath string) (string, error) {
+	project := repo.Project
+	if project == "" {
+		project = c.project
+	}
+	repoName := repo.Repo
+	if repoName == "" {
+		repoName = project
+	}
+
+	params := url.Values{
+		"path":        {filePath},
+		"$format":     {"text"},
+		apiVersionKey: {apiVersionValue},
+	}
+	apiURL := fmt.Sprintf("%s/%s/_apis/git/repositories/%s/items?%s",
+		c.baseURL, project, repoName, params.Encode())
+
+	req, err := c.newAPIRequest(ctx, apiURL)
+	if err != nil {
+		return "", err
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("file not found: %d %s (repo: %s/%s)", resp.StatusCode, filePath, project, repoName)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+	return string(body), nil
+}
+
+// DiscoverRepos returns additional repositories used by the build pipeline.
+// Results are cached — subsequent calls for any buildID return the cached list.
+func (c *Client) DiscoverRepos(ctx context.Context, buildID int64) ([]ci.RepoRef, error) {
+	if c.reposDiscovered {
+		return c.discoveredRepos, nil
+	}
+	c.reposDiscovered = true
+
+	// Start with any pre-seeded repos from --test-repo flag
+	c.discoveredRepos = append([]ci.RepoRef{}, c.ExtraRepos...)
+
+	// Get build to find definition ID
+	apiURL := fmt.Sprintf("%s/%s/_apis/build/builds/%d?%s=%s", c.baseURL, c.project, buildID, apiVersionKey, apiVersionValue)
+	var b build
+	if err := c.doRequest(ctx, apiURL, &b); err != nil {
+		return c.discoveredRepos, nil // non-fatal: return what we have
+	}
+
+	if b.Definition.ID == 0 {
+		return c.discoveredRepos, nil
+	}
+
+	// Get definition resources
+	resURL := fmt.Sprintf("%s/%s/_apis/build/definitions/%d/resources?%s=%s",
+		c.baseURL, c.project, b.Definition.ID, apiVersionKey, apiVersionValue+"-preview.1")
+
+	var resources struct {
+		Resources []struct {
+			Type string `json:"type"`
+			ID   string `json:"id"`
+		} `json:"resources"`
+	}
+	if err := c.doRequest(ctx, resURL, &resources); err != nil {
+		return c.discoveredRepos, nil // non-fatal
+	}
+
+	seen := make(map[string]bool)
+	for _, r := range c.discoveredRepos {
+		seen[r.Project+"/"+r.Repo] = true
+	}
+
+	for _, r := range resources.Resources {
+		if r.Type != "repository" {
+			continue
+		}
+		// Resource ID format: "project/repo" or just "repo" (same project)
+		project, repo := c.project, r.ID
+		if parts := strings.SplitN(r.ID, "/", 2); len(parts) == 2 {
+			project = parts[0]
+			repo = parts[1]
+		}
+		// Skip primary repo
+		if project == c.project && repo == c.project {
+			continue
+		}
+		key := project + "/" + repo
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		c.discoveredRepos = append(c.discoveredRepos, ci.RepoRef{Project: project, Repo: repo})
+	}
+
+	return c.discoveredRepos, nil
 }

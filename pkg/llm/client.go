@@ -22,6 +22,21 @@ func emit(h ToolExecutor, ev ProgressEvent) {
 	}
 }
 
+// formatModelContent serializes a model response Content for debug logging.
+func formatModelContent(c Content) string {
+	var parts []string
+	for _, p := range c.Parts {
+		if p.Text != "" {
+			parts = append(parts, "[text] "+p.Text)
+		}
+		if p.FunctionCall != nil {
+			args, _ := json.Marshal(p.FunctionCall.Args)
+			parts = append(parts, fmt.Sprintf("[call] %s(%s)", p.FunctionCall.Name, string(args)))
+		}
+	}
+	return strings.Join(parts, "\n")
+}
+
 const maxIterations = 30
 const softLimitIteration = 15
 const circuitBreakerThreshold = 3 // consecutive file reads before breaker fires
@@ -201,10 +216,19 @@ Bug location classification:
   - Only CI config changed → bug_location="infrastructure"
   - No diff available → rely on logs and stack traces alone
 
-  Choose "test" when: stack trace is entirely in test files, expected value is outdated, assertion is brittle.
-  Choose "production" when: stack trace shows exception in app code, actual values indicate logic bug, PR changed production files.
-  Choose "infrastructure" when: logs show ECONNREFUSED, missing tables, empty DB, failed migrations, many unrelated tests fail similarly.
-  Priority: infrastructure → production → test → unknown (smallest scope that explains the failure).
+  CRITICAL: Before classifying bug_location, you MUST read the test source file using get_repo_file.
+  Do not classify based on logs alone — browser console errors (403, 404, 500, 503) do NOT
+  automatically mean infrastructure. Tests may be failing because they don't handle expected
+  error states, have wrong selectors, missing waits, or race conditions.
+
+  Choose "test" when: test code has wrong selectors, missing waits, brittle assertions,
+    doesn't handle expected app states, or fails even when the error condition is benign.
+  Choose "production" when: stack trace shows exception in app code, actual values indicate
+    logic bug, PR changed production files.
+  Choose "infrastructure" when: services are completely unreachable (ECONNREFUSED, DNS failure),
+    DB missing/empty, CI agent misconfiguration. HTTP 4xx/5xx in browser console alone is NOT
+    sufficient — the app may intentionally handle these errors.
+  Priority: Gather evidence first, classify last. Read test source before deciding.
 
   Set bug_location_confidence:
   - "high": Clear stack trace + file evidence
@@ -308,6 +332,10 @@ func (c *Client) RunAgentLoop(ctx context.Context, handler ToolExecutor, toolDec
 		calledTools: make(map[string]bool),
 	}
 
+	// Debug: emit system prompt and initial context
+	emit(handler, ProgressEvent{Type: "system_prompt", Content: system.Parts[0].Text})
+	emit(handler, ProgressEvent{Type: "initial_context", Content: initialContext})
+
 	for i := range maxIterations {
 		si := &stepInfo{step: i + 1, iteration: i, verbose: verbose}
 
@@ -331,6 +359,9 @@ func (c *Client) RunAgentLoop(ctx context.Context, handler ToolExecutor, toolDec
 		modelContent := candidate.Content
 		modelContent.Role = "model"
 		s.history = append(s.history, modelContent)
+
+		// Debug: emit full model response
+		emit(handler, ProgressEvent{Type: "model_response", Step: si.step, Content: formatModelContent(modelContent)})
 
 		result, err := c.processResponse(ctx, s, handler, modelContent, si)
 		if err != nil {
@@ -557,7 +588,7 @@ func (c *Client) executeCalls(ctx context.Context, s *loopState, handler ToolExe
 	done := false
 	for ci, call := range calls {
 		toolEvent := ProgressEvent{Type: "tool", Step: si.step, MaxStep: maxIterations, Tool: call.Name}
-		if si.verbose && len(call.Args) > 0 {
+		if len(call.Args) > 0 {
 			argsJSON, _ := json.Marshal(call.Args)
 			toolEvent.Args = string(argsJSON)
 		}
@@ -622,6 +653,7 @@ func (s *loopState) interceptCircuitBreaker(call FunctionCall, handler ToolExecu
 
 	if isFileRead && s.consecutiveFileReads > circuitBreakerThreshold && handler.HasTestArtifacts() {
 		s.fileToolsHiddenUntil = si.iteration + circuitBreakerCooldown
+		emit(handler, ProgressEvent{Type: "loop_state", Step: si.step, Message: fmt.Sprintf("circuit breaker: hiding file tools for %d iterations", circuitBreakerCooldown)})
 		return `{"error": "CIRCUIT_BREAKER: You have fetched multiple source files consecutively. File reading is temporarily disabled. Use get_artifact, get_job_logs, or get_test_traces to analyze test failures, then call done with your diagnosis."}`
 	}
 	return ""
@@ -651,17 +683,16 @@ func filterFileTools(tools []Tool) []Tool {
 	return result
 }
 
-// emitToolResult sends a verbose progress event for a completed tool call.
+// emitToolResult sends a progress event for a completed tool call.
+// In verbose mode, it's displayed on stderr. In debug mode, full content is logged to file.
 func emitToolResult(handler ToolExecutor, si *stepInfo, ci, totalCalls, toolMs int, result string) {
-	if !si.verbose {
-		return
-	}
 	ev := ProgressEvent{
 		Type:    "result",
 		Step:    si.step,
 		MaxStep: maxIterations,
 		Chars:   len(result),
 		ToolMs:  toolMs,
+		Content: result, // full content for debug logging
 	}
 	// Attach model stats to the last tool call in this step
 	if ci == totalCalls-1 {
