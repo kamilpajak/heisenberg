@@ -56,6 +56,7 @@ var (
 	azureOrg     string
 	azureProject string
 	testRepo     string
+	debug        bool
 )
 
 var rootCmd = &cobra.Command{
@@ -96,6 +97,7 @@ func init() {
 	rootCmd.Flags().StringVar(&azureOrg, "org", "", "Azure DevOps organization")
 	rootCmd.Flags().StringVar(&azureProject, "project", "", "Azure DevOps project")
 	rootCmd.Flags().StringVar(&testRepo, "test-repo", "", "Additional repository for test code (project/repo)")
+	rootCmd.Flags().BoolVar(&debug, "debug", false, "Write full agent conversation trace to a debug file")
 	_ = rootCmd.Flags().MarkHidden("json") // backward compat alias
 
 	serveCmd.Flags().IntVarP(&port, "port", "p", 8080, "Port to listen on")
@@ -189,7 +191,21 @@ func run(cmd *cobra.Command, args []string) error {
 
 	modelName = resolveModel(modelName, cfg.Model)
 
-	emitter := llm.NewTextEmitter(os.Stderr, verbose)
+	var emitter llm.ProgressEmitter
+	textEmitter := llm.NewTextEmitter(os.Stderr, verbose)
+	if debug {
+		debugEmitter, debugErr := llm.NewDebugEmitter(textEmitter)
+		if debugErr != nil {
+			return debugErr
+		}
+		defer func() {
+			debugEmitter.Close()
+			fmt.Fprintf(os.Stderr, "  Debug log: %s\n", debugEmitter.Path())
+		}()
+		emitter = debugEmitter
+	} else {
+		emitter = textEmitter
+	}
 
 	ciProvider := buildProvider(target, cfg)
 
@@ -205,12 +221,12 @@ func run(cmd *cobra.Command, args []string) error {
 		GoogleAPIKey: cfg.GoogleAPIKey,
 	})
 	if err != nil {
-		emitter.MarkFailed()
-		emitter.Close()
+		textEmitter.MarkFailed()
+		textEmitter.Close()
 		return err
 	}
 
-	emitter.Close()
+	textEmitter.Close()
 
 	// Persist to SaaS dashboard (if configured)
 	if client := saas.NewClient(); client != nil {

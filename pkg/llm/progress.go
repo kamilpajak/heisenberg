@@ -29,6 +29,7 @@ type ProgressEvent struct {
 	Tokens   int             `json:"tokens,omitempty"`   // prompt token count
 	Chars    int             `json:"chars,omitempty"`    // tool result size in characters
 	ToolMs   int             `json:"tool_ms,omitempty"`  // tool execution duration in ms
+	Content  string          `json:"-"`                  // full content for debug logging (ignored by TextEmitter)
 }
 
 // ProgressEmitter receives progress events during analysis.
