@@ -908,7 +908,7 @@ func TestResolveTarget_AzureFlags_MissingOrg(t *testing.T) {
 
 	_, err := resolveTarget(nil, runID)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "--org")
+	assert.Contains(t, err.Error(), "--azure-org")
 
 	providerFlag = ""
 	azureProject = ""
@@ -1393,4 +1393,153 @@ func TestPrintResult_ExecutiveSummary_SectionNames(t *testing.T) {
 	assert.Contains(t, out, "Cause")
 	assert.Contains(t, out, "Fix")
 	assert.NotContains(t, out, "Root Cause", "should use shorter 'Cause' heading")
+}
+
+// --- Phase 1: analyze subcommand + flag relocation ---
+
+func TestAnalyzeCmd_Exists(t *testing.T) {
+	cmd, _, err := rootCmd.Find([]string{"analyze"})
+	require.NoError(t, err)
+	assert.Equal(t, "analyze", cmd.Name())
+}
+
+func TestAnalyzeCmd_HasExamples(t *testing.T) {
+	cmd, _, _ := rootCmd.Find([]string{"analyze"})
+	require.NotNil(t, cmd)
+	assert.NotEmpty(t, cmd.Example)
+	assert.Contains(t, cmd.Example, "--from-env")
+	assert.Contains(t, cmd.Example, "analyze owner/repo")
+	assert.Contains(t, cmd.Example, "-f json")
+}
+
+func TestGlobalFlags_OnPersistentFlags(t *testing.T) {
+	assert.NotNil(t, rootCmd.PersistentFlags().Lookup("verbose"))
+	assert.NotNil(t, rootCmd.PersistentFlags().Lookup("format"))
+	assert.NotNil(t, rootCmd.PersistentFlags().Lookup("debug"))
+}
+
+func TestAnalyzeCmd_OwnFlags(t *testing.T) {
+	cmd, _, _ := rootCmd.Find([]string{"analyze"})
+	require.NotNil(t, cmd)
+	assert.NotNil(t, cmd.Flags().Lookup("from-env"))
+	assert.NotNil(t, cmd.Flags().Lookup("run"))
+	assert.NotNil(t, cmd.Flags().Lookup("run-id"))
+	assert.NotNil(t, cmd.Flags().Lookup("model"))
+	assert.NotNil(t, cmd.Flags().Lookup("provider"))
+}
+
+func TestRootCmd_UseIsClean(t *testing.T) {
+	assert.Equal(t, "heisenberg", rootCmd.Use)
+}
+
+func TestRootCmd_BackwardCompat_Runnable(t *testing.T) {
+	assert.True(t, rootCmd.Runnable(), "rootCmd must remain runnable for backward compat")
+}
+
+func TestRootCmd_AnalyzeFlags_Hidden(t *testing.T) {
+	flag := rootCmd.Flags().Lookup("from-env")
+	require.NotNil(t, flag, "rootCmd must accept --from-env for backward compat")
+	assert.True(t, flag.Hidden, "--from-env should be hidden on rootCmd")
+}
+
+// --- Phase 2: Rename provider-specific flags ---
+
+func TestAnalyzeCmd_AzureFlags(t *testing.T) {
+	cmd, _, _ := rootCmd.Find([]string{"analyze"})
+	require.NotNil(t, cmd)
+	assert.NotNil(t, cmd.Flags().Lookup("azure-org"), "--azure-org should exist")
+	assert.NotNil(t, cmd.Flags().Lookup("azure-project"), "--azure-project should exist")
+	assert.NotNil(t, cmd.Flags().Lookup("azure-test-repo"), "--azure-test-repo should exist")
+}
+
+func TestAnalyzeCmd_DeprecatedFlags(t *testing.T) {
+	cmd, _, _ := rootCmd.Find([]string{"analyze"})
+	require.NotNil(t, cmd)
+	orgFlag := cmd.Flags().Lookup("org")
+	require.NotNil(t, orgFlag, "--org should still exist as deprecated alias")
+	assert.NotEmpty(t, orgFlag.Deprecated)
+}
+
+// --- Phase 3: Short flag aliases ---
+
+func TestShortFlags(t *testing.T) {
+	fmtFlag := rootCmd.PersistentFlags().ShorthandLookup("f")
+	require.NotNil(t, fmtFlag, "-f should exist")
+	assert.Equal(t, "format", fmtFlag.Name)
+
+	cmd, _, _ := rootCmd.Find([]string{"analyze"})
+	require.NotNil(t, cmd)
+	runFlag := cmd.Flags().ShorthandLookup("r")
+	require.NotNil(t, runFlag, "-r should exist")
+	assert.Equal(t, "run", runFlag.Name)
+}
+
+// --- CR fixes ---
+
+func TestRootCmd_ProviderFlagFallsThrough(t *testing.T) {
+	// "heisenberg --provider azure" should NOT show help — should fall through
+	// to run() which returns a proper validation error.
+	providerFlag = "azure"
+	azureOrg = ""
+	azureProject = ""
+	fromEnv = false
+	runURL = ""
+	defer func() { providerFlag = "" }()
+
+	err := rootCmd.RunE(rootCmd, nil)
+	// Should be an error from resolveTarget, not nil (help)
+	require.Error(t, err, "should fall through to run(), not show help")
+	assert.Contains(t, err.Error(), "--azure-org")
+}
+
+func TestRootCmd_AzureProjectFallsThrough(t *testing.T) {
+	// "heisenberg --azure-project foo" should NOT show help
+	azureProject = "foo"
+	azureOrg = ""
+	fromEnv = false
+	runURL = ""
+	providerFlag = ""
+	defer func() { azureProject = "" }()
+
+	err := rootCmd.RunE(rootCmd, nil)
+	assert.Error(t, err)
+}
+
+func TestServeCmd_SilencesErrors(t *testing.T) {
+	assert.True(t, serveCmd.SilenceUsage, "serveCmd should silence usage on error")
+	assert.True(t, serveCmd.SilenceErrors, "serveCmd should silence errors")
+}
+
+func TestRootCmd_DeprecatedFlagsOnRoot(t *testing.T) {
+	// Legacy flags on rootCmd should also be marked deprecated
+	orgFlag := rootCmd.Flags().Lookup("org")
+	require.NotNil(t, orgFlag)
+	assert.NotEmpty(t, orgFlag.Deprecated, "--org on rootCmd should be deprecated")
+
+	projectFlag := rootCmd.Flags().Lookup("project")
+	require.NotNil(t, projectFlag)
+	assert.NotEmpty(t, projectFlag.Deprecated, "--project on rootCmd should be deprecated")
+
+	testRepoFlag := rootCmd.Flags().Lookup("test-repo")
+	require.NotNil(t, testRepoFlag)
+	assert.NotEmpty(t, testRepoFlag.Deprecated, "--test-repo on rootCmd should be deprecated")
+}
+
+func TestRun_ResolvesFormatBeforeError(t *testing.T) {
+	// Pre-existing bug: resolveFormat ran AFTER resolveTarget, so if
+	// resolveTarget failed, format was still "" and printError would
+	// use human output even when piped (non-TTY expects JSON).
+	oldFormat := format
+	oldFromEnv := fromEnv
+	oldRunURL := runURL
+	format = ""
+	fromEnv = false
+	runURL = ""
+	defer func() { format = oldFormat; fromEnv = oldFromEnv; runURL = oldRunURL }()
+
+	// run() with invalid args — fails at resolveTarget
+	_ = run(rootCmd, []string{"invalid"})
+
+	// format should already be resolved (not still "")
+	assert.NotEmpty(t, format, "format should be resolved before resolveTarget can fail")
 }
