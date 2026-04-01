@@ -216,10 +216,19 @@ Bug location classification:
   - Only CI config changed → bug_location="infrastructure"
   - No diff available → rely on logs and stack traces alone
 
-  Choose "test" when: stack trace is entirely in test files, expected value is outdated, assertion is brittle.
-  Choose "production" when: stack trace shows exception in app code, actual values indicate logic bug, PR changed production files.
-  Choose "infrastructure" when: logs show ECONNREFUSED, missing tables, empty DB, failed migrations, many unrelated tests fail similarly.
-  Priority: infrastructure → production → test → unknown (smallest scope that explains the failure).
+  CRITICAL: Before classifying bug_location, you MUST read the test source file using get_repo_file.
+  Do not classify based on logs alone — browser console errors (403, 404, 500, 503) do NOT
+  automatically mean infrastructure. Tests may be failing because they don't handle expected
+  error states, have wrong selectors, missing waits, or race conditions.
+
+  Choose "test" when: test code has wrong selectors, missing waits, brittle assertions,
+    doesn't handle expected app states, or fails even when the error condition is benign.
+  Choose "production" when: stack trace shows exception in app code, actual values indicate
+    logic bug, PR changed production files.
+  Choose "infrastructure" when: services are completely unreachable (ECONNREFUSED, DNS failure),
+    DB missing/empty, CI agent misconfiguration. HTTP 4xx/5xx in browser console alone is NOT
+    sufficient — the app may intentionally handle these errors.
+  Priority: Gather evidence first, classify last. Read test source before deciding.
 
   Set bug_location_confidence:
   - "high": Clear stack trace + file evidence

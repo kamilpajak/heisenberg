@@ -10,6 +10,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/fatih/color"
+	"github.com/kamilpajak/heisenberg/pkg/azure"
 	"github.com/kamilpajak/heisenberg/pkg/config"
 	"github.com/kamilpajak/heisenberg/pkg/llm"
 	"github.com/stretchr/testify/assert"
@@ -963,6 +964,31 @@ func TestBuildProvider_AzureFromEnv(t *testing.T) {
 	target := &targetInfo{provider: "azure", owner: "myorg", repo: "myproject"}
 	p := buildProvider(target, &config.Config{})
 	assert.Equal(t, "azure", p.Name())
+}
+
+func TestBuildProvider_AzureWithTestRepo(t *testing.T) {
+	target := &targetInfo{provider: "azure", owner: "myorg", repo: "myproject"}
+	testRepo = "e2e-tests"
+	defer func() { testRepo = "" }()
+
+	p := buildProvider(target, &config.Config{AzureDevOpsPAT: "pat"})
+	azClient := p.(*azure.Client)
+	require.Len(t, azClient.ExtraRepos, 1)
+	// Single name: project and repo should BOTH be the test repo name, not the org
+	assert.Equal(t, "e2e-tests", azClient.ExtraRepos[0].Project)
+	assert.Equal(t, "e2e-tests", azClient.ExtraRepos[0].Repo)
+}
+
+func TestBuildProvider_AzureWithTestRepoExplicitProject(t *testing.T) {
+	target := &targetInfo{provider: "azure", owner: "myorg", repo: "myproject"}
+	testRepo = "other-project/test-repo"
+	defer func() { testRepo = "" }()
+
+	p := buildProvider(target, &config.Config{AzureDevOpsPAT: "pat"})
+	azClient := p.(*azure.Client)
+	require.Len(t, azClient.ExtraRepos, 1)
+	assert.Equal(t, "other-project", azClient.ExtraRepos[0].Project)
+	assert.Equal(t, "test-repo", azClient.ExtraRepos[0].Repo)
 }
 
 func TestPrintRunHeader(t *testing.T) {

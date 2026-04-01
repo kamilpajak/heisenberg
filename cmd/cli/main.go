@@ -467,11 +467,14 @@ func buildProvider(target *targetInfo, cfg *config.Config) ci.Provider {
 		client := azure.NewClient(target.owner, target.repo, pat)
 		if testRepo != "" {
 			parts := strings.SplitN(testRepo, "/", 2)
-			repo := parts[0]
-			project := target.owner // same org by default
+			var project, repo string
 			if len(parts) == 2 {
 				project = parts[0]
 				repo = parts[1]
+			} else {
+				// Single name: use as both project and repo (Azure DevOps convention)
+				project = parts[0]
+				repo = parts[0]
 			}
 			client.ExtraRepos = []ci.RepoRef{{Project: project, Repo: repo}}
 		}
