@@ -69,9 +69,9 @@ func (c *Client) Name() string { return "azure" }
 // AnalysisHints returns Azure-specific strategy hints for the LLM.
 func (c *Client) AnalysisHints() string {
 	return `Azure Pipelines specific notes:
-- Use get_test_results first to see structured test failures with error messages and stack traces
-- Then use job logs for additional context around the failures
-- Pipeline definition files are typically in the repo root or a pipelines/ directory`
+- IMPORTANT: Call get_test_results FIRST before reading any logs. It returns structured test failures with error messages and stack traces directly from Azure's Test Results API.
+- Use job logs only for additional context after reviewing structured test results.
+- Pipeline definition files are typically in the repo root or a pipelines/ directory.`
 }
 
 // Internal types for JSON deserialization of Azure DevOps API responses.
@@ -131,6 +131,8 @@ func mapResult(result string) string {
 func stripBranchPrefix(ref string) string {
 	ref = strings.TrimPrefix(ref, "refs/heads/")
 	ref = strings.TrimPrefix(ref, "refs/tags/")
+	ref = strings.TrimPrefix(ref, "refs/")
+	ref = strings.TrimSuffix(ref, "/merge")
 	return ref
 }
 

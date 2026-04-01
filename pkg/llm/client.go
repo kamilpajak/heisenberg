@@ -105,7 +105,7 @@ func describeEmptyResponse(c *Candidate) string {
 }
 
 // DefaultModel is the Gemini model used when no override is specified.
-const DefaultModel = "gemini-3-pro-preview"
+const DefaultModel = "gemini-2.5-pro"
 
 // NewClient creates a new LLM client (Google Gemini).
 // If model is empty, DefaultModel is used.
