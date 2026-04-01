@@ -77,7 +77,7 @@ export GITHUB_TOKEN=ghp_...
 export GOOGLE_API_KEY=AIza...
 
 heisenberg doctor                           # verify your setup
-heisenberg owner/repo                       # analyze latest failed run
+heisenberg analyze owner/repo               # analyze latest failed run
 ```
 
 `heisenberg doctor` checks tokens, network connectivity, Playwright, and config:
@@ -110,12 +110,12 @@ Under the hood: an agentic tool-calling loop (up to 30 iterations) lets Gemini d
 ## How It Works
 
 ```
-heisenberg owner/repo
+heisenberg analyze owner/repo
        │
        ▼
 ┌─────────────────────────────┐
 │  Fetch workflow run from    │
-│  GitHub Actions             │
+│  GitHub Actions / Azure     │
 └─────────────┬───────────────┘
               │
               ▼
@@ -161,25 +161,31 @@ heisenberg owner/repo
 
 ```bash
 # Analyze the latest failed workflow run
-heisenberg owner/repo
+heisenberg analyze owner/repo
 
 # Analyze a specific run by URL (paste from your browser)
-heisenberg --run https://github.com/org/repo/actions/runs/123456
+heisenberg analyze -r https://github.com/org/repo/actions/runs/123456
 
 # Analyze a specific run by ID
-heisenberg owner/repo --run-id 123456
+heisenberg analyze owner/repo --run-id 123456
 
 # JSON output for CI pipelines
-heisenberg owner/repo --format json
+heisenberg analyze owner/repo -f json
 
 # CI mode — read repo and run ID from GitHub Actions environment
-heisenberg --from-env
+heisenberg analyze --from-env
 
 # Show detailed tool call info
-heisenberg owner/repo --verbose
+heisenberg analyze owner/repo --verbose
 
 # Override the Gemini model
-heisenberg owner/repo --model gemini-2.5-flash
+heisenberg analyze owner/repo --model gemini-2.5-flash
+
+# Azure DevOps — analyze by build URL
+heisenberg analyze -r "https://dev.azure.com/org/project/_build/results?buildId=456"
+
+# Azure DevOps — explicit org/project
+heisenberg analyze --azure-org myorg --azure-project myproject --run-id 789
 
 # Start the local web dashboard
 heisenberg serve

@@ -88,7 +88,7 @@ repository URL or CI environment variables.`,
   $ heisenberg analyze owner/repo
 
   # Analyze a specific CI run by URL
-  $ heisenberg analyze owner/repo -r "https://github.com/owner/repo/actions/runs/123"
+  $ heisenberg analyze -r "https://github.com/owner/repo/actions/runs/123"
 
   # Auto-detect from CI environment
   $ heisenberg analyze --from-env
@@ -445,11 +445,17 @@ func resolveAzureEnv(flagRunID int64) (*targetInfo, error) {
 }
 
 // extractAzureOrg extracts the organization name from an Azure DevOps collection URI.
-// e.g., "https://dev.azure.com/myorg/" → "myorg"
+// Supports both formats:
+//
+//	"https://dev.azure.com/myorg/"       → "myorg"
+//	"https://myorg.visualstudio.com/"    → "myorg"
 func extractAzureOrg(uri string) string {
 	u, err := url.Parse(strings.TrimRight(uri, "/"))
 	if err != nil || u.Host == "" {
 		return ""
+	}
+	if strings.HasSuffix(u.Host, ".visualstudio.com") {
+		return strings.TrimSuffix(u.Host, ".visualstudio.com")
 	}
 	parts := strings.Split(strings.Trim(u.Path, "/"), "/")
 	if len(parts) > 0 && parts[0] != "" {

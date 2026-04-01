@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `analyze` subcommand — explicit entry point for test failure analysis (`heisenberg analyze owner/repo`)
+- Azure DevOps flags: `--azure-org`, `--azure-project`, `--azure-test-repo` (replaces `--org`, `--project`, `--test-repo`)
+- Short flag aliases: `-f` (format), `-r` (run)
+- Cross-repository file access for Azure DevOps multi-repo pipelines (`--azure-test-repo`)
+- `--debug` flag for full agent conversation trace
+
+### Changed
+
+- Bare `heisenberg` now shows help with subcommand list instead of erroring
+- Global flags (`--verbose`, `--format`, `--debug`) available to all subcommands
+- Output format resolved before target resolution — piped errors now correctly produce JSON
+
+### Deprecated
+
+- `--org`, `--project`, `--test-repo` flags (use `--azure-org`, `--azure-project`, `--azure-test-repo`)
+- Running analysis on root command (`heisenberg owner/repo`) — use `heisenberg analyze owner/repo`
+
 ## [0.3.1] - 2026-03-30
 
 ### Fixed

@@ -937,6 +937,9 @@ func TestExtractAzureOrg(t *testing.T) {
 		{"https://dev.azure.com/myorg/", "myorg"},
 		{"https://dev.azure.com/myorg", "myorg"},
 		{"https://dev.azure.com/my-org/", "my-org"},
+		{"https://myorg.visualstudio.com/", "myorg"},
+		{"https://myorg.visualstudio.com", "myorg"},
+		{"https://my-org.visualstudio.com/DefaultCollection", "my-org"},
 		{"", ""},
 		{"not-a-url", ""},
 	}
@@ -1410,6 +1413,14 @@ func TestAnalyzeCmd_HasExamples(t *testing.T) {
 	assert.Contains(t, cmd.Example, "--from-env")
 	assert.Contains(t, cmd.Example, "analyze owner/repo")
 	assert.Contains(t, cmd.Example, "-f json")
+
+	// --run URL example should NOT include owner/repo (URL already contains it)
+	for _, line := range strings.Split(cmd.Example, "\n") {
+		if strings.Contains(line, "-r ") && strings.Contains(line, "http") {
+			assert.NotRegexp(t, `analyze\s+\S+/\S+\s+-r`, line,
+				"--run URL example should not include owner/repo — URL already identifies the target")
+		}
+	}
 }
 
 func TestGlobalFlags_OnPersistentFlags(t *testing.T) {

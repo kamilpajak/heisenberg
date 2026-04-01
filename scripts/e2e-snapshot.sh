@@ -35,7 +35,7 @@ for entry in "${REPOS[@]}"; do
   SLUG="${REPO//\//_}_${RUN_ID}"
   echo -n "  $REPO #$RUN_ID ... "
 
-  if "$BINARY" --json --model "$MODEL" "$REPO" --run-id "$RUN_ID" \
+  if "$BINARY" analyze --format json --model "$MODEL" "$REPO" --run-id "$RUN_ID" \
     2>"$DIR/${SLUG}.stderr" > "$DIR/${SLUG}.json"; then
     CATEGORY=$(jq -r '.category' "$DIR/${SLUG}.json")
     COUNT=$(jq '.analyses | length' "$DIR/${SLUG}.json")
