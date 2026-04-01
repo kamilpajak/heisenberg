@@ -151,6 +151,22 @@ type TestRun struct {
 	FailedTests int
 }
 
+// CrossRepoProvider is an optional capability for CI platforms that can
+// discover and access files from additional repositories used by a build
+// pipeline (e.g., test repos checked out via resources.repositories).
+type CrossRepoProvider interface {
+	// DiscoverRepos returns additional repository references used by the build pipeline.
+	DiscoverRepos(ctx context.Context, buildID int64) ([]RepoRef, error)
+	// GetFileFromRepo fetches a file from a specific repository.
+	GetFileFromRepo(ctx context.Context, repo RepoRef, path string) (string, error)
+}
+
+// RepoRef identifies a repository within a CI platform.
+type RepoRef struct {
+	Project string // Azure: project name; GitHub: owner
+	Repo    string // repository name or ID
+}
+
 // TestResult represents a single test result.
 type TestResult struct {
 	ID           int64

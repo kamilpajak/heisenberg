@@ -55,6 +55,7 @@ var (
 	providerFlag string
 	azureOrg     string
 	azureProject string
+	testRepo     string
 )
 
 var rootCmd = &cobra.Command{
@@ -94,6 +95,7 @@ func init() {
 	rootCmd.Flags().StringVar(&providerFlag, "provider", "", "CI provider: github or azure (default: auto-detect)")
 	rootCmd.Flags().StringVar(&azureOrg, "org", "", "Azure DevOps organization")
 	rootCmd.Flags().StringVar(&azureProject, "project", "", "Azure DevOps project")
+	rootCmd.Flags().StringVar(&testRepo, "test-repo", "", "Additional repository for test code (project/repo)")
 	_ = rootCmd.Flags().MarkHidden("json") // backward compat alias
 
 	serveCmd.Flags().IntVarP(&port, "port", "p", 8080, "Port to listen on")
@@ -446,7 +448,18 @@ func buildProvider(target *targetInfo, cfg *config.Config) ci.Provider {
 		if pat == "" && cfg != nil {
 			pat = cfg.AzureDevOpsPAT
 		}
-		return azure.NewClient(target.owner, target.repo, pat)
+		client := azure.NewClient(target.owner, target.repo, pat)
+		if testRepo != "" {
+			parts := strings.SplitN(testRepo, "/", 2)
+			repo := parts[0]
+			project := target.owner // same org by default
+			if len(parts) == 2 {
+				project = parts[0]
+				repo = parts[1]
+			}
+			client.ExtraRepos = []ci.RepoRef{{Project: project, Repo: repo}}
+		}
+		return client
 	default:
 		token := ""
 		if cfg != nil {

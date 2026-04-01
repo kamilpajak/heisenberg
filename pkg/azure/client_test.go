@@ -16,6 +16,7 @@ import (
 
 // Compile-time interface checks
 var _ ci.Provider = (*Client)(nil)
+var _ ci.CrossRepoProvider = (*Client)(nil)
 var _ ci.TestResultsProvider = (*Client)(nil)
 
 func TestName(t *testing.T) {
@@ -573,4 +574,122 @@ func buildTestZip(t *testing.T, name string, content []byte) []byte {
 	}
 	require.NoError(t, w.Close())
 	return buf.Bytes()
+}
+
+func TestGetFileFromRepo(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Verify it hits a DIFFERENT project/repo than the client's own
+		assert.Contains(t, r.URL.Path, "/other-project/_apis/git/repositories/other-repo/items")
+		assert.Equal(t, "src/Test.java", r.URL.Query().Get("path"))
+		w.Write([]byte("public class Test {}"))
+	}))
+	defer srv.Close()
+
+	c := NewTestClient("myorg", "myproject", srv.URL, srv.Client())
+	content, err := c.GetFileFromRepo(context.Background(), ci.RepoRef{Project: "other-project", Repo: "other-repo"}, "src/Test.java")
+	require.NoError(t, err)
+	assert.Equal(t, "public class Test {}", content)
+}
+
+func TestGetFileFromRepo_NotFound(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	c := NewTestClient("myorg", "myproject", srv.URL, srv.Client())
+	_, err := c.GetFileFromRepo(context.Background(), ci.RepoRef{Project: "other", Repo: "other"}, "missing.java")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "404")
+}
+
+func TestDiscoverRepos(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "/builds/100") && !strings.Contains(r.URL.Path, "/timeline") && !strings.Contains(r.URL.Path, "/artifacts") && !strings.Contains(r.URL.Path, "/logs") {
+			w.Write([]byte(`{"id":100,"definition":{"id":42,"name":"CI","path":"\\"}}`))
+			return
+		}
+		if strings.Contains(r.URL.Path, "/definitions/42/resources") {
+			w.Write([]byte(`{"resources":[
+				{"type":"repository","id":"e2e-tests/e2e-tests"},
+				{"type":"repository","id":"myproject"},
+				{"type":"endpoint","id":"some-connection"}
+			]}`))
+			return
+		}
+		w.WriteHeader(404)
+	}))
+	defer srv.Close()
+
+	c := NewTestClient("myorg", "myproject", srv.URL, srv.Client())
+	repos, err := c.DiscoverRepos(context.Background(), 100)
+	require.NoError(t, err)
+	assert.Len(t, repos, 1) // myproject (self) skipped, endpoint skipped
+	assert.Equal(t, "e2e-tests", repos[0].Project)
+	assert.Equal(t, "e2e-tests", repos[0].Repo)
+}
+
+func TestDiscoverRepos_NoExtraRepos(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "/builds/200") {
+			w.Write([]byte(`{"id":200,"definition":{"id":10,"name":"CI","path":"\\"}}`))
+			return
+		}
+		if strings.Contains(r.URL.Path, "/definitions/10/resources") {
+			w.Write([]byte(`{"resources":[{"type":"repository","id":"myproject"}]}`))
+			return
+		}
+		w.WriteHeader(404)
+	}))
+	defer srv.Close()
+
+	c := NewTestClient("myorg", "myproject", srv.URL, srv.Client())
+	repos, err := c.DiscoverRepos(context.Background(), 200)
+	require.NoError(t, err)
+	assert.Empty(t, repos)
+}
+
+func TestDiscoverRepos_WithExtraRepos(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "/builds/300") {
+			w.Write([]byte(`{"id":300,"definition":{"id":5,"name":"CI","path":"\\"}}`))
+			return
+		}
+		if strings.Contains(r.URL.Path, "/definitions/5/resources") {
+			w.Write([]byte(`{"resources":[]}`))
+			return
+		}
+		w.WriteHeader(404)
+	}))
+	defer srv.Close()
+
+	c := NewTestClient("myorg", "myproject", srv.URL, srv.Client())
+	c.ExtraRepos = []ci.RepoRef{{Project: "other", Repo: "tests"}}
+	repos, err := c.DiscoverRepos(context.Background(), 300)
+	require.NoError(t, err)
+	assert.Len(t, repos, 1)
+	assert.Equal(t, "tests", repos[0].Repo)
+}
+
+func TestDiscoverRepos_Cached(t *testing.T) {
+	callCount := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		callCount++
+		if strings.Contains(r.URL.Path, "/builds/100") {
+			w.Write([]byte(`{"id":100,"definition":{"id":1}}`))
+			return
+		}
+		if strings.Contains(r.URL.Path, "/definitions/") {
+			w.Write([]byte(`{"resources":[]}`))
+			return
+		}
+		w.WriteHeader(404)
+	}))
+	defer srv.Close()
+
+	c := NewTestClient("myorg", "myproject", srv.URL, srv.Client())
+	_, _ = c.DiscoverRepos(context.Background(), 100)
+	firstCallCount := callCount
+	_, _ = c.DiscoverRepos(context.Background(), 100)
+	assert.Equal(t, firstCallCount, callCount) // second call should be cached — no new API calls
 }

@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -1589,4 +1590,81 @@ func TestToolDeclarations_Azure(t *testing.T) {
 		names[i] = d.Name
 	}
 	assert.Contains(t, names, "get_test_results")
+}
+
+// mockCrossRepoProvider implements ci.Provider + ci.CrossRepoProvider for testing.
+type mockCrossRepoProvider struct {
+	ci.Provider
+	repos   []ci.RepoRef
+	files   map[string]string // "project/repo:path" → content
+	repoErr error
+}
+
+func (m *mockCrossRepoProvider) Name() string          { return "mock-cross" }
+func (m *mockCrossRepoProvider) AnalysisHints() string { return "" }
+func (m *mockCrossRepoProvider) GetRepoFile(_ context.Context, path string) (string, error) {
+	return "", fmt.Errorf("file not found: 404 %s", path)
+}
+func (m *mockCrossRepoProvider) ListDirectory(_ context.Context, _ string) ([]string, error) {
+	return nil, fmt.Errorf("not found")
+}
+func (m *mockCrossRepoProvider) DiscoverRepos(_ context.Context, _ int64) ([]ci.RepoRef, error) {
+	return m.repos, m.repoErr
+}
+func (m *mockCrossRepoProvider) GetFileFromRepo(_ context.Context, repo ci.RepoRef, path string) (string, error) {
+	key := repo.Project + "/" + repo.Repo + ":" + path
+	if content, ok := m.files[key]; ok {
+		return content, nil
+	}
+	return "", fmt.Errorf("file not found: 404 %s", path)
+}
+
+func TestGetRepoFile_CrossRepoFallback(t *testing.T) {
+	mock := &mockCrossRepoProvider{
+		repos: []ci.RepoRef{{Project: "tests-project", Repo: "e2e-tests"}},
+		files: map[string]string{
+			"tests-project/e2e-tests:com/test/MyTest.java": "public class MyTest {}",
+		},
+	}
+	h := &ToolHandler{CI: mock, RunID: 100, hasReadErrorContext: true}
+	result, isDone, err := h.Execute(context.Background(), llm.FunctionCall{
+		Name: "get_repo_file",
+		Args: map[string]any{"path": "com/test/MyTest.java"},
+	})
+	require.NoError(t, err)
+	assert.False(t, isDone)
+	assert.Equal(t, "public class MyTest {}", result)
+}
+
+func TestGetRepoFile_CrossRepoAllFail(t *testing.T) {
+	mock := &mockCrossRepoProvider{
+		repos: []ci.RepoRef{{Project: "tests-project", Repo: "e2e-tests"}},
+		files: map[string]string{}, // nothing found
+	}
+	h := &ToolHandler{CI: mock, RunID: 100, hasReadErrorContext: true}
+	result, _, err := h.Execute(context.Background(), llm.FunctionCall{
+		Name: "get_repo_file",
+		Args: map[string]any{"path": "nonexistent.java"},
+	})
+	require.NoError(t, err)
+	// Should fall back to smartNotFound (returns error JSON)
+	assert.Contains(t, result, "file not found")
+}
+
+func TestGetRepoFile_NoCrossRepo(t *testing.T) {
+	// GitHub client doesn't implement CrossRepoProvider — should just smartNotFound
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte(`{"message":"Not Found"}`))
+	}))
+	defer srv.Close()
+
+	ghClient := gh.NewTestClient("owner", "repo", srv.URL, srv.Client())
+	h := &ToolHandler{CI: ghClient, RunID: 100, hasReadErrorContext: true}
+	result, _, err := h.Execute(context.Background(), llm.FunctionCall{
+		Name: "get_repo_file",
+		Args: map[string]any{"path": "missing.ts"},
+	})
+	require.NoError(t, err)
+	assert.Contains(t, result, "file not found")
 }
