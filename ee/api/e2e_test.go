@@ -402,18 +402,10 @@ func TestE2E_SimilarAnalyses(t *testing.T) {
 	require.NoError(t, err)
 
 	// Wait for async embedding goroutines to complete
-	time.Sleep(2 * time.Second)
-
-	// Verify embeddings were created
 	analysisID1, _ := uuid.Parse(id1)
-	embeddings, err := db.GetRCAEmbeddingsByAnalysis(ctx, analysisID1)
-	require.NoError(t, err)
-	require.Len(t, embeddings, 1, "analysis 1 should have 1 RCA embedding")
-
 	analysisID2, _ := uuid.Parse(id2)
-	embeddings, err = db.GetRCAEmbeddingsByAnalysis(ctx, analysisID2)
-	require.NoError(t, err)
-	require.Len(t, embeddings, 1, "analysis 2 should have 1 RCA embedding")
+	waitForEmbeddings(t, db, analysisID1, 1)
+	waitForEmbeddings(t, db, analysisID2, 1)
 
 	// Query /similar for analysis 1
 	similarURL := fmt.Sprintf("%s/api/organizations/%s/analyses/%s/similar?limit=5&threshold=0.5",
@@ -465,7 +457,7 @@ func TestE2E_PatternSearch(t *testing.T) {
 	client := mustNewTestClient(ts.URL, apiKey)
 
 	// Submit an analysis
-	_, err := client.SubmitAnalysis(ctx, saas.SubmitParams{
+	id, err := client.SubmitAnalysis(ctx, saas.SubmitParams{
 		OrgID: orgID.String(), Owner: "searchowner", Repo: "searchrepo",
 		RunID: 91001, Branch: "main",
 		Result: &llm.AnalysisResult{
@@ -482,7 +474,8 @@ func TestE2E_PatternSearch(t *testing.T) {
 	require.NoError(t, err)
 
 	// Wait for async embedding
-	time.Sleep(2 * time.Second)
+	analysisID, _ := uuid.Parse(id)
+	waitForEmbeddings(t, db, analysisID, 1)
 
 	// Search for patterns
 	searchURL := fmt.Sprintf("%s/api/organizations/%s/patterns/search?q=timeout+selector&limit=5",
@@ -542,4 +535,25 @@ func TestE2E_PatternSearch_MissingQuery(t *testing.T) {
 	require.NoError(t, err)
 	defer resp.Body.Close()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+}
+
+// waitForEmbeddings polls the database until the expected number of embeddings
+// appear for the given analysis, or fails the test after a timeout.
+func waitForEmbeddings(t *testing.T, db *database.DB, analysisID uuid.UUID, expected int) {
+	t.Helper()
+	ctx := context.Background()
+
+	for range 50 { // 50 * 100ms = 5s max
+		embeddings, err := db.GetRCAEmbeddingsByAnalysis(ctx, analysisID)
+		if err == nil && len(embeddings) >= expected {
+			return
+		}
+		sleepCtx, cancel := context.WithTimeout(ctx, 100*time.Millisecond)
+		<-sleepCtx.Done()
+		cancel()
+	}
+
+	embeddings, _ := db.GetRCAEmbeddingsByAnalysis(ctx, analysisID)
+	require.Len(t, embeddings, expected,
+		"timed out waiting for embeddings for analysis %s", analysisID)
 }
