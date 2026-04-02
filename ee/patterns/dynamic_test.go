@@ -23,7 +23,7 @@ func TestDynamicMatcher_Match_EmbeddingFailure(t *testing.T) {
 	defer server.Close()
 
 	client := &EmbeddingClient{
-		apiKey:     "test-key",
+		apiKey:     testAPIKey,
 		baseURL:    server.URL,
 		model:      defaultEmbeddingModel,
 		dimensions: defaultDimensions,
@@ -49,13 +49,13 @@ func TestDynamicMatcher_Match_Success(t *testing.T) {
 		for i := range resp.Embedding.Values {
 			resp.Embedding.Values[i] = 0.1
 		}
-		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set(testContentType, testJSON)
 		_ = json.NewEncoder(w).Encode(resp)
 	}))
 	defer server.Close()
 
 	client := &EmbeddingClient{
-		apiKey:     "test-key",
+		apiKey:     testAPIKey,
 		baseURL:    server.URL,
 		model:      defaultEmbeddingModel,
 		dimensions: defaultDimensions,

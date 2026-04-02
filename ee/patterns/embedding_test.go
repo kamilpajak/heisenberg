@@ -12,6 +12,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const (
+	testAPIKey      = "test-key"
+	testContentType = "Content-Type"
+	testJSON        = "application/json"
+)
+
 func TestComputeEmbeddingText(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -97,13 +103,13 @@ func TestEmbeddingClient_Embed(t *testing.T) {
 
 		resp := embedResponse{}
 		resp.Embedding.Values = expectedVector
-		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set(testContentType, testJSON)
 		_ = json.NewEncoder(w).Encode(resp)
 	}))
 	defer server.Close()
 
 	client := &EmbeddingClient{
-		apiKey:     "test-key",
+		apiKey:     testAPIKey,
 		baseURL:    server.URL,
 		model:      defaultEmbeddingModel,
 		dimensions: defaultDimensions,
@@ -124,7 +130,7 @@ func TestEmbeddingClient_Embed_APIError(t *testing.T) {
 	defer server.Close()
 
 	client := &EmbeddingClient{
-		apiKey:     "test-key",
+		apiKey:     testAPIKey,
 		baseURL:    server.URL,
 		model:      defaultEmbeddingModel,
 		dimensions: defaultDimensions,
@@ -163,13 +169,13 @@ func TestNewTestEmbeddingClient(t *testing.T) {
 
 func TestEmbeddingClient_Embed_EmptyVector(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set(testContentType, testJSON)
 		_, _ = w.Write([]byte(`{"embedding":{"values":[]}}`))
 	}))
 	defer server.Close()
 
 	client := &EmbeddingClient{
-		apiKey:     "test-key",
+		apiKey:     testAPIKey,
 		baseURL:    server.URL,
 		model:      defaultEmbeddingModel,
 		dimensions: defaultDimensions,
@@ -183,13 +189,13 @@ func TestEmbeddingClient_Embed_EmptyVector(t *testing.T) {
 
 func TestEmbeddingClient_Embed_ErrorResponse(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set(testContentType, testJSON)
 		_, _ = w.Write([]byte(`{"error":{"code":400,"message":"bad request"}}`))
 	}))
 	defer server.Close()
 
 	client := &EmbeddingClient{
-		apiKey:     "test-key",
+		apiKey:     testAPIKey,
 		baseURL:    server.URL,
 		model:      defaultEmbeddingModel,
 		dimensions: defaultDimensions,
@@ -203,13 +209,13 @@ func TestEmbeddingClient_Embed_ErrorResponse(t *testing.T) {
 
 func TestEmbeddingClient_Embed_InvalidJSON(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set(testContentType, testJSON)
 		_, _ = w.Write([]byte(`not json`))
 	}))
 	defer server.Close()
 
 	client := &EmbeddingClient{
-		apiKey:     "test-key",
+		apiKey:     testAPIKey,
 		baseURL:    server.URL,
 		model:      defaultEmbeddingModel,
 		dimensions: defaultDimensions,
