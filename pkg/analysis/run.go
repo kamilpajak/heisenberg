@@ -33,7 +33,7 @@ func Run(ctx context.Context, p Params) (*llm.AnalysisResult, error) {
 	// Resolve run ID
 	if p.RunID == 0 {
 		emitInfo(p.Emitter, fmt.Sprintf("Finding run to analyze for %s/%s...", p.Owner, p.Repo))
-		runs, err := p.CI.ListRuns(ctx, ci.RunFilter{Status: "completed", PerPage: 10})
+		runs, err := p.CI.ListRuns(ctx, ci.RunFilter{Status: ci.StatusCompleted, PerPage: 10})
 		if err != nil {
 			return nil, fmt.Errorf("failed to list runs: %w", err)
 		}
@@ -64,6 +64,14 @@ func Run(ctx context.Context, p Params) (*llm.AnalysisResult, error) {
 	jobs, err := p.CI.ListJobs(ctx, p.RunID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list jobs: %w", err)
+	}
+
+	// Validate run has completed or has actionable failed jobs.
+	// In-progress runs are allowed if they have completed failed jobs (e.g.,
+	// Azure builds waiting for manual approval on later stages, or GitHub
+	// matrix builds where some jobs have failed while others are still running).
+	if err := validateRunStatus(ciRun, jobs); err != nil {
+		return nil, err
 	}
 
 	artifacts, err := p.CI.ListArtifacts(ctx, p.RunID)
@@ -266,7 +274,7 @@ func fetchFailureLogs(ctx context.Context, p Params, failedJobs []ci.Job) []clus
 func filterFailed(jobs []ci.Job) []ci.Job {
 	var failed []ci.Job
 	for _, j := range jobs {
-		if j.Conclusion == "failure" {
+		if j.Conclusion == ci.ConclusionFailure {
 			failed = append(failed, j)
 		}
 	}
@@ -360,6 +368,24 @@ func stampRunMeta(result *llm.AnalysisResult, p Params, ciRun *ci.Run) {
 	result.Event = ciRun.Event
 }
 
+// validateRunStatus returns an error if the run lacks actionable failure data.
+// Allows in-progress runs if they have at least one completed failed job (e.g.,
+// Azure builds pending manual approval, GitHub matrix builds with partial failures).
+func validateRunStatus(run *ci.Run, jobs []ci.Job) error {
+	if run.Status == "" || run.IsCompleted() {
+		return nil
+	}
+	if run.Status == ci.StatusInProgress {
+		for _, j := range jobs {
+			if j.Status == ci.StatusCompleted && j.Conclusion == ci.ConclusionFailure {
+				return nil
+			}
+		}
+		return fmt.Errorf("run %d is still in progress and has no completed failed jobs — wait for it to complete before analyzing", run.ID)
+	}
+	return fmt.Errorf("run %d is not yet completed (status: %s)", run.ID, run.Status)
+}
+
 func emitInfo(e llm.ProgressEmitter, msg string) {
 	if e != nil {
 		e.Emit(llm.ProgressEvent{Type: "info", Message: msg})
@@ -431,13 +457,13 @@ func findRunToAnalyze(runs []ci.Run) (runID int64, shouldSkip bool) {
 
 	// Check if the latest completed run is a success
 	latest := runs[0]
-	if latest.Conclusion == "success" {
+	if latest.Conclusion == ci.ConclusionSuccess {
 		return 0, true
 	}
 
 	// Find the first failure
 	for _, r := range runs {
-		if r.Conclusion == "failure" {
+		if r.Conclusion == ci.ConclusionFailure {
 			return r.ID, false
 		}
 	}

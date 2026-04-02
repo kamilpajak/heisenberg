@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -231,6 +232,45 @@ func TestGetRun_PullRequests(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, run.PRNumbers, 1)
 	assert.Equal(t, 42, run.PRNumbers[0])
+}
+
+func TestMapConclusion(t *testing.T) {
+	tests := []struct{ in, want string }{
+		{"success", ci.ConclusionSuccess},
+		{"failure", ci.ConclusionFailure},
+		{"timed_out", ci.ConclusionFailure},
+		{"cancelled", "cancelled"},
+		{"skipped", "skipped"},
+		{"", ""},
+	}
+	for _, tt := range tests {
+		assert.Equal(t, tt.want, mapConclusion(tt.in), "mapConclusion(%q)", tt.in)
+	}
+}
+
+func TestGetRun_MapsTimedOutConclusion(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, `{"id":1,"status":"completed","conclusion":"timed_out","head_branch":"main","head_sha":"abc"}`)
+	}))
+	defer srv.Close()
+
+	c := NewTestClient("o", "r", srv.URL, srv.Client())
+	run, err := c.GetRun(context.Background(), 1)
+	require.NoError(t, err)
+	assert.Equal(t, ci.ConclusionFailure, run.Conclusion, "timed_out should map to failure")
+}
+
+func TestListJobs_MapsTimedOutConclusion(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, `{"jobs":[{"id":1,"name":"test","status":"completed","conclusion":"timed_out"}]}`)
+	}))
+	defer srv.Close()
+
+	c := NewTestClient("o", "r", srv.URL, srv.Client())
+	jobs, err := c.ListJobs(context.Background(), 1)
+	require.NoError(t, err)
+	require.Len(t, jobs, 1)
+	assert.Equal(t, ci.ConclusionFailure, jobs[0].Conclusion, "timed_out job should map to failure")
 }
 
 func TestName(t *testing.T) {

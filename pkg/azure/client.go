@@ -106,6 +106,7 @@ func (b *build) toCIRun() ci.Run {
 	run := ci.Run{
 		ID:           int64(b.ID),
 		Name:         b.Definition.Name,
+		Status:       mapStatus(b.Status),
 		Conclusion:   mapResult(b.Result),
 		Branch:       stripBranchPrefix(b.SourceBranch),
 		CommitSHA:    b.SourceVersion,
@@ -124,12 +125,27 @@ func (b *build) toCIRun() ci.Run {
 	return run
 }
 
+// mapStatus normalizes Azure build status to ci.Run status values.
+// Azure statuses: all, cancelling, completed, inProgress, none, notStarted, postponed
+func mapStatus(status string) string {
+	switch status {
+	case "completed":
+		return ci.StatusCompleted
+	case "inProgress", "cancelling":
+		return ci.StatusInProgress
+	case "notStarted", "postponed", "none":
+		return ci.StatusQueued
+	default:
+		return status
+	}
+}
+
 func mapResult(result string) string {
 	switch result {
 	case "succeeded":
-		return "success"
+		return ci.ConclusionSuccess
 	case "failed", "partiallySucceeded":
-		return "failure"
+		return ci.ConclusionFailure
 	case "canceled":
 		return "cancelled"
 	default:
@@ -272,7 +288,7 @@ func (c *Client) ListJobs(ctx context.Context, runID int64) ([]ci.Job, error) {
 		jobs = append(jobs, ci.Job{
 			ID:         encodeJobID(runID, logID),
 			Name:       r.Name,
-			Status:     r.State,
+			Status:     mapStatus(r.State),
 			Conclusion: mapResult(r.Result),
 		})
 	}

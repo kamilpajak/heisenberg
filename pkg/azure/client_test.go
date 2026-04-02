@@ -524,6 +524,63 @@ func TestExtractFirstFile_Empty(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestListJobs_NormalizesStatus(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{
+			"records": [
+				{"id": "j1", "type": "Job", "name": "running-job", "state": "inProgress", "result": "", "log": {"id": 1}},
+				{"id": "j2", "type": "Job", "name": "done-job", "state": "completed", "result": "succeeded", "log": {"id": 2}}
+			]
+		}`))
+	}))
+	defer srv.Close()
+
+	c := NewTestClient("org", "proj", srv.URL, srv.Client())
+	jobs, err := c.ListJobs(context.Background(), 1)
+	require.NoError(t, err)
+	require.Len(t, jobs, 2)
+	assert.Equal(t, ci.StatusInProgress, jobs[0].Status, "Azure inProgress should normalize to in_progress")
+	assert.Equal(t, ci.StatusCompleted, jobs[1].Status)
+}
+
+func TestMapStatus(t *testing.T) {
+	tests := []struct{ in, want string }{
+		{"completed", "completed"},
+		{"inProgress", "in_progress"},
+		{"notStarted", "queued"},
+		{"postponed", "queued"},
+		{"none", "queued"},
+		{"cancelling", "in_progress"},
+		{"other", "other"},
+	}
+	for _, tt := range tests {
+		assert.Equal(t, tt.want, mapStatus(tt.in), "mapStatus(%q)", tt.in)
+	}
+}
+
+func TestGetRun_MapsStatus(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{
+			"id": 789,
+			"buildNumber": "20260402.1",
+			"status": "inProgress",
+			"result": "",
+			"sourceBranch": "refs/heads/main",
+			"sourceVersion": "abc",
+			"reason": "manual",
+			"queueTime": "2026-04-02T10:00:00Z",
+			"definition": {"name": "CI", "path": "\\pipelines"}
+		}`))
+	}))
+	defer srv.Close()
+
+	c := NewTestClient("org", "proj", srv.URL, srv.Client())
+	run, err := c.GetRun(context.Background(), 789)
+	require.NoError(t, err)
+	assert.Equal(t, "in_progress", run.Status)
+	assert.False(t, run.IsCompleted())
+}
+
 func TestMapResult(t *testing.T) {
 	tests := []struct{ in, want string }{
 		{"succeeded", "success"},
