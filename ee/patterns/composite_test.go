@@ -35,18 +35,19 @@ func TestCompositeMatcher_MergesResults(t *testing.T) {
 }
 
 func TestCompositeMatcher_DeduplicatesByName(t *testing.T) {
+	const dupName = "same-pattern"
 	m1 := &mockMatcher{results: []llm.MatchedPattern{
-		{Name: "same-pattern", Similarity: 0.8},
+		{Name: dupName, Similarity: 0.8},
 	}}
 	m2 := &mockMatcher{results: []llm.MatchedPattern{
-		{Name: "same-pattern", Similarity: 0.9},
+		{Name: dupName, Similarity: 0.9},
 	}}
 
 	composite := NewCompositeMatcher(m1, m2)
 	results := composite.Match(context.Background(), &llm.RootCauseAnalysis{})
 
 	assert.Len(t, results, 1, "duplicates should be removed")
-	assert.Equal(t, "same-pattern", results[0].Name)
+	assert.Equal(t, dupName, results[0].Name)
 	assert.Equal(t, 0.8, results[0].Similarity, "first occurrence wins")
 }
 

@@ -89,16 +89,7 @@ func main() {
 	})
 
 	// Initialize embedding client (optional — degrades gracefully if not configured)
-	var embeddingClient *eepatterns.EmbeddingClient
-	if apiKey := os.Getenv("GOOGLE_API_KEY"); apiKey != "" {
-		var ecErr error
-		embeddingClient, ecErr = eepatterns.NewEmbeddingClient(apiKey)
-		if ecErr != nil {
-			log.Printf("Warning: embedding client disabled: %v", ecErr)
-		} else {
-			log.Println("Embedding client initialized (dynamic patterns enabled)")
-		}
-	}
+	embeddingClient := initEmbeddingClient()
 
 	// Create API server
 	server := api.NewServer(api.Config{
@@ -143,6 +134,20 @@ func main() {
 	}
 
 	log.Println("Server stopped")
+}
+
+func initEmbeddingClient() *eepatterns.EmbeddingClient {
+	apiKey := os.Getenv("GOOGLE_API_KEY")
+	if apiKey == "" {
+		return nil
+	}
+	client, err := eepatterns.NewEmbeddingClient(apiKey)
+	if err != nil {
+		log.Printf("Warning: embedding client disabled: %v", err)
+		return nil
+	}
+	log.Println("Embedding client initialized (dynamic patterns enabled)")
+	return client
 }
 
 func getEnv(key, defaultValue string) string {

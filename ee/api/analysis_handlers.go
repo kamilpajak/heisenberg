@@ -16,7 +16,10 @@ import (
 	"github.com/kamilpajak/heisenberg/pkg/llm"
 )
 
-const errDatabase = "database error"
+const (
+	errDatabase         = "database error"
+	errAnalysisNotFound = "analysis not found"
+)
 
 // handleListAnalyses returns analyses for a repository.
 func (s *Server) handleListAnalyses(w http.ResponseWriter, r *http.Request) {
@@ -81,30 +84,18 @@ func (s *Server) handleGetAnalysis(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	analysisID, err := parseAnalysisID(r)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid analysis ID")
+	analysis, ok := s.requireOrgAnalysis(w, r, oc)
+	if !ok {
 		return
 	}
 
-	analysis, err := s.db.GetAnalysisByID(r.Context(), analysisID)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, errDatabase)
-		return
-	}
-	if analysis == nil {
-		writeError(w, http.StatusNotFound, "analysis not found")
-		return
-	}
-
-	// Verify analysis belongs to a repo in this org
 	repo, err := s.db.GetRepositoryByID(r.Context(), analysis.RepoID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, errDatabase)
 		return
 	}
-	if repo == nil || repo.OrgID != oc.OrgID {
-		writeError(w, http.StatusNotFound, "analysis not found")
+	if repo == nil {
+		writeError(w, http.StatusNotFound, errAnalysisNotFound)
 		return
 	}
 
@@ -140,18 +131,7 @@ func (s *Server) handleCreateAnalysis(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req struct {
-		Owner       string                  `json:"owner"`
-		Repo        string                  `json:"repo"`
-		RunID       int64                   `json:"run_id"`
-		Branch      string                  `json:"branch"`
-		CommitSHA   string                  `json:"commit_sha"`
-		Category    string                  `json:"category"`
-		Confidence  *int                    `json:"confidence"`
-		Sensitivity string                  `json:"sensitivity"`
-		RCAs        []llm.RootCauseAnalysis `json:"analyses"`
-		Text        string                  `json:"text"`
-	}
+	var req createAnalysisRequest
 	if err := readJSON(r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
@@ -180,28 +160,7 @@ func (s *Server) handleCreateAnalysis(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Build params
-	params := database.CreateAnalysisParams{
-		RepoID:   repo.ID,
-		RunID:    req.RunID,
-		Category: req.Category,
-		Text:     req.Text,
-		RCAs:     req.RCAs,
-	}
-	if req.Branch != "" {
-		params.Branch = &req.Branch
-	}
-	if req.CommitSHA != "" {
-		params.CommitSHA = &req.CommitSHA
-	}
-	if req.Confidence != nil {
-		params.Confidence = req.Confidence
-	}
-	if req.Sensitivity != "" {
-		params.Sensitivity = &req.Sensitivity
-	}
-
-	analysis, err := s.db.CreateAnalysis(r.Context(), params)
+	analysis, err := s.db.CreateAnalysis(r.Context(), buildAnalysisParams(repo.ID, req))
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
@@ -246,6 +205,37 @@ func (s *Server) generateEmbeddings(ctx context.Context, analysis *database.Anal
 	}
 }
 
+// requireOrgAnalysis validates the analysis exists and belongs to the request's org.
+func (s *Server) requireOrgAnalysis(w http.ResponseWriter, r *http.Request, oc *orgContext) (*database.Analysis, bool) {
+	analysisID, err := parseAnalysisID(r)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid analysis ID")
+		return nil, false
+	}
+
+	analysis, err := s.db.GetAnalysisByID(r.Context(), analysisID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, errDatabase)
+		return nil, false
+	}
+	if analysis == nil {
+		writeError(w, http.StatusNotFound, errAnalysisNotFound)
+		return nil, false
+	}
+
+	repo, err := s.db.GetRepositoryByID(r.Context(), analysis.RepoID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, errDatabase)
+		return nil, false
+	}
+	if repo == nil || repo.OrgID != oc.OrgID {
+		writeError(w, http.StatusNotFound, errAnalysisNotFound)
+		return nil, false
+	}
+
+	return analysis, true
+}
+
 // handleSimilarAnalyses finds analyses with RCAs similar to the given analysis.
 func (s *Server) handleSimilarAnalyses(w http.ResponseWriter, r *http.Request) {
 	oc, ok := s.requireOrgMember(w, r)
@@ -258,36 +248,14 @@ func (s *Server) handleSimilarAnalyses(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	analysisID, err := parseAnalysisID(r)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid analysis ID")
-		return
-	}
-
-	// Verify analysis belongs to this org
-	analysis, err := s.db.GetAnalysisByID(r.Context(), analysisID)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, errDatabase)
-		return
-	}
-	if analysis == nil {
-		writeError(w, http.StatusNotFound, "analysis not found")
-		return
-	}
-	repo, err := s.db.GetRepositoryByID(r.Context(), analysis.RepoID)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, errDatabase)
-		return
-	}
-	if repo == nil || repo.OrgID != oc.OrgID {
-		writeError(w, http.StatusNotFound, "analysis not found")
+	analysis, ok := s.requireOrgAnalysis(w, r, oc)
+	if !ok {
 		return
 	}
 
 	limit, threshold := parseSimilarParams(r)
 
-	// Get embeddings for this analysis
-	embeddings, err := s.db.GetRCAEmbeddingsByAnalysis(r.Context(), analysisID)
+	embeddings, err := s.db.GetRCAEmbeddingsByAnalysis(r.Context(), analysis.ID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, errDatabase)
 		return
@@ -297,29 +265,33 @@ func (s *Server) handleSimilarAnalyses(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Find similar RCAs across the org for each embedding
+	allSimilar := s.collectSimilar(r.Context(), oc.OrgID, analysis.ID, embeddings, limit, threshold)
+
+	writeJSON(w, http.StatusOK, map[string]any{"similar": allSimilar})
+}
+
+// collectSimilar gathers deduplicated similar RCAs across multiple embeddings.
+func (s *Server) collectSimilar(ctx context.Context, orgID, excludeID uuid.UUID,
+	embeddings []database.RCAEmbedding, limit int, threshold float64) []database.SimilarRCA {
+
 	seen := make(map[uuid.UUID]struct{})
-	var allSimilar []database.SimilarRCA
+	var all []database.SimilarRCA
 	for _, emb := range embeddings {
-		similar, err := s.db.FindSimilarRCAs(r.Context(), oc.OrgID, emb.Embedding, analysisID, limit, threshold)
+		similar, err := s.db.FindSimilarRCAs(ctx, orgID, emb.Embedding, excludeID, limit, threshold)
 		if err != nil {
-			writeError(w, http.StatusInternalServerError, errDatabase)
-			return
+			continue
 		}
-		for _, s := range similar {
-			if _, ok := seen[s.ID]; !ok {
-				seen[s.ID] = struct{}{}
-				allSimilar = append(allSimilar, s)
+		for _, sr := range similar {
+			if _, exists := seen[sr.ID]; !exists {
+				seen[sr.ID] = struct{}{}
+				all = append(all, sr)
 			}
 		}
 	}
-
-	// Cap results
-	if len(allSimilar) > limit {
-		allSimilar = allSimilar[:limit]
+	if len(all) > limit {
+		all = all[:limit]
 	}
-
-	writeJSON(w, http.StatusOK, map[string]any{"similar": allSimilar})
+	return all
 }
 
 // handlePatternSearch searches historical patterns by free-text query.
@@ -353,13 +325,50 @@ func (s *Server) handlePatternSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	results, err := s.db.FindSimilarRCAsByText(r.Context(), oc.OrgID, pgvector.NewVector(embedding), limit, 0.5)
+	results, err := s.db.FindSimilarRCAs(r.Context(), oc.OrgID, pgvector.NewVector(embedding), uuid.Nil, limit, 0.5)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, errDatabase)
 		return
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{"results": results})
+}
+
+// createAnalysisRequest holds the JSON body for analysis creation.
+type createAnalysisRequest struct {
+	Owner       string                  `json:"owner"`
+	Repo        string                  `json:"repo"`
+	RunID       int64                   `json:"run_id"`
+	Branch      string                  `json:"branch"`
+	CommitSHA   string                  `json:"commit_sha"`
+	Category    string                  `json:"category"`
+	Confidence  *int                    `json:"confidence"`
+	Sensitivity string                  `json:"sensitivity"`
+	RCAs        []llm.RootCauseAnalysis `json:"analyses"`
+	Text        string                  `json:"text"`
+}
+
+func buildAnalysisParams(repoID uuid.UUID, req createAnalysisRequest) database.CreateAnalysisParams {
+	params := database.CreateAnalysisParams{
+		RepoID:   repoID,
+		RunID:    req.RunID,
+		Category: req.Category,
+		Text:     req.Text,
+		RCAs:     req.RCAs,
+	}
+	if req.Branch != "" {
+		params.Branch = &req.Branch
+	}
+	if req.CommitSHA != "" {
+		params.CommitSHA = &req.CommitSHA
+	}
+	if req.Confidence != nil {
+		params.Confidence = req.Confidence
+	}
+	if req.Sensitivity != "" {
+		params.Sensitivity = &req.Sensitivity
+	}
+	return params
 }
 
 // parseSimilarParams extracts limit and threshold from query parameters.

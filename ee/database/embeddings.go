@@ -122,48 +122,6 @@ func (db *DB) FindSimilarRCAs(ctx context.Context, orgID uuid.UUID, embedding pg
 	return results, rows.Err()
 }
 
-// FindSimilarRCAsByText finds RCA embeddings similar to the given vector within an organization.
-// Unlike FindSimilarRCAs, this does not exclude any analysis, making it suitable for
-// free-text search queries.
-func (db *DB) FindSimilarRCAsByText(ctx context.Context, orgID uuid.UUID, embedding pgvector.Vector,
-	limit int, threshold float64) ([]SimilarRCA, error) {
-
-	if limit <= 0 {
-		limit = 10
-	}
-
-	rows, err := db.pool.Query(ctx,
-		`SELECT e.id, e.analysis_id, e.rca_index, e.failure_type, e.embedding_text,
-		        1 - (e.embedding <=> $1::vector) AS similarity,
-		        a.run_id, a.branch, r.full_name, a.created_at
-		 FROM rca_embeddings e
-		 JOIN analyses a ON e.analysis_id = a.id
-		 JOIN repositories r ON a.repo_id = r.id
-		 WHERE e.org_id = $2
-		   AND e.embedding IS NOT NULL
-		   AND 1 - (e.embedding <=> $1::vector) >= $3
-		 ORDER BY e.embedding <=> $1::vector
-		 LIMIT $4`,
-		embedding, orgID, threshold, limit,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var results []SimilarRCA
-	for rows.Next() {
-		var s SimilarRCA
-		if err := rows.Scan(&s.ID, &s.AnalysisID, &s.RCAIndex, &s.FailureType,
-			&s.EmbeddingText, &s.Similarity, &s.RunID, &s.Branch,
-			&s.RepoFullName, &s.CreatedAt); err != nil {
-			return nil, err
-		}
-		results = append(results, s)
-	}
-	return results, rows.Err()
-}
-
 func scanEmbeddings(rows pgx.Rows) ([]RCAEmbedding, error) {
 	var embeddings []RCAEmbedding
 	for rows.Next() {

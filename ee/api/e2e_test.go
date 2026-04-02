@@ -25,6 +25,11 @@ import (
 	"github.com/google/uuid"
 )
 
+const (
+	e2eTitleCheckout = "Checkout timeout"
+	e2eAuthBearer    = "Bearer "
+)
+
 // seedTestAPIKey creates a user, org, and API key, returning the plaintext key.
 func seedTestAPIKey(t *testing.T, db *database.DB) (plainKey string, orgID uuid.UUID) {
 	t.Helper()
@@ -111,7 +116,7 @@ func TestE2E_CLIPersistence(t *testing.T) {
 			Sensitivity: "medium",
 			RCAs: []llm.RootCauseAnalysis{
 				{
-					Title:       "Checkout timeout",
+					Title:       e2eTitleCheckout,
 					FailureType: llm.FailureTypeTimeout,
 					RootCause:   "Modal overlay blocks submit button",
 					Remediation: "Wait for modal to close before clicking submit",
@@ -131,7 +136,7 @@ func TestE2E_CLIPersistence(t *testing.T) {
 	assert.Equal(t, llm.CategoryDiagnosis, analysis.Category)
 	assert.Equal(t, &confidence, analysis.Confidence)
 	require.Len(t, analysis.RCAs, 1)
-	assert.Equal(t, "Checkout timeout", analysis.RCAs[0].Title)
+	assert.Equal(t, e2eTitleCheckout, analysis.RCAs[0].Title)
 	assert.Equal(t, "main", *analysis.Branch)
 	assert.Equal(t, "e2eabc123", *analysis.CommitSHA)
 }
@@ -353,7 +358,7 @@ func TestE2E_SimilarAnalyses(t *testing.T) {
 			Text:     "Timeout in checkout flow",
 			Category: llm.CategoryDiagnosis,
 			RCAs: []llm.RootCauseAnalysis{{
-				Title:       "Checkout timeout",
+				Title:       e2eTitleCheckout,
 				FailureType: llm.FailureTypeTimeout,
 				Location:    &llm.CodeLocation{FilePath: "tests/checkout.spec.ts"},
 				RootCause:   "waitForSelector timed out in beforeEach hook",
@@ -411,7 +416,7 @@ func TestE2E_SimilarAnalyses(t *testing.T) {
 	similarURL := fmt.Sprintf("%s/api/organizations/%s/analyses/%s/similar?limit=5&threshold=0.5",
 		ts.URL, orgID, id1)
 	req, _ := http.NewRequest("GET", similarURL, nil)
-	req.Header.Set("Authorization", "Bearer "+apiKey)
+	req.Header.Set("Authorization", e2eAuthBearer+apiKey)
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
 	defer resp.Body.Close()
@@ -481,7 +486,7 @@ func TestE2E_PatternSearch(t *testing.T) {
 	searchURL := fmt.Sprintf("%s/api/organizations/%s/patterns/search?q=timeout+selector&limit=5",
 		ts.URL, orgID)
 	req, _ := http.NewRequest("GET", searchURL, nil)
-	req.Header.Set("Authorization", "Bearer "+apiKey)
+	req.Header.Set("Authorization", e2eAuthBearer+apiKey)
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
 	defer resp.Body.Close()
@@ -510,7 +515,7 @@ func TestE2E_SimilarAnalyses_NoEmbeddings(t *testing.T) {
 	similarURL := fmt.Sprintf("%s/api/organizations/%s/analyses/%s/similar",
 		ts.URL, orgID, fakeID)
 	req, _ := http.NewRequest("GET", similarURL, nil)
-	req.Header.Set("Authorization", "Bearer "+apiKey)
+	req.Header.Set("Authorization", e2eAuthBearer+apiKey)
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
 	defer resp.Body.Close()
@@ -530,7 +535,7 @@ func TestE2E_PatternSearch_MissingQuery(t *testing.T) {
 	// Search without q parameter
 	searchURL := fmt.Sprintf("%s/api/organizations/%s/patterns/search", ts.URL, orgID)
 	req, _ := http.NewRequest("GET", searchURL, nil)
-	req.Header.Set("Authorization", "Bearer "+apiKey)
+	req.Header.Set("Authorization", e2eAuthBearer+apiKey)
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
 	defer resp.Body.Close()
