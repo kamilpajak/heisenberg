@@ -569,11 +569,13 @@ func TestDeleteOldAnalyses(t *testing.T) {
 	require.NoError(t, err)
 
 	// Delete analyses older than future date (should delete all)
+	// In shared CI databases, other tests may have created analyses too,
+	// so we assert >= 1 for the global count and verify our repo specifically.
 	deleted, err := db.DeleteOldAnalyses(ctx, time.Now().Add(time.Hour))
 	require.NoError(t, err)
-	assert.Equal(t, int64(1), deleted)
+	assert.GreaterOrEqual(t, deleted, int64(1))
 
-	// Verify deletion
+	// Verify our specific repo's analysis was deleted
 	count, err := db.CountRepoAnalyses(ctx, repo.ID, nil)
 	require.NoError(t, err)
 	assert.Equal(t, 0, count)

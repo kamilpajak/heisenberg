@@ -4,36 +4,42 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"sync"
 
 	"github.com/kamilpajak/heisenberg/ee/auth"
 	"github.com/kamilpajak/heisenberg/ee/billing"
 	"github.com/kamilpajak/heisenberg/ee/database"
+	eepatterns "github.com/kamilpajak/heisenberg/ee/patterns"
 )
 
 // Server is the API server.
 type Server struct {
-	db            *database.DB
-	authVerifier  *auth.Verifier
-	billingClient *billing.Client
-	usageChecker  *billing.UsageChecker
-	mux           *http.ServeMux
+	db              *database.DB
+	authVerifier    *auth.Verifier
+	billingClient   *billing.Client
+	usageChecker    *billing.UsageChecker
+	embeddingClient *eepatterns.EmbeddingClient
+	bgTasks         sync.WaitGroup
+	mux             *http.ServeMux
 }
 
 // Config holds API server configuration.
 type Config struct {
-	DB            *database.DB
-	AuthVerifier  *auth.Verifier
-	BillingClient *billing.Client
+	DB              *database.DB
+	AuthVerifier    *auth.Verifier
+	BillingClient   *billing.Client
+	EmbeddingClient *eepatterns.EmbeddingClient // nil = embeddings disabled
 }
 
 // NewServer creates a new API server.
 func NewServer(cfg Config) *Server {
 	s := &Server{
-		db:            cfg.DB,
-		authVerifier:  cfg.AuthVerifier,
-		billingClient: cfg.BillingClient,
-		usageChecker:  billing.NewUsageChecker(cfg.DB),
-		mux:           http.NewServeMux(),
+		db:              cfg.DB,
+		authVerifier:    cfg.AuthVerifier,
+		billingClient:   cfg.BillingClient,
+		usageChecker:    billing.NewUsageChecker(cfg.DB),
+		embeddingClient: cfg.EmbeddingClient,
+		mux:             http.NewServeMux(),
 	}
 
 	s.registerRoutes()
@@ -60,6 +66,8 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("GET /api/organizations/{orgID}/repositories/{repoID}/analyses", s.withAuth(authMiddleware, s.handleListAnalyses))
 	s.mux.HandleFunc("GET /api/organizations/{orgID}/analyses/{analysisID}", s.withAuth(authMiddleware, s.handleGetAnalysis))
 	s.mux.HandleFunc("POST /api/organizations/{orgID}/analyses", s.withAuth(authMiddleware, s.handleCreateAnalysis))
+	s.mux.HandleFunc("GET /api/organizations/{orgID}/analyses/{analysisID}/similar", s.withAuth(authMiddleware, s.handleSimilarAnalyses))
+	s.mux.HandleFunc("GET /api/organizations/{orgID}/patterns/search", s.withAuth(authMiddleware, s.handlePatternSearch))
 	s.mux.HandleFunc("POST /api/organizations/{orgID}/api-keys", s.withAuth(authMiddleware, s.handleCreateAPIKey))
 	s.mux.HandleFunc("GET /api/organizations/{orgID}/api-keys", s.withAuth(authMiddleware, s.handleListAPIKeys))
 	s.mux.HandleFunc("DELETE /api/organizations/{orgID}/api-keys/{keyID}", s.withAuth(authMiddleware, s.handleDeleteAPIKey))
@@ -92,8 +100,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.mux.ServeHTTP(w, r)
 }
 
-// Close releases resources.
+// Close releases resources and waits for background tasks to finish.
 func (s *Server) Close() {
+	s.bgTasks.Wait()
 	if s.authVerifier != nil {
 		s.authVerifier.Close()
 	}

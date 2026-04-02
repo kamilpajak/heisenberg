@@ -16,6 +16,7 @@ import (
 	"github.com/kamilpajak/heisenberg/ee/auth"
 	"github.com/kamilpajak/heisenberg/ee/billing"
 	"github.com/kamilpajak/heisenberg/ee/database"
+	eepatterns "github.com/kamilpajak/heisenberg/ee/patterns"
 )
 
 func main() {
@@ -87,11 +88,15 @@ func main() {
 		},
 	})
 
+	// Initialize embedding client (optional — degrades gracefully if not configured)
+	embeddingClient := initEmbeddingClient()
+
 	// Create API server
 	server := api.NewServer(api.Config{
-		DB:            db,
-		AuthVerifier:  authVerifier,
-		BillingClient: billingClient,
+		DB:              db,
+		AuthVerifier:    authVerifier,
+		BillingClient:   billingClient,
+		EmbeddingClient: embeddingClient,
 	})
 	defer server.Close()
 
@@ -129,6 +134,20 @@ func main() {
 	}
 
 	log.Println("Server stopped")
+}
+
+func initEmbeddingClient() *eepatterns.EmbeddingClient {
+	apiKey := os.Getenv("GOOGLE_API_KEY")
+	if apiKey == "" {
+		return nil
+	}
+	client, err := eepatterns.NewEmbeddingClient(apiKey)
+	if err != nil {
+		log.Printf("Warning: embedding client disabled: %v", err)
+		return nil
+	}
+	log.Println("Embedding client initialized (dynamic patterns enabled)")
+	return client
 }
 
 func getEnv(key, defaultValue string) string {

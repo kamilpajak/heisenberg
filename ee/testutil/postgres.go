@@ -70,7 +70,7 @@ func startContainer(t *testing.T) string {
 		ctx := context.Background()
 
 		container, err := postgres.Run(ctx,
-			"postgres:16-alpine",
+			"pgvector/pgvector:pg16",
 			postgres.WithDatabase(testDBName),
 			postgres.WithUsername(testDBUser),
 			postgres.WithPassword(testDBPass),
