@@ -288,7 +288,7 @@ func (c *Client) ListJobs(ctx context.Context, runID int64) ([]ci.Job, error) {
 		jobs = append(jobs, ci.Job{
 			ID:         encodeJobID(runID, logID),
 			Name:       r.Name,
-			Status:     r.State,
+			Status:     mapStatus(r.State),
 			Conclusion: mapResult(r.Result),
 		})
 	}

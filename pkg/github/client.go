@@ -97,12 +97,25 @@ type workflowRun struct {
 	} `json:"pull_requests"`
 }
 
+// mapConclusion normalizes GitHub conclusion values. GitHub uses "timed_out"
+// for jobs that exceed their timeout, which should be treated as a failure.
+func mapConclusion(conclusion string) string {
+	switch conclusion {
+	case "success":
+		return ci.ConclusionSuccess
+	case "failure", "timed_out":
+		return ci.ConclusionFailure
+	default:
+		return conclusion
+	}
+}
+
 func (r *workflowRun) toCIRun() ci.Run {
 	run := ci.Run{
 		ID:           r.ID,
 		Name:         r.Name,
 		Status:       r.Status,
-		Conclusion:   r.Conclusion,
+		Conclusion:   mapConclusion(r.Conclusion),
 		Branch:       r.HeadBranch,
 		CommitSHA:    r.HeadSHA,
 		Event:        r.Event,
@@ -128,7 +141,7 @@ func (j *job) toCIJob() ci.Job {
 		ID:         j.ID,
 		Name:       j.Name,
 		Status:     j.Status,
-		Conclusion: j.Conclusion,
+		Conclusion: mapConclusion(j.Conclusion),
 	}
 }
 

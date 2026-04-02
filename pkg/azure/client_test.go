@@ -524,6 +524,25 @@ func TestExtractFirstFile_Empty(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestListJobs_NormalizesStatus(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{
+			"records": [
+				{"id": "j1", "type": "Job", "name": "running-job", "state": "inProgress", "result": "", "log": {"id": 1}},
+				{"id": "j2", "type": "Job", "name": "done-job", "state": "completed", "result": "succeeded", "log": {"id": 2}}
+			]
+		}`))
+	}))
+	defer srv.Close()
+
+	c := NewTestClient("org", "proj", srv.URL, srv.Client())
+	jobs, err := c.ListJobs(context.Background(), 1)
+	require.NoError(t, err)
+	require.Len(t, jobs, 2)
+	assert.Equal(t, ci.StatusInProgress, jobs[0].Status, "Azure inProgress should normalize to in_progress")
+	assert.Equal(t, ci.StatusCompleted, jobs[1].Status)
+}
+
 func TestMapStatus(t *testing.T) {
 	tests := []struct{ in, want string }{
 		{"completed", "completed"},
