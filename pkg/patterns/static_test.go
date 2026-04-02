@@ -128,6 +128,29 @@ func TestStaticMatcher_GoRaceDetector(t *testing.T) {
 	assert.Equal(t, "go-test-race-detector", matches[0].Name)
 }
 
+func TestStaticMatcher_NoFalsePositiveFromStructuralOnly(t *testing.T) {
+	matcher, err := NewStaticMatcher()
+	require.NoError(t, err)
+
+	// Assertion in *.ts — matches failure_type + file_pattern for many patterns
+	// but root cause has zero token overlap with auth-token or visual-regression.
+	rca := &llm.RootCauseAnalysis{
+		FailureType: "assertion",
+		Location:    &llm.CodeLocation{FilePath: "tests/perf.spec.ts"},
+		RootCause:   "module loading behavior changed after dependency update, utilsBundle not found in output",
+	}
+
+	matches := matcher.Match(context.Background(), rca)
+
+	// Should NOT match auth-token-expired or screenshot-visual-regression
+	for _, m := range matches {
+		assert.NotEqual(t, "auth-token-expired", m.Name,
+			"auth-token should not match — zero error token overlap")
+		assert.NotEqual(t, "screenshot-visual-regression", m.Name,
+			"visual-regression should not match — zero error token overlap")
+	}
+}
+
 func TestJaccard(t *testing.T) {
 	tests := []struct {
 		name string

@@ -71,6 +71,14 @@ func (m *StaticMatcher) Match(_ context.Context, rca *llm.RootCauseAnalysis) []l
 }
 
 func computeScore(fp Fingerprint, entry CatalogEntry) float64 {
+	// Semantic gate: structural signals (failure_type, file_pattern) alone are
+	// insufficient. Require non-zero error token overlap to prevent false
+	// positives like matching "auth-token-expired" for a Playwright assertion.
+	errorSim := jaccard(fp.ErrorTokens, entry.ErrorTokens)
+	if errorSim == 0 {
+		return 0
+	}
+
 	var score float64
 
 	// Failure type: exact match
@@ -79,9 +87,7 @@ func computeScore(fp Fingerprint, entry CatalogEntry) float64 {
 	}
 
 	// Error tokens: Jaccard similarity
-	if len(fp.ErrorTokens) > 0 && len(entry.ErrorTokens) > 0 {
-		score += weightError * jaccard(fp.ErrorTokens, entry.ErrorTokens)
-	}
+	score += weightError * errorSim
 
 	// File pattern: glob match
 	if fp.FilePattern != "" && len(entry.FilePatterns) > 0 {
