@@ -142,3 +142,81 @@ func TestNewEmbeddingClient_MissingKey(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "GOOGLE_API_KEY")
 }
+
+func TestNewEmbeddingClient_Success(t *testing.T) {
+	client, err := NewEmbeddingClient("test-api-key")
+	require.NoError(t, err)
+	assert.NotNil(t, client)
+}
+
+func TestNewEmbeddingClient_FromEnv(t *testing.T) {
+	t.Setenv("GOOGLE_API_KEY", "env-key")
+	client, err := NewEmbeddingClient("")
+	require.NoError(t, err)
+	assert.NotNil(t, client)
+}
+
+func TestNewTestEmbeddingClient(t *testing.T) {
+	client := NewTestEmbeddingClient("http://localhost:1234")
+	assert.NotNil(t, client)
+}
+
+func TestEmbeddingClient_Embed_EmptyVector(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"embedding":{"values":[]}}`))
+	}))
+	defer server.Close()
+
+	client := &EmbeddingClient{
+		apiKey:     "test-key",
+		baseURL:    server.URL,
+		model:      defaultEmbeddingModel,
+		dimensions: defaultDimensions,
+		httpClient: server.Client(),
+	}
+
+	_, err := client.Embed(context.Background(), "test")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "empty vector")
+}
+
+func TestEmbeddingClient_Embed_ErrorResponse(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"error":{"code":400,"message":"bad request"}}`))
+	}))
+	defer server.Close()
+
+	client := &EmbeddingClient{
+		apiKey:     "test-key",
+		baseURL:    server.URL,
+		model:      defaultEmbeddingModel,
+		dimensions: defaultDimensions,
+		httpClient: server.Client(),
+	}
+
+	_, err := client.Embed(context.Background(), "test")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "bad request")
+}
+
+func TestEmbeddingClient_Embed_InvalidJSON(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`not json`))
+	}))
+	defer server.Close()
+
+	client := &EmbeddingClient{
+		apiKey:     "test-key",
+		baseURL:    server.URL,
+		model:      defaultEmbeddingModel,
+		dimensions: defaultDimensions,
+		httpClient: server.Client(),
+	}
+
+	_, err := client.Embed(context.Background(), "test")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unmarshal")
+}
