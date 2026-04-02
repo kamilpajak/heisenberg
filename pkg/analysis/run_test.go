@@ -16,10 +16,13 @@ import (
 )
 
 const (
-	htmlReportName  = "html-report"
-	testReportLabel = "TEST REPORT"
-	e2eJobName      = "E2E 1/4"
-	testRunDate     = "2026-02-08"
+	htmlReportName     = "html-report"
+	testReportLabel    = "TEST REPORT"
+	e2eJobName         = "E2E 1/4"
+	testRunDate        = "2026-02-08"
+	testRunPath        = "/repos/owner/repo/actions/runs/999"
+	testJobsPath       = testRunPath + "/jobs"
+	errStillInProgress = "still in progress"
 )
 
 func TestFormatRunDate_ValidRFC3339(t *testing.T) {
@@ -318,9 +321,9 @@ func TestIsTestArtifact(t *testing.T) {
 func TestRun_RejectsInProgressRunWithNoFailedJobs(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case "/repos/owner/repo/actions/runs/999":
+		case testRunPath:
 			fmt.Fprint(w, `{"id":999,"status":"in_progress","conclusion":"","head_branch":"main","head_sha":"abc"}`)
-		case "/repos/owner/repo/actions/runs/999/jobs":
+		case testJobsPath:
 			fmt.Fprint(w, `{"jobs":[{"id":1,"name":"build","status":"in_progress","conclusion":""}]}`)
 		default:
 			w.WriteHeader(http.StatusNotFound)
@@ -337,16 +340,16 @@ func TestRun_RejectsInProgressRunWithNoFailedJobs(t *testing.T) {
 	})
 
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "still in progress")
+	assert.Contains(t, err.Error(), errStillInProgress)
 }
 
 func TestRun_AllowsInProgressRunWithCompletedFailedJobs(t *testing.T) {
 	// Simulates Azure manual approval: test job failed, deploy stage pending
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case "/repos/owner/repo/actions/runs/999":
+		case testRunPath:
 			fmt.Fprint(w, `{"id":999,"status":"in_progress","conclusion":"","head_branch":"main","head_sha":"abc"}`)
-		case "/repos/owner/repo/actions/runs/999/jobs":
+		case testJobsPath:
 			fmt.Fprint(w, `{"jobs":[
 				{"id":1,"name":"test","status":"completed","conclusion":"failure"},
 				{"id":2,"name":"deploy","status":"queued","conclusion":""}
@@ -379,9 +382,9 @@ func TestRun_AllowsInProgressRunWithCompletedFailedJobs(t *testing.T) {
 func TestRun_RejectsQueuedRun(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case "/repos/owner/repo/actions/runs/999":
+		case testRunPath:
 			fmt.Fprint(w, `{"id":999,"status":"queued","conclusion":"","head_branch":"main","head_sha":"abc"}`)
-		case "/repos/owner/repo/actions/runs/999/jobs":
+		case testJobsPath:
 			fmt.Fprint(w, `{"jobs":[]}`)
 		default:
 			w.WriteHeader(http.StatusNotFound)
@@ -431,7 +434,7 @@ func TestValidateRunStatus(t *testing.T) {
 	t.Run("in_progress with no jobs is rejected", func(t *testing.T) {
 		err := validateRunStatus(&ci.Run{ID: 1, Status: "in_progress"}, nil)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "still in progress")
+		assert.Contains(t, err.Error(), errStillInProgress)
 	})
 
 	t.Run("in_progress with completed failed job is allowed", func(t *testing.T) {
@@ -449,7 +452,7 @@ func TestValidateRunStatus(t *testing.T) {
 		}
 		err := validateRunStatus(&ci.Run{ID: 1, Status: "in_progress"}, jobs)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "still in progress")
+		assert.Contains(t, err.Error(), errStillInProgress)
 	})
 
 	t.Run("in_progress with completed success jobs only is rejected", func(t *testing.T) {
@@ -459,7 +462,7 @@ func TestValidateRunStatus(t *testing.T) {
 		}
 		err := validateRunStatus(&ci.Run{ID: 1, Status: "in_progress"}, jobs)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "still in progress")
+		assert.Contains(t, err.Error(), errStillInProgress)
 	})
 
 	t.Run("queued run is rejected", func(t *testing.T) {
