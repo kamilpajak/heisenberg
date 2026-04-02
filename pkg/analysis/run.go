@@ -66,6 +66,14 @@ func Run(ctx context.Context, p Params) (*llm.AnalysisResult, error) {
 		return nil, fmt.Errorf("failed to list jobs: %w", err)
 	}
 
+	// Validate run has completed or has actionable failed jobs.
+	// In-progress runs are allowed if they have completed failed jobs (e.g.,
+	// Azure builds waiting for manual approval on later stages, or GitHub
+	// matrix builds where some jobs have failed while others are still running).
+	if err := validateRunStatus(ciRun, jobs); err != nil {
+		return nil, err
+	}
+
 	artifacts, err := p.CI.ListArtifacts(ctx, p.RunID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list artifacts: %w", err)
@@ -358,6 +366,24 @@ func stampRunMeta(result *llm.AnalysisResult, p Params, ciRun *ci.Run) {
 	result.Branch = ciRun.Branch
 	result.CommitSHA = ciRun.CommitSHA
 	result.Event = ciRun.Event
+}
+
+// validateRunStatus returns an error if the run lacks actionable failure data.
+// Allows in-progress runs if they have at least one completed failed job (e.g.,
+// Azure builds pending manual approval, GitHub matrix builds with partial failures).
+func validateRunStatus(run *ci.Run, jobs []ci.Job) error {
+	if run.Status == "" || run.IsCompleted() {
+		return nil
+	}
+	if run.Status == "in_progress" {
+		for _, j := range jobs {
+			if j.Status == "completed" && j.Conclusion == "failure" {
+				return nil
+			}
+		}
+		return fmt.Errorf("run %d is still in progress and has no completed failed jobs — wait for it to complete before analyzing", run.ID)
+	}
+	return fmt.Errorf("run %d is not yet completed (status: %s)", run.ID, run.Status)
 }
 
 func emitInfo(e llm.ProgressEmitter, msg string) {

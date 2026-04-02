@@ -84,6 +84,7 @@ func ClassifyArtifact(name string) ci.ArtifactType {
 type workflowRun struct {
 	ID           int64  `json:"id"`
 	Name         string `json:"name"`
+	Status       string `json:"status"`
 	Conclusion   string `json:"conclusion"`
 	HeadBranch   string `json:"head_branch"`
 	HeadSHA      string `json:"head_sha"`
@@ -100,6 +101,7 @@ func (r *workflowRun) toCIRun() ci.Run {
 	run := ci.Run{
 		ID:           r.ID,
 		Name:         r.Name,
+		Status:       r.Status,
 		Conclusion:   r.Conclusion,
 		Branch:       r.HeadBranch,
 		CommitSHA:    r.HeadSHA,

@@ -67,6 +67,7 @@ type RunFilter struct {
 type Run struct {
 	ID           int64
 	Name         string
+	Status       string // "completed", "in_progress", "queued", etc.
 	Conclusion   string // "success", "failure", etc.
 	Branch       string
 	CommitSHA    string
@@ -75,6 +76,11 @@ type Run struct {
 	DisplayTitle string
 	CreatedAt    string
 	PRNumbers    []int // associated pull request numbers
+}
+
+// IsCompleted returns true if the run has finished (not in progress or queued).
+func (r *Run) IsCompleted() bool {
+	return r.Status == "completed"
 }
 
 // Job represents a unit of work within a CI run.

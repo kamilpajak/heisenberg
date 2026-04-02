@@ -315,6 +315,160 @@ func TestIsTestArtifact(t *testing.T) {
 	assert.False(t, isTestArtifact("coverage.out"))
 }
 
+func TestRun_RejectsInProgressRunWithNoFailedJobs(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/repos/owner/repo/actions/runs/999":
+			fmt.Fprint(w, `{"id":999,"status":"in_progress","conclusion":"","head_branch":"main","head_sha":"abc"}`)
+		case "/repos/owner/repo/actions/runs/999/jobs":
+			fmt.Fprint(w, `{"jobs":[{"id":1,"name":"build","status":"in_progress","conclusion":""}]}`)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	ghClient := gh.NewTestClient("owner", "repo", srv.URL, srv.Client())
+	_, err := Run(context.Background(), Params{
+		Owner: "owner",
+		Repo:  "repo",
+		RunID: 999,
+		CI:    ghClient,
+	})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "still in progress")
+}
+
+func TestRun_AllowsInProgressRunWithCompletedFailedJobs(t *testing.T) {
+	// Simulates Azure manual approval: test job failed, deploy stage pending
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/repos/owner/repo/actions/runs/999":
+			fmt.Fprint(w, `{"id":999,"status":"in_progress","conclusion":"","head_branch":"main","head_sha":"abc"}`)
+		case "/repos/owner/repo/actions/runs/999/jobs":
+			fmt.Fprint(w, `{"jobs":[
+				{"id":1,"name":"test","status":"completed","conclusion":"failure"},
+				{"id":2,"name":"deploy","status":"queued","conclusion":""}
+			]}`)
+		case "/repos/owner/repo/actions/runs/999/artifacts":
+			fmt.Fprint(w, `{"artifacts":[]}`)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	ghClient := gh.NewTestClient("owner", "repo", srv.URL, srv.Client())
+	// Run() should NOT return an error — the run has actionable failures
+	_, err := Run(context.Background(), Params{
+		Owner:        "owner",
+		Repo:         "repo",
+		RunID:        999,
+		CI:           ghClient,
+		GoogleAPIKey: "fake", // needed to create LLM client
+	})
+
+	// The run should pass validation. It will fail later (no real LLM key),
+	// but the error should NOT be about "in progress".
+	if err != nil {
+		assert.NotContains(t, err.Error(), "in progress")
+	}
+}
+
+func TestRun_RejectsQueuedRun(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/repos/owner/repo/actions/runs/999":
+			fmt.Fprint(w, `{"id":999,"status":"queued","conclusion":"","head_branch":"main","head_sha":"abc"}`)
+		case "/repos/owner/repo/actions/runs/999/jobs":
+			fmt.Fprint(w, `{"jobs":[]}`)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	ghClient := gh.NewTestClient("owner", "repo", srv.URL, srv.Client())
+	_, err := Run(context.Background(), Params{
+		Owner: "owner",
+		Repo:  "repo",
+		RunID: 999,
+		CI:    ghClient,
+	})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not yet completed")
+}
+
+func TestRunIsCompleted(t *testing.T) {
+	tests := []struct {
+		status    string
+		completed bool
+	}{
+		{"completed", true},
+		{"in_progress", false},
+		{"queued", false},
+		{"", false},
+	}
+	for _, tt := range tests {
+		r := &ci.Run{Status: tt.status}
+		assert.Equal(t, tt.completed, r.IsCompleted(), "status=%q", tt.status)
+	}
+}
+
+func TestValidateRunStatus(t *testing.T) {
+	t.Run("completed run is allowed", func(t *testing.T) {
+		err := validateRunStatus(&ci.Run{ID: 1, Status: "completed"}, nil)
+		assert.NoError(t, err)
+	})
+
+	t.Run("empty status is allowed (legacy provider)", func(t *testing.T) {
+		err := validateRunStatus(&ci.Run{ID: 1, Status: ""}, nil)
+		assert.NoError(t, err)
+	})
+
+	t.Run("in_progress with no jobs is rejected", func(t *testing.T) {
+		err := validateRunStatus(&ci.Run{ID: 1, Status: "in_progress"}, nil)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "still in progress")
+	})
+
+	t.Run("in_progress with completed failed job is allowed", func(t *testing.T) {
+		jobs := []ci.Job{
+			{ID: 1, Name: "test", Status: "completed", Conclusion: "failure"},
+			{ID: 2, Name: "deploy", Status: "queued", Conclusion: ""},
+		}
+		err := validateRunStatus(&ci.Run{ID: 1, Status: "in_progress"}, jobs)
+		assert.NoError(t, err)
+	})
+
+	t.Run("in_progress with only running jobs is rejected", func(t *testing.T) {
+		jobs := []ci.Job{
+			{ID: 1, Name: "build", Status: "in_progress", Conclusion: ""},
+		}
+		err := validateRunStatus(&ci.Run{ID: 1, Status: "in_progress"}, jobs)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "still in progress")
+	})
+
+	t.Run("in_progress with completed success jobs only is rejected", func(t *testing.T) {
+		jobs := []ci.Job{
+			{ID: 1, Name: "build", Status: "completed", Conclusion: "success"},
+			{ID: 2, Name: "test", Status: "in_progress", Conclusion: ""},
+		}
+		err := validateRunStatus(&ci.Run{ID: 1, Status: "in_progress"}, jobs)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "still in progress")
+	})
+
+	t.Run("queued run is rejected", func(t *testing.T) {
+		err := validateRunStatus(&ci.Run{ID: 1, Status: "queued"}, nil)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "not yet completed")
+	})
+}
+
 func TestFetchFailureLogs(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Return different logs per job

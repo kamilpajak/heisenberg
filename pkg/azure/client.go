@@ -106,6 +106,7 @@ func (b *build) toCIRun() ci.Run {
 	run := ci.Run{
 		ID:           int64(b.ID),
 		Name:         b.Definition.Name,
+		Status:       mapStatus(b.Status),
 		Conclusion:   mapResult(b.Result),
 		Branch:       stripBranchPrefix(b.SourceBranch),
 		CommitSHA:    b.SourceVersion,
@@ -122,6 +123,23 @@ func (b *build) toCIRun() ci.Run {
 	}
 
 	return run
+}
+
+// mapStatus normalizes Azure build status to ci.Run status values.
+// Azure statuses: all, cancelling, completed, inProgress, none, notStarted, postponed
+func mapStatus(status string) string {
+	switch status {
+	case "completed":
+		return "completed"
+	case "inProgress":
+		return "in_progress"
+	case "notStarted", "postponed", "none":
+		return "queued"
+	case "cancelling":
+		return "in_progress"
+	default:
+		return status
+	}
 }
 
 func mapResult(result string) string {
