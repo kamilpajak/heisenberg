@@ -81,7 +81,8 @@ func (db *DB) GetRCAEmbeddingsByAnalysis(ctx context.Context, analysisID uuid.UU
 
 // FindSimilarRCAs finds RCA embeddings similar to the given vector within an organization.
 // Results are ordered by cosine similarity descending. The excludeAnalysisID parameter
-// prevents an analysis from matching itself.
+// prevents an analysis from matching itself. Pass uuid.Nil to skip exclusion (e.g. for
+// free-text search where there is no source analysis).
 func (db *DB) FindSimilarRCAs(ctx context.Context, orgID uuid.UUID, embedding pgvector.Vector,
 	excludeAnalysisID uuid.UUID, limit int, threshold float64) ([]SimilarRCA, error) {
 

@@ -4,6 +4,7 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"sync"
 
 	"github.com/kamilpajak/heisenberg/ee/auth"
 	"github.com/kamilpajak/heisenberg/ee/billing"
@@ -18,6 +19,7 @@ type Server struct {
 	billingClient   *billing.Client
 	usageChecker    *billing.UsageChecker
 	embeddingClient *eepatterns.EmbeddingClient
+	bgTasks         sync.WaitGroup
 	mux             *http.ServeMux
 }
 
@@ -98,8 +100,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.mux.ServeHTTP(w, r)
 }
 
-// Close releases resources.
+// Close releases resources and waits for background tasks to finish.
 func (s *Server) Close() {
+	s.bgTasks.Wait()
 	if s.authVerifier != nil {
 		s.authVerifier.Close()
 	}

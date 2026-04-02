@@ -522,6 +522,52 @@ func TestE2E_SimilarAnalyses_NoEmbeddings(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
+func TestE2E_SimilarAnalyses_EmptyArrayNotNull(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	ctx := context.Background()
+
+	embServer := mockEmbeddingServer(t)
+	defer embServer.Close()
+	embClient := eepatterns.NewTestEmbeddingClient(embServer.URL)
+
+	apiKey, orgID := seedTestAPIKey(t, db)
+	ts := e2eServerWithEmbeddings(t, db, embClient)
+	client := mustNewTestClient(ts.URL, apiKey)
+
+	// Submit one analysis so it has embeddings
+	id, err := client.SubmitAnalysis(ctx, saas.SubmitParams{
+		OrgID: orgID.String(), Owner: "nullowner", Repo: "nullrepo",
+		RunID: 92001, Branch: "main",
+		Result: &llm.AnalysisResult{
+			Text:     "Unique failure",
+			Category: llm.CategoryDiagnosis,
+			RCAs: []llm.RootCauseAnalysis{{
+				Title:       "Unique error",
+				FailureType: llm.FailureTypeTimeout,
+				RootCause:   "something unique that won't match anything",
+				Remediation: "fix it",
+			}},
+		},
+	})
+	require.NoError(t, err)
+
+	analysisID, _ := uuid.Parse(id)
+	waitForEmbeddings(t, db, analysisID, 1)
+
+	// Query /similar with threshold=0.99 — no matches expected
+	// The response should contain "similar": [] (empty array), NOT "similar": null
+	similarURL := fmt.Sprintf("%s/api/organizations/%s/analyses/%s/similar?threshold=0.99",
+		ts.URL, orgID, id)
+	req, _ := http.NewRequest("GET", similarURL, nil)
+	req.Header.Set("Authorization", e2eAuthBearer+apiKey)
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	assert.Contains(t, string(body), `"similar":[]`, "empty results should be [] not null")
+}
+
 func TestE2E_PatternSearch_MissingQuery(t *testing.T) {
 	db := testutil.NewTestDB(t)
 

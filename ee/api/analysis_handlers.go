@@ -173,7 +173,11 @@ func (s *Server) handleCreateAnalysis(w http.ResponseWriter, r *http.Request) {
 
 	// Generate embeddings asynchronously for pattern matching
 	if req.Category == llm.CategoryDiagnosis && s.embeddingClient != nil {
-		go s.generateEmbeddings(context.Background(), analysis, oc.OrgID)
+		s.bgTasks.Add(1)
+		go func() {
+			defer s.bgTasks.Done()
+			s.generateEmbeddings(context.Background(), analysis, oc.OrgID)
+		}()
 	}
 
 	writeJSON(w, http.StatusCreated, map[string]any{
@@ -275,10 +279,11 @@ func (s *Server) collectSimilar(ctx context.Context, orgID, excludeID uuid.UUID,
 	embeddings []database.RCAEmbedding, limit int, threshold float64) []database.SimilarRCA {
 
 	seen := make(map[uuid.UUID]struct{})
-	var all []database.SimilarRCA
+	all := make([]database.SimilarRCA, 0)
 	for _, emb := range embeddings {
 		similar, err := s.db.FindSimilarRCAs(ctx, orgID, emb.Embedding, excludeID, limit, threshold)
 		if err != nil {
+			log.Printf("FindSimilarRCAs failed for embedding %s: %v", emb.ID, err)
 			continue
 		}
 		for _, sr := range similar {

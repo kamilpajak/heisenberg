@@ -3,6 +3,7 @@ package patterns
 import (
 	"context"
 	"fmt"
+	"log"
 
 	"github.com/google/uuid"
 	"github.com/pgvector/pgvector-go"
@@ -41,12 +42,14 @@ func (m *DynamicMatcher) Match(ctx context.Context, rca *llm.RootCauseAnalysis) 
 
 	embedding, err := m.embeddingClient.Embed(ctx, text)
 	if err != nil {
+		log.Printf("dynamic matcher embedding failed: %v", err)
 		return nil
 	}
 
 	similar, err := m.db.FindSimilarRCAs(ctx, m.orgID, pgvector.NewVector(embedding),
 		uuid.Nil, dynamicMaxMatches, dynamicThreshold)
 	if err != nil {
+		log.Printf("dynamic matcher DB query failed: %v", err)
 		return nil
 	}
 
