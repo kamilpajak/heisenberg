@@ -1,0 +1,2 @@
+DROP TABLE IF EXISTS rca_embeddings;
+DROP EXTENSION IF EXISTS vector;

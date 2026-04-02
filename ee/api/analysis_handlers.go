@@ -1,12 +1,18 @@
 package api
 
 import (
+	"context"
 	"errors"
+	"log"
 	"net/http"
 	"strconv"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/pgvector/pgvector-go"
+
 	"github.com/kamilpajak/heisenberg/ee/database"
+	eepatterns "github.com/kamilpajak/heisenberg/ee/patterns"
 	"github.com/kamilpajak/heisenberg/pkg/llm"
 )
 
@@ -206,7 +212,170 @@ func (s *Server) handleCreateAnalysis(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Generate embeddings asynchronously for pattern matching
+	if req.Category == llm.CategoryDiagnosis && s.embeddingClient != nil {
+		go s.generateEmbeddings(context.Background(), analysis, oc.OrgID)
+	}
+
 	writeJSON(w, http.StatusCreated, map[string]any{
 		"id": analysis.ID,
 	})
+}
+
+// generateEmbeddings creates vector embeddings for each RCA in an analysis.
+// Runs asynchronously — failures are logged but do not affect the analysis.
+func (s *Server) generateEmbeddings(ctx context.Context, analysis *database.Analysis, orgID uuid.UUID) {
+	for i, rca := range analysis.RCAs {
+		text := eepatterns.ComputeEmbeddingText(&rca)
+		embedding, err := s.embeddingClient.Embed(ctx, text)
+		if err != nil {
+			log.Printf("embedding failed for analysis %s rca %d: %v", analysis.ID, i, err)
+			continue
+		}
+		_, err = s.db.CreateRCAEmbedding(ctx, database.CreateEmbeddingParams{
+			AnalysisID:    analysis.ID,
+			RCAIndex:      i,
+			OrgID:         orgID,
+			FailureType:   &rca.FailureType,
+			EmbeddingText: text,
+			Embedding:     pgvector.NewVector(embedding),
+		})
+		if err != nil {
+			log.Printf("failed to store embedding for analysis %s rca %d: %v", analysis.ID, i, err)
+		}
+	}
+}
+
+// handleSimilarAnalyses finds analyses with RCAs similar to the given analysis.
+func (s *Server) handleSimilarAnalyses(w http.ResponseWriter, r *http.Request) {
+	oc, ok := s.requireOrgMember(w, r)
+	if !ok {
+		return
+	}
+
+	if s.embeddingClient == nil {
+		writeError(w, http.StatusServiceUnavailable, "embeddings not configured")
+		return
+	}
+
+	analysisID, err := parseAnalysisID(r)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid analysis ID")
+		return
+	}
+
+	// Verify analysis belongs to this org
+	analysis, err := s.db.GetAnalysisByID(r.Context(), analysisID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, errDatabase)
+		return
+	}
+	if analysis == nil {
+		writeError(w, http.StatusNotFound, "analysis not found")
+		return
+	}
+	repo, err := s.db.GetRepositoryByID(r.Context(), analysis.RepoID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, errDatabase)
+		return
+	}
+	if repo == nil || repo.OrgID != oc.OrgID {
+		writeError(w, http.StatusNotFound, "analysis not found")
+		return
+	}
+
+	limit, threshold := parseSimilarParams(r)
+
+	// Get embeddings for this analysis
+	embeddings, err := s.db.GetRCAEmbeddingsByAnalysis(r.Context(), analysisID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, errDatabase)
+		return
+	}
+	if len(embeddings) == 0 {
+		writeJSON(w, http.StatusOK, map[string]any{"similar": []any{}})
+		return
+	}
+
+	// Find similar RCAs across the org for each embedding
+	seen := make(map[uuid.UUID]struct{})
+	var allSimilar []database.SimilarRCA
+	for _, emb := range embeddings {
+		similar, err := s.db.FindSimilarRCAs(r.Context(), oc.OrgID, emb.Embedding, analysisID, limit, threshold)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, errDatabase)
+			return
+		}
+		for _, s := range similar {
+			if _, ok := seen[s.ID]; !ok {
+				seen[s.ID] = struct{}{}
+				allSimilar = append(allSimilar, s)
+			}
+		}
+	}
+
+	// Cap results
+	if len(allSimilar) > limit {
+		allSimilar = allSimilar[:limit]
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"similar": allSimilar})
+}
+
+// handlePatternSearch searches historical patterns by free-text query.
+func (s *Server) handlePatternSearch(w http.ResponseWriter, r *http.Request) {
+	oc, ok := s.requireOrgMember(w, r)
+	if !ok {
+		return
+	}
+
+	if s.embeddingClient == nil {
+		writeError(w, http.StatusServiceUnavailable, "embeddings not configured")
+		return
+	}
+
+	query := r.URL.Query().Get("q")
+	if query == "" {
+		writeError(w, http.StatusBadRequest, "q parameter required")
+		return
+	}
+
+	limit := 10
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 && parsed <= 50 {
+			limit = parsed
+		}
+	}
+
+	embedding, err := s.embeddingClient.Embed(r.Context(), query)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to generate embedding")
+		return
+	}
+
+	results, err := s.db.FindSimilarRCAsByText(r.Context(), oc.OrgID, pgvector.NewVector(embedding), limit, 0.5)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, errDatabase)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"results": results})
+}
+
+// parseSimilarParams extracts limit and threshold from query parameters.
+func parseSimilarParams(r *http.Request) (limit int, threshold float64) {
+	limit = 5
+	threshold = 0.7
+
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 && parsed <= 50 {
+			limit = parsed
+		}
+	}
+	if t := r.URL.Query().Get("threshold"); t != "" {
+		if parsed, err := strconv.ParseFloat(t, 64); err == nil && parsed >= 0 && parsed <= 1 {
+			threshold = parsed
+		}
+	}
+	return limit, threshold
 }
