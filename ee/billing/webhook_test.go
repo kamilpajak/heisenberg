@@ -10,6 +10,12 @@ import (
 	"github.com/stripe/stripe-go/v76"
 )
 
+const (
+	webhookPath            = "/webhook"
+	headerStripeSig        = "Stripe-Signature"
+	eventCheckoutCompleted = "checkout.session.completed"
+)
+
 func TestWebhookHandler_MissingSignature(t *testing.T) {
 	client := NewClient(Config{
 		WebhookSecret: "whsec_test123",
@@ -22,7 +28,7 @@ func TestWebhookHandler_MissingSignature(t *testing.T) {
 	})
 
 	body := bytes.NewBufferString(`{"type": "test"}`)
-	req := httptest.NewRequest(http.MethodPost, "/webhook", body)
+	req := httptest.NewRequest(http.MethodPost, webhookPath, body)
 	rec := httptest.NewRecorder()
 
 	handler.ServeHTTP(rec, req)
@@ -41,8 +47,8 @@ func TestWebhookHandler_InvalidSignature(t *testing.T) {
 	})
 
 	body := bytes.NewBufferString(`{"type": "test"}`)
-	req := httptest.NewRequest(http.MethodPost, "/webhook", body)
-	req.Header.Set("Stripe-Signature", "invalid_signature")
+	req := httptest.NewRequest(http.MethodPost, webhookPath, body)
+	req.Header.Set(headerStripeSig, "invalid_signature")
 	rec := httptest.NewRecorder()
 
 	handler.ServeHTTP(rec, req)
@@ -53,7 +59,7 @@ func TestWebhookHandler_InvalidSignature(t *testing.T) {
 
 func TestWebhookEvent_Fields(t *testing.T) {
 	event := WebhookEvent{
-		Type:               "checkout.session.completed",
+		Type:               eventCheckoutCompleted,
 		CustomerID:         "cus_123",
 		SubscriptionID:     "sub_456",
 		SubscriptionStatus: "active",
@@ -61,7 +67,7 @@ func TestWebhookEvent_Fields(t *testing.T) {
 		OrgID:              "org_abc",
 	}
 
-	assert.Equal(t, "checkout.session.completed", event.Type)
+	assert.Equal(t, eventCheckoutCompleted, event.Type)
 	assert.Equal(t, "cus_123", event.CustomerID)
 	assert.Equal(t, "sub_456", event.SubscriptionID)
 	assert.Equal(t, "active", event.SubscriptionStatus)
@@ -99,8 +105,8 @@ func TestWebhookHandler_EmptyBody(t *testing.T) {
 		return nil
 	})
 
-	req := httptest.NewRequest(http.MethodPost, "/webhook", nil)
-	req.Header.Set("Stripe-Signature", "t=123,v1=abc")
+	req := httptest.NewRequest(http.MethodPost, webhookPath, nil)
+	req.Header.Set(headerStripeSig, "t=123,v1=abc")
 	rec := httptest.NewRecorder()
 
 	handler.ServeHTTP(rec, req)
@@ -129,7 +135,7 @@ func TestWebhookHandler_WithMockVerifier_CheckoutCompleted(t *testing.T) {
 	mockVerifier := &MockWebhookVerifier{
 		ConstructEventFn: func(payload []byte, header string, secret string) (stripe.Event, error) {
 			return stripe.Event{
-				Type: "checkout.session.completed",
+				Type: eventCheckoutCompleted,
 				Data: &stripe.EventData{
 					Raw: []byte(`{
 						"id": "cs_123",
@@ -148,14 +154,14 @@ func TestWebhookHandler_WithMockVerifier_CheckoutCompleted(t *testing.T) {
 	})
 
 	body := bytes.NewBufferString(`{"type": "checkout.session.completed"}`)
-	req := httptest.NewRequest(http.MethodPost, "/webhook", body)
-	req.Header.Set("Stripe-Signature", "valid_sig")
+	req := httptest.NewRequest(http.MethodPost, webhookPath, body)
+	req.Header.Set(headerStripeSig, "valid_sig")
 	rec := httptest.NewRecorder()
 
 	handler.ServeHTTP(rec, req)
 
 	assert.Equal(t, http.StatusOK, rec.Code)
-	assert.Equal(t, "checkout.session.completed", receivedEvent.Type)
+	assert.Equal(t, eventCheckoutCompleted, receivedEvent.Type)
 	assert.Equal(t, "cus_456", receivedEvent.CustomerID)
 	assert.Equal(t, "sub_789", receivedEvent.SubscriptionID)
 	assert.Equal(t, "org_abc", receivedEvent.OrgID)
@@ -191,8 +197,8 @@ func TestWebhookHandler_WithMockVerifier_SubscriptionCreated(t *testing.T) {
 	})
 
 	body := bytes.NewBufferString(`{"type": "customer.subscription.created"}`)
-	req := httptest.NewRequest(http.MethodPost, "/webhook", body)
-	req.Header.Set("Stripe-Signature", "valid_sig")
+	req := httptest.NewRequest(http.MethodPost, webhookPath, body)
+	req.Header.Set(headerStripeSig, "valid_sig")
 	rec := httptest.NewRecorder()
 
 	handler.ServeHTTP(rec, req)
@@ -232,8 +238,8 @@ func TestWebhookHandler_WithMockVerifier_SubscriptionUpdated(t *testing.T) {
 	})
 
 	body := bytes.NewBufferString(`{}`)
-	req := httptest.NewRequest(http.MethodPost, "/webhook", body)
-	req.Header.Set("Stripe-Signature", "valid")
+	req := httptest.NewRequest(http.MethodPost, webhookPath, body)
+	req.Header.Set(headerStripeSig, "valid")
 	rec := httptest.NewRecorder()
 
 	handler.ServeHTTP(rec, req)
@@ -270,8 +276,8 @@ func TestWebhookHandler_WithMockVerifier_SubscriptionDeleted(t *testing.T) {
 	})
 
 	body := bytes.NewBufferString(`{}`)
-	req := httptest.NewRequest(http.MethodPost, "/webhook", body)
-	req.Header.Set("Stripe-Signature", "valid")
+	req := httptest.NewRequest(http.MethodPost, webhookPath, body)
+	req.Header.Set(headerStripeSig, "valid")
 	rec := httptest.NewRecorder()
 
 	handler.ServeHTTP(rec, req)
@@ -307,8 +313,8 @@ func TestWebhookHandler_WithMockVerifier_InvoicePaymentSucceeded(t *testing.T) {
 	})
 
 	body := bytes.NewBufferString(`{}`)
-	req := httptest.NewRequest(http.MethodPost, "/webhook", body)
-	req.Header.Set("Stripe-Signature", "valid")
+	req := httptest.NewRequest(http.MethodPost, webhookPath, body)
+	req.Header.Set(headerStripeSig, "valid")
 	rec := httptest.NewRecorder()
 
 	handler.ServeHTTP(rec, req)
@@ -344,8 +350,8 @@ func TestWebhookHandler_WithMockVerifier_InvoicePaymentFailed(t *testing.T) {
 	})
 
 	body := bytes.NewBufferString(`{}`)
-	req := httptest.NewRequest(http.MethodPost, "/webhook", body)
-	req.Header.Set("Stripe-Signature", "valid")
+	req := httptest.NewRequest(http.MethodPost, webhookPath, body)
+	req.Header.Set(headerStripeSig, "valid")
 	rec := httptest.NewRecorder()
 
 	handler.ServeHTTP(rec, req)
@@ -376,8 +382,8 @@ func TestWebhookHandler_WithMockVerifier_UnhandledEvent(t *testing.T) {
 	})
 
 	body := bytes.NewBufferString(`{}`)
-	req := httptest.NewRequest(http.MethodPost, "/webhook", body)
-	req.Header.Set("Stripe-Signature", "valid")
+	req := httptest.NewRequest(http.MethodPost, webhookPath, body)
+	req.Header.Set(headerStripeSig, "valid")
 	rec := httptest.NewRecorder()
 
 	handler.ServeHTTP(rec, req)
@@ -393,7 +399,7 @@ func TestWebhookHandler_WithMockVerifier_HandlerError(t *testing.T) {
 	mockVerifier := &MockWebhookVerifier{
 		ConstructEventFn: func(payload []byte, header string, secret string) (stripe.Event, error) {
 			return stripe.Event{
-				Type: "checkout.session.completed",
+				Type: eventCheckoutCompleted,
 				Data: &stripe.EventData{
 					Raw: []byte(`{
 						"customer": {"id": "cus_123"},
@@ -410,8 +416,8 @@ func TestWebhookHandler_WithMockVerifier_HandlerError(t *testing.T) {
 	})
 
 	body := bytes.NewBufferString(`{}`)
-	req := httptest.NewRequest(http.MethodPost, "/webhook", body)
-	req.Header.Set("Stripe-Signature", "valid")
+	req := httptest.NewRequest(http.MethodPost, webhookPath, body)
+	req.Header.Set(headerStripeSig, "valid")
 	rec := httptest.NewRecorder()
 
 	handler.ServeHTTP(rec, req)
@@ -425,7 +431,7 @@ func TestWebhookHandler_WithMockVerifier_NilCallback(t *testing.T) {
 	mockVerifier := &MockWebhookVerifier{
 		ConstructEventFn: func(payload []byte, header string, secret string) (stripe.Event, error) {
 			return stripe.Event{
-				Type: "checkout.session.completed",
+				Type: eventCheckoutCompleted,
 				Data: &stripe.EventData{
 					Raw: []byte(`{
 						"customer": {"id": "cus_123"},
@@ -441,8 +447,8 @@ func TestWebhookHandler_WithMockVerifier_NilCallback(t *testing.T) {
 	handler := NewWebhookHandlerWithVerifier(client, mockVerifier, nil)
 
 	body := bytes.NewBufferString(`{}`)
-	req := httptest.NewRequest(http.MethodPost, "/webhook", body)
-	req.Header.Set("Stripe-Signature", "valid")
+	req := httptest.NewRequest(http.MethodPost, webhookPath, body)
+	req.Header.Set(headerStripeSig, "valid")
 	rec := httptest.NewRecorder()
 
 	handler.ServeHTTP(rec, req)

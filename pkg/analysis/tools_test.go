@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -16,6 +17,20 @@ import (
 	"github.com/kamilpajak/heisenberg/pkg/llm"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+)
+
+const (
+	notFoundMsg         = "not found"
+	fileNotFoundMsg     = "file not found"
+	htmlReportArtifact  = "html-report"
+	blobReport1Artifact = "blob-report-1"
+	buildCacheArtifact  = "build-cache"
+	blobReportArtifact  = "blob-report"
+	playwrightArtifact  = "playwright-report"
+	checkoutSpecPath    = "tests/checkout.spec.ts"
+	packageJSONPath     = "package.json"
+	sampleHTMLContent   = "<html>test</html>"
+	reportHTMLFile      = "report.html"
 )
 
 func TestDoneDiagnosis(t *testing.T) {
@@ -122,7 +137,7 @@ func TestDoneWithAnalysesArray(t *testing.T) {
 				map[string]any{
 					"title":        "Timeout in checkout",
 					"failure_type": "timeout",
-					"file_path":    "tests/checkout.spec.ts",
+					"file_path":    checkoutSpecPath,
 					"line_number":  float64(45),
 					"bug_location": "test",
 					"root_cause":   "Cookie banner overlay",
@@ -148,7 +163,7 @@ func TestDoneWithAnalysesArray(t *testing.T) {
 
 	assert.Equal(t, "Timeout in checkout", rcas[0].Title)
 	assert.Equal(t, llm.FailureTypeTimeout, rcas[0].FailureType)
-	assert.Equal(t, "tests/checkout.spec.ts", rcas[0].Location.FilePath)
+	assert.Equal(t, checkoutSpecPath, rcas[0].Location.FilePath)
 	assert.Equal(t, 45, rcas[0].Location.LineNumber)
 	assert.Equal(t, llm.BugLocationTest, rcas[0].BugLocation)
 
@@ -228,13 +243,13 @@ func TestDoneSkippedCategory(t *testing.T) {
 func TestFindArtifactByName(t *testing.T) {
 	h := &ToolHandler{
 		artifacts: []ci.Artifact{
-			{ID: 1, Name: "html-report"},
-			{ID: 2, Name: "blob-report-1"},
-			{ID: 3, Name: "test-results"},
+			{ID: 1, Name: htmlReportArtifact},
+			{ID: 2, Name: blobReport1Artifact},
+			{ID: 3, Name: testResultsArtifact},
 		},
 	}
 
-	artifact := h.findArtifactByName("blob-report-1")
+	artifact := h.findArtifactByName(blobReport1Artifact)
 	require.NotNil(t, artifact)
 	assert.Equal(t, int64(2), artifact.ID)
 }
@@ -242,7 +257,7 @@ func TestFindArtifactByName(t *testing.T) {
 func TestFindArtifactByNameNotFound(t *testing.T) {
 	h := &ToolHandler{
 		artifacts: []ci.Artifact{
-			{ID: 1, Name: "html-report"},
+			{ID: 1, Name: htmlReportArtifact},
 		},
 	}
 
@@ -259,8 +274,8 @@ func TestFindArtifactByNameEmpty(t *testing.T) {
 func TestFindTraceArtifactByName(t *testing.T) {
 	h := &ToolHandler{
 		artifacts: []ci.Artifact{
-			{ID: 1, Name: "html-report", Expired: false},
-			{ID: 2, Name: "test-results", Expired: false},
+			{ID: 1, Name: htmlReportArtifact, Expired: false},
+			{ID: 2, Name: testResultsArtifact, Expired: false},
 			{ID: 3, Name: "my-test-results", Expired: false},
 		},
 	}
@@ -273,8 +288,8 @@ func TestFindTraceArtifactByName(t *testing.T) {
 func TestFindTraceArtifactAutoDetect(t *testing.T) {
 	h := &ToolHandler{
 		artifacts: []ci.Artifact{
-			{ID: 1, Name: "build-cache", Expired: false},
-			{ID: 2, Name: "test-results", Expired: false},
+			{ID: 1, Name: buildCacheArtifact, Expired: false},
+			{ID: 2, Name: testResultsArtifact, Expired: false},
 		},
 	}
 
@@ -286,7 +301,7 @@ func TestFindTraceArtifactAutoDetect(t *testing.T) {
 func TestFindTraceArtifactSkipsExpired(t *testing.T) {
 	h := &ToolHandler{
 		artifacts: []ci.Artifact{
-			{ID: 1, Name: "test-results", Expired: true},
+			{ID: 1, Name: testResultsArtifact, Expired: true},
 			{ID: 2, Name: "other-test-results", Expired: false},
 		},
 	}
@@ -299,7 +314,7 @@ func TestFindTraceArtifactSkipsExpired(t *testing.T) {
 func TestFindTraceArtifactNotFound(t *testing.T) {
 	h := &ToolHandler{
 		artifacts: []ci.Artifact{
-			{ID: 1, Name: "build-cache", Expired: false},
+			{ID: 1, Name: buildCacheArtifact, Expired: false},
 		},
 	}
 
@@ -316,25 +331,25 @@ func TestHasPendingTraces(t *testing.T) {
 	}{
 		{
 			name:         "has pending traces",
-			artifacts:    []ci.Artifact{{Name: "test-results", Expired: false}},
+			artifacts:    []ci.Artifact{{Name: testResultsArtifact, Expired: false}},
 			calledTraces: false,
 			want:         true,
 		},
 		{
 			name:         "already called traces",
-			artifacts:    []ci.Artifact{{Name: "test-results", Expired: false}},
+			artifacts:    []ci.Artifact{{Name: testResultsArtifact, Expired: false}},
 			calledTraces: true,
 			want:         false,
 		},
 		{
 			name:         "no test-results artifact",
-			artifacts:    []ci.Artifact{{Name: "html-report", Expired: false}},
+			artifacts:    []ci.Artifact{{Name: htmlReportArtifact, Expired: false}},
 			calledTraces: false,
 			want:         false,
 		},
 		{
 			name:         "test-results expired",
-			artifacts:    []ci.Artifact{{Name: "test-results", Expired: true}},
+			artifacts:    []ci.Artifact{{Name: testResultsArtifact, Expired: true}},
 			calledTraces: false,
 			want:         false,
 		},
@@ -384,7 +399,7 @@ func TestCacheArtifactsError(t *testing.T) {
 }
 
 func TestFetchHTMLArtifact(t *testing.T) {
-	zipData := buildZip(t, map[string][]byte{"report.html": []byte("<html>test</html>")})
+	zipData := buildZip(t, map[string][]byte{reportHTMLFile: []byte(sampleHTMLContent)})
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write(zipData)
@@ -404,7 +419,7 @@ func TestFetchHTMLArtifact(t *testing.T) {
 }
 
 func TestFetchHTMLArtifactNoSnapshot(t *testing.T) {
-	zipData := buildZip(t, map[string][]byte{"report.html": []byte("<html>test</html>")})
+	zipData := buildZip(t, map[string][]byte{reportHTMLFile: []byte(sampleHTMLContent)})
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write(zipData)
@@ -431,12 +446,12 @@ func TestFetchBlobInfo(t *testing.T) {
 
 	ghClient := gh.NewTestClient("owner", "repo", srv.URL, srv.Client())
 	h := &ToolHandler{CI: ghClient}
-	artifact := &ci.Artifact{ID: 1, Name: "blob-report"}
+	artifact := &ci.Artifact{ID: 1, Name: blobReportArtifact}
 
 	result, isDone, err := h.fetchBlobInfo(context.Background(), artifact)
 	require.NoError(t, err)
 	assert.False(t, isDone)
-	assert.Contains(t, result, "blob-report")
+	assert.Contains(t, result, blobReportArtifact)
 	assert.Contains(t, result, "bytes downloaded")
 }
 
@@ -458,7 +473,7 @@ func TestFetchDefaultArtifact(t *testing.T) {
 }
 
 func TestFetchArtifactContent(t *testing.T) {
-	zipData := buildZip(t, map[string][]byte{"report.html": []byte("<html>test</html>")})
+	zipData := buildZip(t, map[string][]byte{reportHTMLFile: []byte(sampleHTMLContent)})
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write(zipData)
@@ -478,12 +493,12 @@ func TestFetchArtifactContent(t *testing.T) {
 	}{
 		{
 			name:     "HTML artifact",
-			artifact: &ci.Artifact{ID: 1, Name: "html-report"},
+			artifact: &ci.Artifact{ID: 1, Name: htmlReportArtifact},
 			wantStr:  "html snapshot",
 		},
 		{
 			name:     "blob artifact",
-			artifact: &ci.Artifact{ID: 2, Name: "blob-report-1"},
+			artifact: &ci.Artifact{ID: 2, Name: blobReport1Artifact},
 			wantStr:  "bytes downloaded",
 		},
 		{
@@ -515,7 +530,7 @@ func TestFetchHTMLArtifactDownloadError(t *testing.T) {
 }
 
 func TestFetchHTMLArtifactSnapshotError(t *testing.T) {
-	zipData := buildZip(t, map[string][]byte{"report.html": []byte("<html>test</html>")})
+	zipData := buildZip(t, map[string][]byte{reportHTMLFile: []byte(sampleHTMLContent)})
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write(zipData)
@@ -540,7 +555,7 @@ func TestFetchBlobInfoError(t *testing.T) {
 
 	ghClient := gh.NewTestClient("owner", "repo", srv.URL, srv.Client())
 	h := &ToolHandler{CI: ghClient}
-	artifact := &ci.Artifact{ID: 1, Name: "blob-report"}
+	artifact := &ci.Artifact{ID: 1, Name: blobReportArtifact}
 
 	result, _, _ := h.fetchBlobInfo(context.Background(), artifact)
 	assert.Contains(t, result, "error")
@@ -632,7 +647,7 @@ func TestExecuteGetArtifact(t *testing.T) {
 }
 
 func TestExecuteGetTestTraces(t *testing.T) {
-	artifacts := []ci.Artifact{{ID: 1, Name: "test-results", Expired: false}}
+	artifacts := []ci.Artifact{{ID: 1, Name: testResultsArtifact, Expired: false}}
 
 	// Build a minimal test-results artifact
 	traceZip := buildZip(t, map[string][]byte{
@@ -696,7 +711,7 @@ func TestExecuteGetArtifactNotFound(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.False(t, isDone)
-	assert.Contains(t, result, "not found")
+	assert.Contains(t, result, notFoundMsg)
 }
 
 func TestExecuteGetArtifactCacheError(t *testing.T) {
@@ -719,7 +734,7 @@ func TestExecuteGetArtifactCacheError(t *testing.T) {
 }
 
 func TestExecuteGetTestTracesNotFound(t *testing.T) {
-	artifacts := []ci.Artifact{{ID: 1, Name: "build-cache", Expired: false}}
+	artifacts := []ci.Artifact{{ID: 1, Name: buildCacheArtifact, Expired: false}}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(map[string]any{"artifacts": artifacts})
 	}))
@@ -737,7 +752,7 @@ func TestExecuteGetTestTracesNotFound(t *testing.T) {
 }
 
 func TestExecuteGetTestTracesWithNameNotFound(t *testing.T) {
-	artifacts := []ci.Artifact{{ID: 1, Name: "test-results", Expired: false}}
+	artifacts := []ci.Artifact{{ID: 1, Name: testResultsArtifact, Expired: false}}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(map[string]any{"artifacts": artifacts})
 	}))
@@ -751,7 +766,7 @@ func TestExecuteGetTestTracesWithNameNotFound(t *testing.T) {
 		Args: map[string]any{"artifact_name": "nonexistent"},
 	})
 
-	assert.Contains(t, result, "not found")
+	assert.Contains(t, result, notFoundMsg)
 }
 
 func TestExecuteGetTestTracesCacheError(t *testing.T) {
@@ -772,7 +787,7 @@ func TestExecuteGetTestTracesCacheError(t *testing.T) {
 }
 
 func TestExecuteGetTestTracesDownloadError(t *testing.T) {
-	artifacts := []ci.Artifact{{ID: 1, Name: "test-results", Expired: false}}
+	artifacts := []ci.Artifact{{ID: 1, Name: testResultsArtifact, Expired: false}}
 	requestCount := 0
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requestCount++
@@ -796,7 +811,7 @@ func TestExecuteGetTestTracesDownloadError(t *testing.T) {
 }
 
 func TestExecuteGetTestTracesParseError(t *testing.T) {
-	artifacts := []ci.Artifact{{ID: 1, Name: "test-results", Expired: false}}
+	artifacts := []ci.Artifact{{ID: 1, Name: testResultsArtifact, Expired: false}}
 	requestCount := 0
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requestCount++
@@ -1199,7 +1214,9 @@ func TestToolDeclarations_DoneAnalysesArrayHasItems(t *testing.T) {
 
 type mockEmitter struct{}
 
-func (m *mockEmitter) Emit(llm.ProgressEvent) {}
+func (m *mockEmitter) Emit(llm.ProgressEvent) {
+	// no-op: mock emitter discards all events during testing
+}
 
 func buildZip(t *testing.T, files map[string][]byte) []byte {
 	t.Helper()
@@ -1217,11 +1234,11 @@ func buildZip(t *testing.T, files map[string][]byte) []byte {
 
 func TestPrerequisiteGating_BlocksRepoFileBeforeArtifacts(t *testing.T) {
 	h := &ToolHandler{
-		artifacts: []ci.Artifact{{Name: "playwright-report", Expired: false}},
+		artifacts: []ci.Artifact{{Name: playwrightArtifact, Expired: false}},
 	}
 	result, _, err := h.Execute(context.Background(), llm.FunctionCall{
 		Name: "get_repo_file",
-		Args: map[string]any{"path": "package.json"},
+		Args: map[string]any{"path": packageJSONPath},
 	})
 	require.NoError(t, err)
 	assert.Contains(t, result, "ACCESS_DENIED")
@@ -1245,13 +1262,13 @@ func TestPrerequisiteGating_AllowsAfterJobLogs(t *testing.T) {
 	h := &ToolHandler{
 		CI:        ghClient,
 		RunID:     123,
-		artifacts: []ci.Artifact{{Name: "playwright-report", Expired: false}},
+		artifacts: []ci.Artifact{{Name: playwrightArtifact, Expired: false}},
 	}
 
 	// Before job logs → blocked
 	result, _, _ := h.Execute(context.Background(), llm.FunctionCall{
 		Name: "get_repo_file",
-		Args: map[string]any{"path": "package.json"},
+		Args: map[string]any{"path": packageJSONPath},
 	})
 	assert.Contains(t, result, "ACCESS_DENIED")
 
@@ -1264,7 +1281,7 @@ func TestPrerequisiteGating_AllowsAfterJobLogs(t *testing.T) {
 	// After job logs → allowed
 	result, _, _ = h.Execute(context.Background(), llm.FunctionCall{
 		Name: "get_repo_file",
-		Args: map[string]any{"path": "package.json"},
+		Args: map[string]any{"path": packageJSONPath},
 	})
 	assert.NotContains(t, result, "ACCESS_DENIED")
 }
@@ -1288,7 +1305,7 @@ func TestPrerequisiteGating_DisabledWhenNoTestArtifacts(t *testing.T) {
 	// No artifacts → get_repo_file allowed immediately
 	result, _, err := h.Execute(context.Background(), llm.FunctionCall{
 		Name: "get_repo_file",
-		Args: map[string]any{"path": "package.json"},
+		Args: map[string]any{"path": packageJSONPath},
 	})
 	require.NoError(t, err)
 	assert.NotContains(t, result, "ACCESS_DENIED")
@@ -1300,17 +1317,17 @@ func TestHasTestArtifacts(t *testing.T) {
 		artifacts []ci.Artifact
 		want      bool
 	}{
-		{"with playwright report", []ci.Artifact{{Name: "playwright-report", Expired: false}}, true},
-		{"with blob report", []ci.Artifact{{Name: "blob-report-1", Expired: false}}, true},
-		{"with test results", []ci.Artifact{{Name: "test-results", Expired: false}}, true},
+		{"with playwright report", []ci.Artifact{{Name: playwrightArtifact, Expired: false}}, true},
+		{"with blob report", []ci.Artifact{{Name: blobReport1Artifact, Expired: false}}, true},
+		{"with test results", []ci.Artifact{{Name: testResultsArtifact, Expired: false}}, true},
 		{"with html report", []ci.Artifact{{Name: "html-report--attempt-1", Expired: false}}, true},
-		{"build cache only", []ci.Artifact{{Name: "build-cache", Expired: false}}, false},
+		{"build cache only", []ci.Artifact{{Name: buildCacheArtifact, Expired: false}}, false},
 		{"docker image only", []ci.Artifact{{Name: "docker-image.tar", Expired: false}}, false},
-		{"expired report", []ci.Artifact{{Name: "playwright-report", Expired: true}}, false},
+		{"expired report", []ci.Artifact{{Name: playwrightArtifact, Expired: true}}, false},
 		{"empty", []ci.Artifact{}, false},
 		{"mixed", []ci.Artifact{
-			{Name: "build-cache", Expired: false},
-			{Name: "playwright-report", Expired: false},
+			{Name: buildCacheArtifact, Expired: false},
+			{Name: playwrightArtifact, Expired: false},
 		}, true},
 	}
 
@@ -1351,7 +1368,7 @@ func TestSmartNotFound_ReturnsDirectoryListing(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	assert.Contains(t, result, "file not found")
+	assert.Contains(t, result, fileNotFoundMsg)
 	assert.Contains(t, result, "e2e/")
 	assert.Contains(t, result, "setup.ts")
 	assert.Contains(t, result, "contents")
@@ -1366,7 +1383,7 @@ func TestSmartNotFound_RootDirectory(t *testing.T) {
 		} else if strings.HasSuffix(path, "/contents/.") || strings.HasSuffix(path, "/contents/") {
 			_ = json.NewEncoder(w).Encode([]map[string]string{
 				{"name": "src", "type": "dir"},
-				{"name": "package.json", "type": "file"},
+				{"name": packageJSONPath, "type": "file"},
 			})
 		}
 	}))
@@ -1385,8 +1402,8 @@ func TestSmartNotFound_RootDirectory(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	assert.Contains(t, result, "file not found")
-	assert.Contains(t, result, "package.json")
+	assert.Contains(t, result, fileNotFoundMsg)
+	assert.Contains(t, result, packageJSONPath)
 }
 
 func TestClassifyFilePath(t *testing.T) {
@@ -1394,7 +1411,7 @@ func TestClassifyFilePath(t *testing.T) {
 		path string
 		want string
 	}{
-		{"tests/checkout.spec.ts", "test"},
+		{checkoutSpecPath, "test"},
 		{"src/components/Button.test.tsx", "test"},
 		{"pkg/analysis/tools_test.go", "test"},
 		{"test/fixtures/data.json", "test"},
@@ -1606,7 +1623,7 @@ func (m *mockCrossRepoProvider) GetRepoFile(_ context.Context, path string) (str
 	return "", fmt.Errorf("file not found: 404 %s", path)
 }
 func (m *mockCrossRepoProvider) ListDirectory(_ context.Context, _ string) ([]string, error) {
-	return nil, fmt.Errorf("not found")
+	return nil, errors.New(notFoundMsg)
 }
 func (m *mockCrossRepoProvider) DiscoverRepos(_ context.Context, _ int64) ([]ci.RepoRef, error) {
 	return m.repos, m.repoErr
@@ -1665,7 +1682,7 @@ func TestGetRepoFile_CrossRepoAllFail(t *testing.T) {
 	})
 	require.NoError(t, err)
 	// Should fall back to smartNotFound (returns error JSON)
-	assert.Contains(t, result, "file not found")
+	assert.Contains(t, result, fileNotFoundMsg)
 }
 
 func TestGetRepoFile_NoCrossRepo(t *testing.T) {
@@ -1683,5 +1700,5 @@ func TestGetRepoFile_NoCrossRepo(t *testing.T) {
 		Args: map[string]any{"path": "missing.ts"},
 	})
 	require.NoError(t, err)
-	assert.Contains(t, result, "file not found")
+	assert.Contains(t, result, fileNotFoundMsg)
 }

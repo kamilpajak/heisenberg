@@ -19,8 +19,9 @@ import (
 )
 
 const (
-	apiVersionKey   = "api-version"
-	apiVersionValue = "7.1"
+	apiVersionKey     = "api-version"
+	apiVersionValue   = "7.1"
+	azureRepoItemsURL = "%s/%s/_apis/git/repositories/%s/items?%s"
 )
 
 // Client handles Azure DevOps API interactions and implements ci.Provider
@@ -371,7 +372,7 @@ func (c *Client) GetRepoFile(ctx context.Context, filePath string) (string, erro
 		"$format":     {"text"},
 		apiVersionKey: {apiVersionValue},
 	}
-	apiURL := fmt.Sprintf("%s/%s/_apis/git/repositories/%s/items?%s", c.baseURL, c.project, c.project, params.Encode())
+	apiURL := fmt.Sprintf(azureRepoItemsURL, c.baseURL, c.project, c.project, params.Encode())
 
 	req, err := c.newAPIRequest(ctx, apiURL)
 	if err != nil {
@@ -401,7 +402,7 @@ func (c *Client) ListDirectory(ctx context.Context, dirPath string) ([]string, e
 		"recursionLevel": {"OneLevel"},
 		apiVersionKey:    {apiVersionValue},
 	}
-	apiURL := fmt.Sprintf("%s/%s/_apis/git/repositories/%s/items?%s", c.baseURL, c.project, c.project, params.Encode())
+	apiURL := fmt.Sprintf(azureRepoItemsURL, c.baseURL, c.project, c.project, params.Encode())
 
 	var result struct {
 		Value []gitItem `json:"value"`
@@ -641,7 +642,7 @@ func (c *Client) GetFileFromRepo(ctx context.Context, repo ci.RepoRef, filePath 
 		"$format":     {"text"},
 		apiVersionKey: {apiVersionValue},
 	}
-	apiURL := fmt.Sprintf("%s/%s/_apis/git/repositories/%s/items?%s",
+	apiURL := fmt.Sprintf(azureRepoItemsURL,
 		c.baseURL, project, repoName, params.Encode())
 
 	req, err := c.newAPIRequest(ctx, apiURL)

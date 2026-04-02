@@ -17,6 +17,30 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const (
+	testRepoE2ETests       = "e2e-tests"
+	testRepoOrgRepo        = "org/repo"
+	testAzureDevOrgURL     = "https://dev.azure.com/myorg/"
+	testModelFromConfig    = "from-config"
+	testModelGemini3Pro    = "gemini-3-pro"
+	testSpecFile           = "test.spec.ts"
+	testCheckoutSpec       = "tests/checkout.spec.ts"
+	testCheckoutSpecLine45 = "tests/checkout.spec.ts:45"
+	testPerfSpec           = "tests/perf.spec.ts"
+	testLoginSpec          = "tests/login.spec.ts"
+	testRootCauseHeading   = "Root Cause"
+	testCookieBannerMsg    = "Cookie banner overlays submit button"
+	testTimeoutError       = "Timeout Error"
+	testTimeoutInCheckout  = "Timeout in checkout"
+	testCookieBanner       = "Cookie banner"
+	testAssertionInLogin   = "Assertion in login"
+	testChangedRedirect    = "Changed redirect"
+	testStatus429          = "429 Too Many Requests"
+	testErrorPrefix        = "Error:"
+	testAnalyzingMsg       = "Analyzing run 123 for owner/repo..."
+	testRootCauseTimeout   = "Root cause: timeout in login"
+)
+
 func init() {
 	color.NoColor = true
 }
@@ -24,7 +48,7 @@ func init() {
 func TestPrintResult_Diagnosis(t *testing.T) {
 	var stderr, stdout bytes.Buffer
 	r := &llm.AnalysisResult{
-		Text:        "Root cause: timeout in login",
+		Text:        testRootCauseTimeout,
 		Category:    llm.CategoryDiagnosis,
 		Confidence:  85,
 		Sensitivity: "low",
@@ -35,7 +59,7 @@ func TestPrintResult_Diagnosis(t *testing.T) {
 	assert.Contains(t, stderr.String(), "━")
 	assert.Contains(t, stderr.String(), "Confidence: 85%")
 	assert.Contains(t, stderr.String(), "low sensitivity")
-	assert.Contains(t, stdout.String(), "Root cause: timeout in login")
+	assert.Contains(t, stdout.String(), testRootCauseTimeout)
 	assert.NotContains(t, stderr.String(), "Tip:")
 }
 
@@ -103,7 +127,7 @@ func TestPrintConfidenceBar_OverflowClamped(t *testing.T) {
 
 func TestJSONOutput(t *testing.T) {
 	r := &llm.AnalysisResult{
-		Text:        "Root cause: timeout in login",
+		Text:        testRootCauseTimeout,
 		Category:    llm.CategoryDiagnosis,
 		Confidence:  85,
 		Sensitivity: "low",
@@ -128,7 +152,7 @@ func TestPrintStructuredRCA_ProductionBug_HighConfidence(t *testing.T) {
 	rca := &llm.RootCauseAnalysis{
 		Title:                 "Price calculation broken",
 		FailureType:           llm.FailureTypeAssertion,
-		Location:              &llm.CodeLocation{FilePath: "tests/checkout.spec.ts", LineNumber: 45},
+		Location:              &llm.CodeLocation{FilePath: testCheckoutSpec, LineNumber: 45},
 		BugLocation:           llm.BugLocationProduction,
 		BugLocationConfidence: "high",
 		BugCodeLocation:       &llm.CodeLocation{FilePath: "src/pricing.ts", LineNumber: 42},
@@ -140,7 +164,7 @@ func TestPrintStructuredRCA_ProductionBug_HighConfidence(t *testing.T) {
 	out := buf.String()
 
 	assert.Contains(t, out, "ASSERTION")
-	assert.Contains(t, out, "tests/checkout.spec.ts:45")
+	assert.Contains(t, out, testCheckoutSpecLine45)
 	assert.Contains(t, out, "[production bug]")
 	assert.Contains(t, out, "src/pricing.ts:42")
 }
@@ -150,7 +174,7 @@ func TestPrintStructuredRCA_ProductionBug_LowConfidence(t *testing.T) {
 	rca := &llm.RootCauseAnalysis{
 		Title:                 "Possible regression",
 		FailureType:           llm.FailureTypeAssertion,
-		Location:              &llm.CodeLocation{FilePath: "tests/checkout.spec.ts", LineNumber: 45},
+		Location:              &llm.CodeLocation{FilePath: testCheckoutSpec, LineNumber: 45},
 		BugLocation:           llm.BugLocationProduction,
 		BugLocationConfidence: "low",
 		RootCause:             "Maybe a regression",
@@ -227,7 +251,7 @@ func TestPrintResult_MultipleRCAs(t *testing.T) {
 				Title:       "utilsBundle not loaded",
 				FailureType: llm.FailureTypeAssertion,
 				BugLocation: llm.BugLocationTest,
-				Location:    &llm.CodeLocation{FilePath: "tests/perf.spec.ts", LineNumber: 29},
+				Location:    &llm.CodeLocation{FilePath: testPerfSpec, LineNumber: 29},
 				RootCause:   "Test assertion outdated",
 				Remediation: "Update test",
 			},
@@ -252,7 +276,7 @@ func TestPrintResult_MultipleRCAs(t *testing.T) {
 	assert.Contains(t, out, "ASSERTION")
 	assert.Contains(t, out, "INFRA")
 	// Detail sections
-	assert.Contains(t, out, "Root Cause")
+	assert.Contains(t, out, testRootCauseHeading)
 	assert.Contains(t, out, "Test assertion outdated")
 	assert.Contains(t, out, "Temp dir not created")
 }
@@ -267,8 +291,8 @@ func TestPrintResult_SingleRCA_NoSummaryList(t *testing.T) {
 			{
 				Title:       "Timeout waiting for Submit Button",
 				FailureType: llm.FailureTypeTimeout,
-				Location:    &llm.CodeLocation{FilePath: "tests/checkout.spec.ts", LineNumber: 45},
-				RootCause:   "Cookie banner overlays submit button",
+				Location:    &llm.CodeLocation{FilePath: testCheckoutSpec, LineNumber: 45},
+				RootCause:   testCookieBannerMsg,
 				Remediation: "Dismiss cookie banner",
 			},
 		},
@@ -281,8 +305,8 @@ func TestPrintResult_SingleRCA_NoSummaryList(t *testing.T) {
 	assert.NotContains(t, out, "root causes found")
 	// But detail section present
 	assert.Contains(t, out, "TIMEOUT")
-	assert.Contains(t, out, "tests/checkout.spec.ts:45")
-	assert.Contains(t, out, "Root Cause")
+	assert.Contains(t, out, testCheckoutSpecLine45)
+	assert.Contains(t, out, testRootCauseHeading)
 }
 
 func TestPrintResult_WithStructuredRCA(t *testing.T) {
@@ -296,11 +320,11 @@ func TestPrintResult_WithStructuredRCA(t *testing.T) {
 				Title:       "Timeout waiting for Submit Button",
 				FailureType: llm.FailureTypeTimeout,
 				Location: &llm.CodeLocation{
-					FilePath:   "tests/checkout.spec.ts",
+					FilePath:   testCheckoutSpec,
 					LineNumber: 45,
 				},
 				Symptom:   "Test timed out after 30000ms",
-				RootCause: "Cookie banner overlays submit button",
+				RootCause: testCookieBannerMsg,
 				Evidence: []llm.Evidence{
 					{Type: llm.EvidenceScreenshot, Content: "Overlay visible at z=999"},
 					{Type: llm.EvidenceTrace, Content: "Click blocked at 12:34:56"},
@@ -314,9 +338,9 @@ func TestPrintResult_WithStructuredRCA(t *testing.T) {
 
 	out := stdout.String()
 	assert.Contains(t, out, "TIMEOUT")
-	assert.Contains(t, out, "tests/checkout.spec.ts:45")
-	assert.Contains(t, out, "Root Cause")
-	assert.Contains(t, out, "Cookie banner overlays submit button")
+	assert.Contains(t, out, testCheckoutSpecLine45)
+	assert.Contains(t, out, testRootCauseHeading)
+	assert.Contains(t, out, testCookieBannerMsg)
 	assert.Contains(t, out, "Evidence")
 	assert.Contains(t, out, "[Screenshot]")
 	assert.Contains(t, out, "Overlay visible")
@@ -477,9 +501,9 @@ func TestPrintStructuredRCA_NoFixConfidence(t *testing.T) {
 func TestPrintStructuredRCA_WordWrap(t *testing.T) {
 	var buf bytes.Buffer
 	rca := &llm.RootCauseAnalysis{
-		Title:       "Timeout Error",
+		Title:       testTimeoutError,
 		FailureType: llm.FailureTypeTimeout,
-		Location:    &llm.CodeLocation{FilePath: "test.spec.ts", LineNumber: 1},
+		Location:    &llm.CodeLocation{FilePath: testSpecFile, LineNumber: 1},
 		Symptom:     "Timeout",
 		RootCause:   "This is a very long root cause description that should definitely be wrapped across multiple lines because it exceeds the maximum line width of seventy-six characters",
 		Evidence:    []llm.Evidence{},
@@ -589,10 +613,10 @@ func TestJSONOutput_WithRCA(t *testing.T) {
 		Sensitivity: "low",
 		RCAs: []llm.RootCauseAnalysis{
 			{
-				Title:       "Timeout Error",
+				Title:       testTimeoutError,
 				FailureType: llm.FailureTypeTimeout,
 				Location: &llm.CodeLocation{
-					FilePath:   "tests/login.spec.ts",
+					FilePath:   testLoginSpec,
 					LineNumber: 42,
 				},
 				Symptom:     "Timed out",
@@ -612,9 +636,9 @@ func TestJSONOutput_WithRCA(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, decoded.RCAs, 1)
-	assert.Equal(t, "Timeout Error", decoded.RCAs[0].Title)
+	assert.Equal(t, testTimeoutError, decoded.RCAs[0].Title)
 	assert.Equal(t, llm.FailureTypeTimeout, decoded.RCAs[0].FailureType)
-	assert.Equal(t, "tests/login.spec.ts", decoded.RCAs[0].Location.FilePath)
+	assert.Equal(t, testLoginSpec, decoded.RCAs[0].Location.FilePath)
 	assert.Equal(t, 42, decoded.RCAs[0].Location.LineNumber)
 	assert.Len(t, decoded.RCAs[0].Evidence, 1)
 }
@@ -626,17 +650,17 @@ func TestJSONOutput_MultiRCA(t *testing.T) {
 		Sensitivity: "low",
 		RCAs: []llm.RootCauseAnalysis{
 			{
-				Title:       "Timeout in checkout",
+				Title:       testTimeoutInCheckout,
 				FailureType: llm.FailureTypeTimeout,
-				Location:    &llm.CodeLocation{FilePath: "tests/checkout.spec.ts", LineNumber: 45},
-				RootCause:   "Cookie banner",
+				Location:    &llm.CodeLocation{FilePath: testCheckoutSpec, LineNumber: 45},
+				RootCause:   testCookieBanner,
 				Remediation: "Dismiss banner",
 			},
 			{
-				Title:       "Assertion in login",
+				Title:       testAssertionInLogin,
 				FailureType: llm.FailureTypeAssertion,
-				Location:    &llm.CodeLocation{FilePath: "tests/login.spec.ts", LineNumber: 12},
-				RootCause:   "Changed redirect",
+				Location:    &llm.CodeLocation{FilePath: testLoginSpec, LineNumber: 12},
+				RootCause:   testChangedRedirect,
 				Remediation: "Update URL",
 			},
 		},
@@ -656,8 +680,8 @@ func TestJSONOutput_MultiRCA(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Len(t, decoded.RCAs, 2)
-	assert.Equal(t, "Timeout in checkout", decoded.RCAs[0].Title)
-	assert.Equal(t, "Assertion in login", decoded.RCAs[1].Title)
+	assert.Equal(t, testTimeoutInCheckout, decoded.RCAs[0].Title)
+	assert.Equal(t, testAssertionInLogin, decoded.RCAs[1].Title)
 }
 
 func TestPrintResult_ThreeRCAs_Numbering(t *testing.T) {
@@ -668,19 +692,19 @@ func TestPrintResult_ThreeRCAs_Numbering(t *testing.T) {
 		Sensitivity: "low",
 		RCAs: []llm.RootCauseAnalysis{
 			{
-				Title:       "Timeout in checkout",
+				Title:       testTimeoutInCheckout,
 				FailureType: llm.FailureTypeTimeout,
 				BugLocation: llm.BugLocationTest,
-				Location:    &llm.CodeLocation{FilePath: "tests/checkout.spec.ts", LineNumber: 45},
-				RootCause:   "Cookie banner",
+				Location:    &llm.CodeLocation{FilePath: testCheckoutSpec, LineNumber: 45},
+				RootCause:   testCookieBanner,
 				Remediation: "Dismiss banner",
 			},
 			{
-				Title:       "Assertion in login",
+				Title:       testAssertionInLogin,
 				FailureType: llm.FailureTypeAssertion,
 				BugLocation: llm.BugLocationProduction,
-				Location:    &llm.CodeLocation{FilePath: "tests/login.spec.ts", LineNumber: 12},
-				RootCause:   "Changed redirect",
+				Location:    &llm.CodeLocation{FilePath: testLoginSpec, LineNumber: 12},
+				RootCause:   testChangedRedirect,
 				Remediation: "Update URL",
 			},
 			{
@@ -711,8 +735,8 @@ func TestPrintResult_ThreeRCAs_Numbering(t *testing.T) {
 	assert.Contains(t, out, "NETWORK")
 
 	// All detail sections present
-	assert.Contains(t, out, "Cookie banner")
-	assert.Contains(t, out, "Changed redirect")
+	assert.Contains(t, out, testCookieBanner)
+	assert.Contains(t, out, testChangedRedirect)
 	assert.Contains(t, out, "DNS failure")
 }
 
@@ -780,7 +804,7 @@ func TestResolveTarget_FromArgs(t *testing.T) {
 	fromEnv = false
 	runURL = ""
 	providerFlag = ""
-	target, err := resolveTarget([]string{"org/repo"}, 0)
+	target, err := resolveTarget([]string{testRepoOrgRepo}, 0)
 	require.NoError(t, err)
 	assert.Equal(t, "github", target.provider)
 	assert.Equal(t, "org", target.owner)
@@ -811,7 +835,7 @@ func TestResolveTarget_FromGitHubEnv(t *testing.T) {
 	runURL = ""
 	runID = 0
 	providerFlag = ""
-	t.Setenv("GITHUB_REPOSITORY", "org/repo")
+	t.Setenv("GITHUB_REPOSITORY", testRepoOrgRepo)
 	t.Setenv("GITHUB_RUN_ID", "99999")
 	t.Setenv("SYSTEM_TEAMPROJECT", "")
 
@@ -831,7 +855,7 @@ func TestResolveTarget_FromAzureEnv(t *testing.T) {
 	runID = 0
 	providerFlag = ""
 	t.Setenv("GITHUB_REPOSITORY", "")
-	t.Setenv("SYSTEM_TEAMFOUNDATIONCOLLECTIONURI", "https://dev.azure.com/myorg/")
+	t.Setenv("SYSTEM_TEAMFOUNDATIONCOLLECTIONURI", testAzureDevOrgURL)
 	t.Setenv("SYSTEM_TEAMPROJECT", "myproject")
 	t.Setenv("BUILD_BUILDID", "789")
 
@@ -849,7 +873,7 @@ func TestResolveTarget_AmbiguousEnv(t *testing.T) {
 	fromEnv = true
 	runURL = ""
 	providerFlag = ""
-	t.Setenv("GITHUB_REPOSITORY", "org/repo")
+	t.Setenv("GITHUB_REPOSITORY", testRepoOrgRepo)
 	t.Setenv("SYSTEM_TEAMPROJECT", "myproject")
 
 	_, err := resolveTarget(nil, runID)
@@ -864,8 +888,8 @@ func TestResolveTarget_AmbiguousEnv_Resolved(t *testing.T) {
 	runURL = ""
 	runID = 0
 	providerFlag = "azure"
-	t.Setenv("GITHUB_REPOSITORY", "org/repo")
-	t.Setenv("SYSTEM_TEAMFOUNDATIONCOLLECTIONURI", "https://dev.azure.com/myorg/")
+	t.Setenv("GITHUB_REPOSITORY", testRepoOrgRepo)
+	t.Setenv("SYSTEM_TEAMFOUNDATIONCOLLECTIONURI", testAzureDevOrgURL)
 	t.Setenv("SYSTEM_TEAMPROJECT", "myproject")
 	t.Setenv("BUILD_BUILDID", "456")
 
@@ -934,7 +958,7 @@ func TestExtractAzureOrg(t *testing.T) {
 		uri  string
 		want string
 	}{
-		{"https://dev.azure.com/myorg/", "myorg"},
+		{testAzureDevOrgURL, "myorg"},
 		{"https://dev.azure.com/myorg", "myorg"},
 		{"https://dev.azure.com/my-org/", "my-org"},
 		{"https://myorg.visualstudio.com/", "myorg"},
@@ -971,15 +995,15 @@ func TestBuildProvider_AzureFromEnv(t *testing.T) {
 
 func TestBuildProvider_AzureWithTestRepo(t *testing.T) {
 	target := &targetInfo{provider: "azure", owner: "myorg", repo: "myproject"}
-	testRepo = "e2e-tests"
+	testRepo = testRepoE2ETests
 	defer func() { testRepo = "" }()
 
 	p := buildProvider(target, &config.Config{AzureDevOpsPAT: "pat"})
 	azClient := p.(*azure.Client)
 	require.Len(t, azClient.ExtraRepos, 1)
 	// Single name: project and repo should BOTH be the test repo name, not the org
-	assert.Equal(t, "e2e-tests", azClient.ExtraRepos[0].Project)
-	assert.Equal(t, "e2e-tests", azClient.ExtraRepos[0].Repo)
+	assert.Equal(t, testRepoE2ETests, azClient.ExtraRepos[0].Project)
+	assert.Equal(t, testRepoE2ETests, azClient.ExtraRepos[0].Repo)
 }
 
 func TestBuildProvider_AzureWithTestRepoExplicitProject(t *testing.T) {
@@ -1035,7 +1059,7 @@ func TestPrintClusterSummary(t *testing.T) {
 	var buf bytes.Buffer
 	rcas := []llm.RootCauseAnalysis{
 		{Title: "Timeout", FailureType: llm.FailureTypeTimeout, BugLocation: llm.BugLocationInfrastructure,
-			Location: &llm.CodeLocation{FilePath: "test.spec.ts", LineNumber: 42}},
+			Location: &llm.CodeLocation{FilePath: testSpecFile, LineNumber: 42}},
 		{Title: "Assertion", FailureType: llm.FailureTypeAssertion, BugLocation: llm.BugLocationTest},
 	}
 	printClusterSummary(&buf, rcas)
@@ -1119,19 +1143,19 @@ func TestResolveModel(t *testing.T) {
 	// flag > env > config > empty
 	assert.Equal(t, "gemini-2.5-pro", resolveModel("gemini-2.5-pro", ""))
 	assert.Equal(t, "", resolveModel("", ""))
-	assert.Equal(t, "from-config", resolveModel("", "from-config"))
+	assert.Equal(t, testModelFromConfig, resolveModel("", testModelFromConfig))
 
-	t.Setenv("HEISENBERG_MODEL", "gemini-3-pro")
-	assert.Equal(t, "gemini-3-pro", resolveModel("", ""))
-	assert.Equal(t, "gemini-3-pro", resolveModel("", "from-config"))     // env beats config
-	assert.Equal(t, "override", resolveModel("override", "from-config")) // flag beats all
+	t.Setenv("HEISENBERG_MODEL", testModelGemini3Pro)
+	assert.Equal(t, testModelGemini3Pro, resolveModel("", ""))
+	assert.Equal(t, testModelGemini3Pro, resolveModel("", testModelFromConfig)) // env beats config
+	assert.Equal(t, "override", resolveModel("override", testModelFromConfig))  // flag beats all
 }
 
 func TestExitCode_APIError(t *testing.T) {
 	var buf bytes.Buffer
 	apiErr := &llm.APIError{
 		StatusCode: 429,
-		Status:     "429 Too Many Requests",
+		Status:     testStatus429,
 		Message:    "Resource has been exhausted",
 		RawBody:    `{"error":{"code":429}}`,
 	}
@@ -1141,8 +1165,8 @@ func TestExitCode_APIError(t *testing.T) {
 
 	out := buf.String()
 	assert.Equal(t, exitAPIError, code)
-	assert.Contains(t, out, "Error:")
-	assert.Contains(t, out, "429 Too Many Requests")
+	assert.Contains(t, out, testErrorPrefix)
+	assert.Contains(t, out, testStatus429)
 	assert.Contains(t, out, "Hint:")
 	assert.Contains(t, out, "Exit code: 3  (external API error)")
 	assert.NotContains(t, out, `"error"`, "raw JSON should not appear without --verbose")
@@ -1164,7 +1188,7 @@ func TestExitCode_GenericError(t *testing.T) {
 
 	out := buf.String()
 	assert.Equal(t, exitGeneral, code)
-	assert.Contains(t, out, "Error:")
+	assert.Contains(t, out, testErrorPrefix)
 	assert.Contains(t, out, "something went wrong")
 	assert.Contains(t, out, "Exit code: 1  (runtime error)")
 	assert.NotContains(t, out, "Hint:")
@@ -1237,7 +1261,7 @@ func TestIntegration_State4_ErrorFlow(t *testing.T) {
 
 	// Simulate: emitter shows progress, then error occurs
 	emitter := llm.NewTextEmitter(&stderr, false)
-	emitter.Emit(llm.ProgressEvent{Type: "info", Message: "Analyzing run 123 for owner/repo..."})
+	emitter.Emit(llm.ProgressEvent{Type: "info", Message: testAnalyzingMsg})
 	emitter.Emit(llm.ProgressEvent{Type: "tool", Step: 2, MaxStep: 30, Tool: "get_job_logs"})
 	emitter.MarkFailed()
 	emitter.Close()
@@ -1245,7 +1269,7 @@ func TestIntegration_State4_ErrorFlow(t *testing.T) {
 	// Then printError renders the error
 	apiErr := &llm.APIError{
 		StatusCode: 429,
-		Status:     "429 Too Many Requests",
+		Status:     testStatus429,
 		Message:    "Resource has been exhausted",
 		Retries:    3,
 	}
@@ -1257,7 +1281,7 @@ func TestIntegration_State4_ErrorFlow(t *testing.T) {
 	assert.Equal(t, exitAPIError, code)
 	infoIdx := strings.Index(out, "Analyzing run 123")
 	closeIdx := strings.Index(out, "Stopped at 2/30")
-	errorIdx := strings.Index(out, "Error:")
+	errorIdx := strings.Index(out, testErrorPrefix)
 	hintIdx := strings.Index(out, "Hint:")
 	exitIdx := strings.Index(out, "Exit code: 3")
 
@@ -1269,7 +1293,7 @@ func TestIntegration_State4_ErrorFlow(t *testing.T) {
 	// Verify content
 	assert.Contains(t, out, "✗")
 	assert.Contains(t, out, "Stopped at 2/30 iterations")
-	assert.Contains(t, out, "429 Too Many Requests")
+	assert.Contains(t, out, testStatus429)
 	assert.Contains(t, out, "Retried 3 times")
 	assert.Contains(t, out, "Exit code: 3  (external API error)")
 }
@@ -1280,7 +1304,7 @@ func TestIntegration_State1And2_ProgressFlow(t *testing.T) {
 	emitter := llm.NewTextEmitter(&stderr, false)
 
 	// State 1: initial
-	emitter.Emit(llm.ProgressEvent{Type: "info", Message: "Analyzing run 123 for owner/repo..."})
+	emitter.Emit(llm.ProgressEvent{Type: "info", Message: testAnalyzingMsg})
 	assert.Contains(t, stderr.String(), "Analyzing run 123")
 
 	// State 2: tool events with aligned phases
@@ -1306,7 +1330,7 @@ func TestIntegration_State3_SuccessFlow(t *testing.T) {
 	var stderr, stdout bytes.Buffer
 
 	emitter := llm.NewTextEmitter(&stderr, false)
-	emitter.Emit(llm.ProgressEvent{Type: "info", Message: "Analyzing run 123 for owner/repo..."})
+	emitter.Emit(llm.ProgressEvent{Type: "info", Message: testAnalyzingMsg})
 	emitter.Emit(llm.ProgressEvent{Type: "tool", Step: 9, MaxStep: 30, Tool: "done"})
 	emitter.Close()
 
@@ -1318,7 +1342,7 @@ func TestIntegration_State3_SuccessFlow(t *testing.T) {
 			{
 				Title:       "Flaky Test Detected",
 				FailureType: llm.FailureTypeFlake,
-				Location:    &llm.CodeLocation{FilePath: "tests/perf.spec.ts", LineNumber: 29},
+				Location:    &llm.CodeLocation{FilePath: testPerfSpec, LineNumber: 29},
 				RootCause:   "utilsBundle loads too fast on macOS runners",
 				Remediation: "Relax assertion in perf.spec.ts",
 			},
@@ -1350,7 +1374,7 @@ func TestPrintResult_ExecutiveSummary(t *testing.T) {
 			{
 				Title:       "Flaky Test Detected",
 				FailureType: llm.FailureTypeFlake,
-				Location:    &llm.CodeLocation{FilePath: "tests/perf.spec.ts", LineNumber: 29},
+				Location:    &llm.CodeLocation{FilePath: testPerfSpec, LineNumber: 29},
 				Symptom:     "utilsBundle not in output",
 				RootCause:   "utilsBundle loads too fast on macOS runners",
 				Evidence:    []llm.Evidence{{Type: llm.EvidenceTrace, Content: "Trace data"}},
@@ -1380,9 +1404,9 @@ func TestPrintResult_ExecutiveSummary_SectionNames(t *testing.T) {
 		Sensitivity: "low",
 		RCAs: []llm.RootCauseAnalysis{
 			{
-				Title:       "Timeout Error",
+				Title:       testTimeoutError,
 				FailureType: llm.FailureTypeTimeout,
-				Location:    &llm.CodeLocation{FilePath: "test.spec.ts", LineNumber: 1},
+				Location:    &llm.CodeLocation{FilePath: testSpecFile, LineNumber: 1},
 				Symptom:     "Timeout",
 				RootCause:   "Slow network",
 				Remediation: "Add retry",
@@ -1395,7 +1419,7 @@ func TestPrintResult_ExecutiveSummary_SectionNames(t *testing.T) {
 	out := stdout.String()
 	assert.Contains(t, out, "Cause")
 	assert.Contains(t, out, "Fix")
-	assert.NotContains(t, out, "Root Cause", "should use shorter 'Cause' heading")
+	assert.NotContains(t, out, testRootCauseHeading, "should use shorter 'Cause' heading")
 }
 
 // --- Phase 1: analyze subcommand + flag relocation ---
@@ -1562,7 +1586,7 @@ func TestPrintStructuredRCA_WithMatchedPattern(t *testing.T) {
 	rca := &llm.RootCauseAnalysis{
 		Title:       "Timeout in beforeEach",
 		FailureType: llm.FailureTypeTimeout,
-		Location:    &llm.CodeLocation{FilePath: "tests/checkout.spec.ts", LineNumber: 28},
+		Location:    &llm.CodeLocation{FilePath: testCheckoutSpec, LineNumber: 28},
 		RootCause:   "Selector changed",
 		Remediation: "Update selector",
 		MatchedPatterns: []llm.MatchedPattern{

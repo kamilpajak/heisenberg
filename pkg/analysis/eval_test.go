@@ -20,6 +20,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const (
+	labelFmt = "  %-25s"
+	valueFmt = "  %-20s"
+)
+
 // groundTruth defines expected results for a test case.
 type groundTruth struct {
 	Repo                  string             `json:"repo"`
@@ -231,18 +236,7 @@ func TestEval_Report(t *testing.T) {
 		t.Skipf("no eval log at %s", logPath)
 	}
 
-	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
-	require.NotEmpty(t, lines, "eval log is empty")
-
-	var entries []evalEntry
-	for _, line := range lines {
-		if line == "" {
-			continue
-		}
-		var e evalEntry
-		require.NoError(t, json.Unmarshal([]byte(line), &e))
-		entries = append(entries, e)
-	}
+	entries := parseEvalEntries(t, data)
 
 	// Group by repo+run_id → model → entries
 	type key struct {
@@ -263,97 +257,107 @@ func TestEval_Report(t *testing.T) {
 		fmt.Printf("  %s #%d\n", k.repo, k.runID)
 		fmt.Printf("  %s\n", strings.Repeat("─", 70))
 
-		// Collect all models
 		var models []string
 		for m := range byModel {
 			models = append(models, m)
 		}
 
-		// Header
-		fmt.Printf("  %-25s", "")
-		for _, m := range models {
-			fmt.Printf("  %-20s", m)
-		}
-		fmt.Println()
-
-		// Runs
-		fmt.Printf("  %-25s", "Runs")
-		for _, m := range models {
-			fmt.Printf("  %-20d", len(byModel[m]))
-		}
-		fmt.Println()
-
-		// Category match
-		fmt.Printf("  %-25s", "Category match")
-		for _, m := range models {
-			match := 0
-			for _, e := range byModel[m] {
-				if e.Category == "diagnosis" {
-					match++
-				}
-			}
-			fmt.Printf("  %-20s", fmt.Sprintf("%d/%d", match, len(byModel[m])))
-		}
-		fmt.Println()
-
-		// Confidence
-		fmt.Printf("  %-25s", "Confidence")
-		for _, m := range models {
-			vals := make([]float64, len(byModel[m]))
-			for i, e := range byModel[m] {
-				vals[i] = float64(e.Confidence)
-			}
-			fmt.Printf("  %-20s", formatStats(vals))
-		}
-		fmt.Println()
-
-		// Analyses count
-		fmt.Printf("  %-25s", "Analyses count")
-		for _, m := range models {
-			vals := make([]float64, len(byModel[m]))
-			for i, e := range byModel[m] {
-				vals[i] = float64(e.Analyses)
-			}
-			fmt.Printf("  %-20s", formatStats(vals))
-		}
-		fmt.Println()
-
-		// Ground truth
-		fmt.Printf("  %-25s", "Ground truth match")
-		for _, m := range models {
-			match := 0
-			total := 0
-			for _, e := range byModel[m] {
-				match += e.Matched
-				total += e.Expected
-			}
-			fmt.Printf("  %-20s", fmt.Sprintf("%d/%d", match, total))
-		}
-		fmt.Println()
-
-		// Iterations
-		fmt.Printf("  %-25s", "Iterations")
-		for _, m := range models {
-			vals := make([]float64, len(byModel[m]))
-			for i, e := range byModel[m] {
-				vals[i] = float64(e.Iterations)
-			}
-			fmt.Printf("  %-20s", formatStats(vals))
-		}
-		fmt.Println()
-
-		// Wall time
-		fmt.Printf("  %-25s", "Wall time")
-		for _, m := range models {
-			vals := make([]float64, len(byModel[m]))
-			for i, e := range byModel[m] {
-				vals[i] = float64(e.WallMs) / 1000
-			}
-			fmt.Printf("  %-20s", formatStatsUnit(vals, "s"))
-		}
-		fmt.Println()
+		printReportHeader(models)
+		printReportRows(models, byModel)
 		fmt.Println()
 	}
+}
+
+func parseEvalEntries(t *testing.T, data []byte) []evalEntry {
+	t.Helper()
+	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+	require.NotEmpty(t, lines, "eval log is empty")
+
+	var entries []evalEntry
+	for _, line := range lines {
+		if line == "" {
+			continue
+		}
+		var e evalEntry
+		require.NoError(t, json.Unmarshal([]byte(line), &e))
+		entries = append(entries, e)
+	}
+	return entries
+}
+
+func printReportHeader(models []string) {
+	fmt.Printf(labelFmt, "")
+	for _, m := range models {
+		fmt.Printf(valueFmt, m)
+	}
+	fmt.Println()
+}
+
+func printReportRows(models []string, byModel map[string][]evalEntry) {
+	printRowInt(models, byModel, "Runs", func(es []evalEntry) string {
+		return fmt.Sprintf("%d", len(es))
+	})
+	printRowInt(models, byModel, "Category match", func(es []evalEntry) string {
+		match := 0
+		for _, e := range es {
+			if e.Category == "diagnosis" {
+				match++
+			}
+		}
+		return fmt.Sprintf("%d/%d", match, len(es))
+	})
+	printRowStats(models, byModel, "Confidence", func(e evalEntry) float64 {
+		return float64(e.Confidence)
+	})
+	printRowStats(models, byModel, "Analyses count", func(e evalEntry) float64 {
+		return float64(e.Analyses)
+	})
+	printRowInt(models, byModel, "Ground truth match", func(es []evalEntry) string {
+		match, total := 0, 0
+		for _, e := range es {
+			match += e.Matched
+			total += e.Expected
+		}
+		return fmt.Sprintf("%d/%d", match, total)
+	})
+	printRowStats(models, byModel, "Iterations", func(e evalEntry) float64 {
+		return float64(e.Iterations)
+	})
+	printRowStatsUnit(models, byModel, "Wall time", "s", func(e evalEntry) float64 {
+		return float64(e.WallMs) / 1000
+	})
+}
+
+func printRowInt(models []string, byModel map[string][]evalEntry, label string, fn func([]evalEntry) string) {
+	fmt.Printf(labelFmt, label)
+	for _, m := range models {
+		fmt.Printf(valueFmt, fn(byModel[m]))
+	}
+	fmt.Println()
+}
+
+func printRowStats(models []string, byModel map[string][]evalEntry, label string, extract func(evalEntry) float64) {
+	fmt.Printf(labelFmt, label)
+	for _, m := range models {
+		vals := make([]float64, len(byModel[m]))
+		for i, e := range byModel[m] {
+			vals[i] = extract(e)
+		}
+		fmt.Printf(valueFmt, formatStats(vals))
+	}
+	fmt.Println()
+}
+
+func printRowStatsUnit(models []string, byModel map[string][]evalEntry, label, unit string, extract func(evalEntry) float64) {
+	fmt.Printf(labelFmt, label)
+	for _, m := range models {
+		vals := make([]float64, len(byModel[m]))
+		for i, e := range byModel[m] {
+			vals[i] = extract(e)
+		}
+		fmt.Printf(valueFmt, formatStatsUnit(vals, unit))
+	}
+	fmt.Println()
 }
 
 func formatStats(vals []float64) string {

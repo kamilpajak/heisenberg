@@ -17,8 +17,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const (
+	msgNotSet         = "not set"
+	msgEverythingFine = "everything is fine"
+)
+
 func alwaysOK(_ context.Context) checkResult {
-	return checkResult{status: statusOK, message: "everything is fine"}
+	return checkResult{status: statusOK, message: msgEverythingFine}
 }
 
 func alwaysFail(_ context.Context) checkResult {
@@ -41,7 +46,7 @@ func TestDoctor_AllPass(t *testing.T) {
 	assert.NoError(t, err)
 
 	out := buf.String()
-	assert.Contains(t, out, "everything is fine")
+	assert.Contains(t, out, msgEverythingFine)
 	assert.Contains(t, out, "heisenberg v0.0.0-test")
 	assert.Contains(t, out, "2 passed")
 	assert.NotContains(t, out, "failed")
@@ -59,7 +64,7 @@ func TestDoctor_SomeFail(t *testing.T) {
 	assert.Contains(t, err.Error(), "1 check(s) failed")
 
 	out := buf.String()
-	assert.Contains(t, out, "everything is fine")
+	assert.Contains(t, out, msgEverythingFine)
 	assert.Contains(t, out, "something broke")
 	assert.Contains(t, out, "fix it")
 	assert.Contains(t, out, "1 passed, 1 failed")
@@ -83,7 +88,7 @@ func TestCheckGitHubToken_Missing(t *testing.T) {
 	check := checkGitHubTokenWith("")
 	result := check(context.Background())
 	assert.Equal(t, statusFail, result.status)
-	assert.Contains(t, result.message, "not set")
+	assert.Contains(t, result.message, msgNotSet)
 }
 
 func TestCheckGitHubToken_Valid(t *testing.T) {
@@ -115,7 +120,7 @@ func TestCheckGoogleAPIKey_Missing(t *testing.T) {
 	check := checkGoogleAPIKeyWith("")
 	result := check(context.Background())
 	assert.Equal(t, statusFail, result.status)
-	assert.Contains(t, result.message, "not set")
+	assert.Contains(t, result.message, msgNotSet)
 }
 
 func TestCheckGoogleAPIKey_UsesHeader(t *testing.T) {
@@ -245,7 +250,7 @@ func TestCheckAzurePAT_Missing(t *testing.T) {
 	check := checkAzurePATWith("")
 	result := check(context.Background())
 	assert.Equal(t, statusFail, result.status)
-	assert.Contains(t, result.message, "not set")
+	assert.Contains(t, result.message, msgNotSet)
 }
 
 func TestCheckAzurePAT_Valid(t *testing.T) {

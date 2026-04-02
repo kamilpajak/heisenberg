@@ -8,12 +8,20 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const (
+	msgTimedOut       = "Timed out"
+	msgFixIt          = "Fix it"
+	fileLoginSpec     = "tests/login.spec.ts"
+	titleTimeoutError = "Timeout Error"
+	fileCheckoutSpec  = "tests/checkout.spec.ts"
+)
+
 func TestRootCauseAnalysis_JSONSerialization(t *testing.T) {
 	rca := &RootCauseAnalysis{
 		Title:       "Timeout waiting for Submit Button",
 		FailureType: FailureTypeTimeout,
 		Location: &CodeLocation{
-			FilePath:     "tests/checkout.spec.ts",
+			FilePath:     fileCheckoutSpec,
 			LineNumber:   45,
 			FunctionName: "test('user can checkout')",
 		},
@@ -86,7 +94,7 @@ func TestCodeLocation_JSONSerialization(t *testing.T) {
 
 func TestCodeLocation_WithoutOptionalFields(t *testing.T) {
 	loc := &CodeLocation{
-		FilePath: "tests/login.spec.ts",
+		FilePath: fileLoginSpec,
 	}
 
 	data, err := json.Marshal(loc)
@@ -96,7 +104,7 @@ func TestCodeLocation_WithoutOptionalFields(t *testing.T) {
 	err = json.Unmarshal(data, &decoded)
 	require.NoError(t, err)
 
-	assert.Equal(t, "tests/login.spec.ts", decoded.FilePath)
+	assert.Equal(t, fileLoginSpec, decoded.FilePath)
 	assert.Equal(t, 0, decoded.LineNumber)
 	assert.Equal(t, "", decoded.FunctionName)
 }
@@ -139,7 +147,7 @@ func TestAnalysisResult_WithRCA(t *testing.T) {
 				Title:       "Element Interception",
 				FailureType: FailureTypeTimeout,
 				Location: &CodeLocation{
-					FilePath:   "tests/checkout.spec.ts",
+					FilePath:   fileCheckoutSpec,
 					LineNumber: 45,
 				},
 				Symptom:     "Timeout waiting for '#submit-btn'",
@@ -194,7 +202,7 @@ func TestParseRCAFromArgs_WithBugLocation(t *testing.T) {
 	args := map[string]any{
 		"title":                   "Price calculation broken",
 		"failure_type":            "assertion",
-		"file_path":               "tests/checkout.spec.ts",
+		"file_path":               fileCheckoutSpec,
 		"line_number":             float64(45),
 		"bug_location":            "production",
 		"bug_location_confidence": "high",
@@ -218,7 +226,7 @@ func TestParseRCAFromArgs_DefaultBugLocation(t *testing.T) {
 	args := map[string]any{
 		"title":        "Error",
 		"failure_type": "timeout",
-		"symptom":      "Timed out",
+		"symptom":      msgTimedOut,
 		"root_cause":   "Slow",
 		"remediation":  "Fix",
 	}
@@ -250,9 +258,9 @@ func TestEvidenceType_Constants(t *testing.T) {
 
 func TestParseRCAFromArgs_Complete(t *testing.T) {
 	args := map[string]any{
-		"title":        "Timeout Error",
+		"title":        titleTimeoutError,
 		"failure_type": "timeout",
-		"file_path":    "tests/login.spec.ts",
+		"file_path":    fileLoginSpec,
 		"line_number":  float64(42),
 		"symptom":      "Test timed out",
 		"root_cause":   "Slow network",
@@ -265,10 +273,10 @@ func TestParseRCAFromArgs_Complete(t *testing.T) {
 	rca := ParseRCAFromArgs(args)
 
 	require.NotNil(t, rca)
-	assert.Equal(t, "Timeout Error", rca.Title)
+	assert.Equal(t, titleTimeoutError, rca.Title)
 	assert.Equal(t, FailureTypeTimeout, rca.FailureType)
 	require.NotNil(t, rca.Location)
-	assert.Equal(t, "tests/login.spec.ts", rca.Location.FilePath)
+	assert.Equal(t, fileLoginSpec, rca.Location.FilePath)
 	assert.Equal(t, 42, rca.Location.LineNumber)
 	assert.Equal(t, "Test timed out", rca.Symptom)
 	assert.Equal(t, "Slow network", rca.RootCause)
@@ -283,7 +291,7 @@ func TestParseRCAFromArgs_Minimal(t *testing.T) {
 		"failure_type": "assertion",
 		"symptom":      "Failed",
 		"root_cause":   "Bug",
-		"remediation":  "Fix it",
+		"remediation":  msgFixIt,
 	}
 
 	rca := ParseRCAFromArgs(args)
@@ -300,7 +308,7 @@ func TestParseRCAFromArgs_InvalidFailureType(t *testing.T) {
 		"failure_type": "unknown_type",
 		"symptom":      "Failed",
 		"root_cause":   "Bug",
-		"remediation":  "Fix it",
+		"remediation":  msgFixIt,
 	}
 
 	rca := ParseRCAFromArgs(args)
@@ -343,7 +351,7 @@ func TestRCA_FormatForCLI(t *testing.T) {
 		Title:       "Timeout waiting for Submit Button",
 		FailureType: FailureTypeTimeout,
 		Location: &CodeLocation{
-			FilePath:   "tests/checkout.spec.ts",
+			FilePath:   fileCheckoutSpec,
 			LineNumber: 45,
 		},
 		Symptom:     "Test timed out after 30000ms",
@@ -424,10 +432,10 @@ func TestParseRCAsFromArgs_MultipleAnalyses(t *testing.T) {
 func TestParseRCAsFromArgs_BackwardCompat_FlatArgs(t *testing.T) {
 	// Old-style flat args without analyses array → single-element slice
 	args := map[string]any{
-		"title":        "Timeout Error",
+		"title":        titleTimeoutError,
 		"failure_type": "timeout",
-		"file_path":    "tests/login.spec.ts",
-		"symptom":      "Timed out",
+		"file_path":    fileLoginSpec,
+		"symptom":      msgTimedOut,
 		"root_cause":   "Slow",
 		"remediation":  "Fix",
 	}
@@ -435,7 +443,7 @@ func TestParseRCAsFromArgs_BackwardCompat_FlatArgs(t *testing.T) {
 	rcas := ParseRCAsFromArgs(args)
 
 	require.Len(t, rcas, 1)
-	assert.Equal(t, "Timeout Error", rcas[0].Title)
+	assert.Equal(t, titleTimeoutError, rcas[0].Title)
 	assert.Equal(t, FailureTypeTimeout, rcas[0].FailureType)
 }
 
@@ -497,7 +505,7 @@ func TestParseRCAFromArgs_WithoutFixConfidence(t *testing.T) {
 	args := map[string]any{
 		"title":        "Error",
 		"failure_type": "timeout",
-		"symptom":      "Timed out",
+		"symptom":      msgTimedOut,
 		"root_cause":   "Slow",
 		"remediation":  "Speed it up",
 	}
@@ -511,7 +519,7 @@ func TestParseRCAFromArgs_FixConfidence_CaseNormalized(t *testing.T) {
 		"title":          "Error",
 		"failure_type":   "assertion",
 		"root_cause":     "Bug",
-		"remediation":    "Fix it",
+		"remediation":    msgFixIt,
 		"fix_confidence": "High",
 	}
 

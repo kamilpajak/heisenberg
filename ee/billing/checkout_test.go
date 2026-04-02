@@ -7,6 +7,12 @@ import (
 	"github.com/stripe/stripe-go/v76"
 )
 
+const (
+	testEmail      = "test@example.com"
+	testSuccessURL = "https://example.com/success"
+	testCancelURL  = "https://example.com/cancel"
+)
+
 func TestCreateCheckoutSession_InvalidTier(t *testing.T) {
 	client := NewClient(Config{
 		SecretKey: "sk_test_fake",
@@ -18,11 +24,11 @@ func TestCreateCheckoutSession_InvalidTier(t *testing.T) {
 
 	// Free tier has no price ID
 	_, err := client.CreateCheckoutSession(CreateCheckoutParams{
-		Email:      "test@example.com",
+		Email:      testEmail,
 		OrgID:      "org_123",
 		Tier:       TierFree,
-		SuccessURL: "https://example.com/success",
-		CancelURL:  "https://example.com/cancel",
+		SuccessURL: testSuccessURL,
+		CancelURL:  testCancelURL,
 	})
 
 	assert.Error(t, err)
@@ -39,11 +45,11 @@ func TestCreateCheckoutSession_UnknownTier(t *testing.T) {
 	})
 
 	_, err := client.CreateCheckoutSession(CreateCheckoutParams{
-		Email:      "test@example.com",
+		Email:      testEmail,
 		OrgID:      "org_123",
 		Tier:       "unknown_tier",
-		SuccessURL: "https://example.com/success",
-		CancelURL:  "https://example.com/cancel",
+		SuccessURL: testSuccessURL,
+		CancelURL:  testCancelURL,
 	})
 
 	assert.Error(t, err)
@@ -53,29 +59,29 @@ func TestCreateCheckoutSession_UnknownTier(t *testing.T) {
 func TestCreateCheckoutParams_Fields(t *testing.T) {
 	params := CreateCheckoutParams{
 		CustomerID: "cus_123",
-		Email:      "test@example.com",
+		Email:      testEmail,
 		OrgID:      "org_456",
 		Tier:       TierTeam,
-		SuccessURL: "https://example.com/success",
-		CancelURL:  "https://example.com/cancel",
+		SuccessURL: testSuccessURL,
+		CancelURL:  testCancelURL,
 	}
 
 	assert.Equal(t, "cus_123", params.CustomerID)
-	assert.Equal(t, "test@example.com", params.Email)
+	assert.Equal(t, testEmail, params.Email)
 	assert.Equal(t, "org_456", params.OrgID)
 	assert.Equal(t, TierTeam, params.Tier)
-	assert.Equal(t, "https://example.com/success", params.SuccessURL)
-	assert.Equal(t, "https://example.com/cancel", params.CancelURL)
+	assert.Equal(t, testSuccessURL, params.SuccessURL)
+	assert.Equal(t, testCancelURL, params.CancelURL)
 }
 
 func TestCreateCheckoutParams_EmptyCustomerID(t *testing.T) {
 	params := CreateCheckoutParams{
 		CustomerID: "",
-		Email:      "test@example.com",
+		Email:      testEmail,
 		OrgID:      "org_456",
 		Tier:       TierTeam,
-		SuccessURL: "https://example.com/success",
-		CancelURL:  "https://example.com/cancel",
+		SuccessURL: testSuccessURL,
+		CancelURL:  testCancelURL,
 	}
 
 	assert.Empty(t, params.CustomerID)
@@ -154,11 +160,11 @@ func TestCreateCheckoutSession_WithMock(t *testing.T) {
 	}, mockProvider)
 
 	session, err := client.CreateCheckoutSession(CreateCheckoutParams{
-		Email:      "test@example.com",
+		Email:      testEmail,
 		OrgID:      "org_123",
 		Tier:       TierTeam,
-		SuccessURL: "https://example.com/success",
-		CancelURL:  "https://example.com/cancel",
+		SuccessURL: testSuccessURL,
+		CancelURL:  testCancelURL,
 	})
 
 	assert.NoError(t, err)
@@ -184,8 +190,8 @@ func TestCreateCheckoutSession_WithCustomerID(t *testing.T) {
 		CustomerID: "cus_existing",
 		OrgID:      "org_123",
 		Tier:       TierTeam,
-		SuccessURL: "https://example.com/success",
-		CancelURL:  "https://example.com/cancel",
+		SuccessURL: testSuccessURL,
+		CancelURL:  testCancelURL,
 	})
 
 	assert.NoError(t, err)
@@ -210,8 +216,8 @@ func TestCreateCheckoutSession_WithEmail(t *testing.T) {
 		Email:      "new@example.com",
 		OrgID:      "org_123",
 		Tier:       TierTeam,
-		SuccessURL: "https://example.com/success",
-		CancelURL:  "https://example.com/cancel",
+		SuccessURL: testSuccessURL,
+		CancelURL:  testCancelURL,
 	})
 
 	assert.NoError(t, err)
@@ -231,11 +237,11 @@ func TestCreateCustomer_WithMock(t *testing.T) {
 
 	client := NewClientWithProvider(Config{}, mockProvider)
 
-	customer, err := client.CreateCustomer("test@example.com", "Test User", "org_456")
+	customer, err := client.CreateCustomer(testEmail, "Test User", "org_456")
 
 	assert.NoError(t, err)
 	assert.Equal(t, "cus_new_123", customer.ID)
-	assert.Equal(t, "test@example.com", customer.Email)
+	assert.Equal(t, testEmail, customer.Email)
 	assert.Equal(t, "Test User", customer.Name)
 }
 
@@ -289,11 +295,11 @@ func TestCreateCheckoutSession_ProviderError(t *testing.T) {
 	}, mockProvider)
 
 	_, err := client.CreateCheckoutSession(CreateCheckoutParams{
-		Email:      "test@example.com",
+		Email:      testEmail,
 		OrgID:      "org_123",
 		Tier:       TierTeam,
-		SuccessURL: "https://example.com/success",
-		CancelURL:  "https://example.com/cancel",
+		SuccessURL: testSuccessURL,
+		CancelURL:  testCancelURL,
 	})
 
 	assert.Error(t, err)

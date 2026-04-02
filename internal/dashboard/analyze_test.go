@@ -109,9 +109,11 @@ func TestNewSSEEmitter_WithoutFlusher(t *testing.T) {
 
 type nonFlusherWriter struct{}
 
-func (w *nonFlusherWriter) Header() http.Header        { return http.Header{} }
-func (w *nonFlusherWriter) Write([]byte) (int, error)  { return 0, nil }
-func (w *nonFlusherWriter) WriteHeader(statusCode int) {}
+func (w *nonFlusherWriter) Header() http.Header       { return http.Header{} }
+func (w *nonFlusherWriter) Write([]byte) (int, error) { return 0, nil }
+func (w *nonFlusherWriter) WriteHeader(statusCode int) {
+	// no-op: mock writer that intentionally omits http.Flusher to test fallback behavior
+}
 
 func TestSSEEmitter_Emit(t *testing.T) {
 	rec := httptest.NewRecorder()

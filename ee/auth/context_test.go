@@ -8,6 +8,12 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+const (
+	msgEmptyStringForEmptyCtx = "returns empty string for empty context"
+	msgFalseForEmptyCtx       = "returns false for empty context"
+	permReadUsers             = "read:users"
+)
+
 func TestClaims(t *testing.T) {
 	t.Run("returns nil for empty context", func(t *testing.T) {
 		ctx := context.Background()
@@ -31,7 +37,7 @@ func TestClaims(t *testing.T) {
 }
 
 func TestUserID(t *testing.T) {
-	t.Run("returns empty string for empty context", func(t *testing.T) {
+	t.Run(msgEmptyStringForEmptyCtx, func(t *testing.T) {
 		ctx := context.Background()
 		assert.Equal(t, "", UserID(ctx))
 	})
@@ -48,7 +54,7 @@ func TestUserID(t *testing.T) {
 }
 
 func TestEmail(t *testing.T) {
-	t.Run("returns empty string for empty context", func(t *testing.T) {
+	t.Run(msgEmptyStringForEmptyCtx, func(t *testing.T) {
 		ctx := context.Background()
 		assert.Equal(t, "", Email(ctx))
 	})
@@ -63,7 +69,7 @@ func TestEmail(t *testing.T) {
 }
 
 func TestOrgCode(t *testing.T) {
-	t.Run("returns empty string for empty context", func(t *testing.T) {
+	t.Run(msgEmptyStringForEmptyCtx, func(t *testing.T) {
 		ctx := context.Background()
 		assert.Equal(t, "", OrgCode(ctx))
 	})
@@ -78,7 +84,7 @@ func TestOrgCode(t *testing.T) {
 }
 
 func TestIsAuthenticated(t *testing.T) {
-	t.Run("returns false for empty context", func(t *testing.T) {
+	t.Run(msgFalseForEmptyCtx, func(t *testing.T) {
 		ctx := context.Background()
 		assert.False(t, IsAuthenticated(ctx))
 	})
@@ -91,14 +97,14 @@ func TestIsAuthenticated(t *testing.T) {
 }
 
 func TestHasPermission(t *testing.T) {
-	t.Run("returns false for empty context", func(t *testing.T) {
+	t.Run(msgFalseForEmptyCtx, func(t *testing.T) {
 		ctx := context.Background()
-		assert.False(t, HasPermission(ctx, "read:users"))
+		assert.False(t, HasPermission(ctx, permReadUsers))
 	})
 
 	t.Run("returns false for missing permission", func(t *testing.T) {
 		claims := &KindeClaims{
-			Permissions: []string{"read:users", "write:users"},
+			Permissions: []string{permReadUsers, "write:users"},
 		}
 		ctx := context.WithValue(context.Background(), claimsKey, claims)
 		assert.False(t, HasPermission(ctx, "delete:users"))
@@ -106,15 +112,15 @@ func TestHasPermission(t *testing.T) {
 
 	t.Run("returns true for existing permission", func(t *testing.T) {
 		claims := &KindeClaims{
-			Permissions: []string{"read:users", "write:users"},
+			Permissions: []string{permReadUsers, "write:users"},
 		}
 		ctx := context.WithValue(context.Background(), claimsKey, claims)
-		assert.True(t, HasPermission(ctx, "read:users"))
+		assert.True(t, HasPermission(ctx, permReadUsers))
 	})
 }
 
 func TestHasRole(t *testing.T) {
-	t.Run("returns false for empty context", func(t *testing.T) {
+	t.Run(msgFalseForEmptyCtx, func(t *testing.T) {
 		ctx := context.Background()
 		assert.False(t, HasRole(ctx, "admin"))
 	})

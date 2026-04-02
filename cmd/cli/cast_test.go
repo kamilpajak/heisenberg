@@ -55,58 +55,67 @@ var ansiPattern = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]|\x1b\[\?25[hl]`)
 // extractFrames replays cast events on a simple terminal simulator and
 // returns deduplicated key frames in chronological order. Spinner character
 // changes are collapsed so each distinct "content state" appears only once.
+// frameBuilder accumulates deduplicated terminal frames from cast events.
+type frameBuilder struct {
+	frames       []string
+	currentLine  string
+	lastNorm     string
+	spinnerChars string
+}
+
+func newFrameBuilder() *frameBuilder {
+	return &frameBuilder{spinnerChars: "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"}
+}
+
+func (fb *frameBuilder) normalize(s string) string {
+	for _, c := range fb.spinnerChars {
+		s = strings.ReplaceAll(s, string(c), "⠋")
+	}
+	return s
+}
+
+func (fb *frameBuilder) emit(line string) {
+	clean := cleanLine(line)
+	if clean == "" {
+		return
+	}
+	norm := fb.normalize(clean)
+	if norm != fb.lastNorm {
+		fb.frames = append(fb.frames, clean)
+		fb.lastNorm = norm
+	}
+}
+
+func (fb *frameBuilder) processChunk(chunk string, isNewline bool) {
+	if isNewline {
+		fb.emit(fb.currentLine)
+		fb.currentLine = ""
+		fb.lastNorm = ""
+	}
+
+	for _, cr := range strings.Split(chunk, "\r") {
+		cr = strings.ReplaceAll(cr, "\x1b[K", "")
+		if cr == "" {
+			fb.currentLine = ""
+		} else {
+			fb.currentLine = cr
+		}
+	}
+
+	fb.emit(fb.currentLine)
+}
+
 func extractFrames(events []castEvent) []string {
-	spinnerChars := "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
-
-	normalize := func(s string) string {
-		for _, c := range spinnerChars {
-			s = strings.ReplaceAll(s, string(c), "⠋")
-		}
-		return s
-	}
-
-	var frames []string
-	var currentLine string
-	lastNorm := ""
-
-	emit := func(line string) {
-		clean := cleanLine(line)
-		if clean == "" {
-			return
-		}
-		norm := normalize(clean)
-		if norm != lastNorm {
-			frames = append(frames, clean)
-			lastNorm = norm
-		}
-	}
+	fb := newFrameBuilder()
 
 	for _, ev := range events {
 		chunks := strings.Split(ev.Data, "\r\n")
 		for i, chunk := range chunks {
-			if i > 0 {
-				// \r\n commits currentLine as a frame
-				emit(currentLine)
-				currentLine = ""
-				lastNorm = "" // reset after newline so next content is captured
-			}
-
-			crParts := strings.Split(chunk, "\r")
-			for _, cr := range crParts {
-				cr = strings.ReplaceAll(cr, "\x1b[K", "")
-				if cr == "" {
-					currentLine = ""
-				} else {
-					currentLine = cr
-				}
-			}
-
-			// Snapshot the current overwrite line if content changed
-			emit(currentLine)
+			fb.processChunk(chunk, i > 0)
 		}
 	}
 
-	return frames
+	return fb.frames
 }
 
 // cleanLine strips ANSI escape codes and trims whitespace.
@@ -186,6 +195,65 @@ func commonCastChecks(t *testing.T, frames []string) {
 	}
 }
 
+func assertNoURLs(t *testing.T, frames []string) {
+	t.Helper()
+	for _, f := range frames {
+		assert.NotContains(t, f, "https://", "URLs should not appear in compact mode: %s", f)
+	}
+}
+
+func assertCloseSummary(t *testing.T, allOutput string) {
+	t.Helper()
+	hasSuccess := strings.Contains(allOutput, "✓") && strings.Contains(allOutput, "Used")
+	hasError := strings.Contains(allOutput, "✗") && strings.Contains(allOutput, "Stopped at")
+
+	switch {
+	case hasError:
+		assert.Contains(t, allOutput, "Error:")
+		assert.Contains(t, allOutput, "Hint:")
+		assert.Contains(t, allOutput, "Exit code:")
+	case hasSuccess:
+		assert.Contains(t, allOutput, "iterations")
+	default:
+		t.Errorf("compact cast should contain ✓ Used or ✗ Stopped at\nframes:\n%s", allOutput)
+	}
+}
+
+func assertCounterConsistency(t *testing.T, frames []string) {
+	t.Helper()
+	closePattern := regexp.MustCompile(`(?:Used|Stopped at) (\d+)/(\d+)`)
+	spinnerPattern := regexp.MustCompile(`(\d+)/\d+\s+\(calling model`)
+	var closeStep string
+	for _, f := range frames {
+		if m := closePattern.FindStringSubmatch(f); m != nil {
+			closeStep = m[1]
+		}
+	}
+	if closeStep == "" {
+		return
+	}
+	for _, f := range frames {
+		if m := spinnerPattern.FindStringSubmatch(f); m != nil {
+			assert.LessOrEqual(t, m[1], closeStep,
+				"spinner counter %s should not exceed close counter %s in frame: %s", m[1], closeStep, f)
+		}
+	}
+}
+
+func assertNoDuplicateStaticLines(t *testing.T, frames []string) {
+	t.Helper()
+	counterPattern := regexp.MustCompile(`^\s*\w[\w\s]+\s+\d+/\d+$`)
+	var prevStatic string
+	for _, f := range frames {
+		if counterPattern.MatchString(f) {
+			if f == prevStatic {
+				t.Errorf("duplicate static progress line: %s", f)
+			}
+			prevStatic = f
+		}
+	}
+}
+
 func validateCompactCast(t *testing.T, castFile string) {
 	t.Helper()
 
@@ -204,54 +272,48 @@ func validateCompactCast(t *testing.T, castFile string) {
 
 	allOutput := strings.Join(frames, "\n")
 
-	// Compact: no URLs
+	assertNoURLs(t, frames)
+	assertCloseSummary(t, allOutput)
+	assertCounterConsistency(t, frames)
+	assertNoDuplicateStaticLines(t, frames)
+}
+
+func assertHasToolLines(t *testing.T, frames []string) {
+	t.Helper()
+	toolPattern := regexp.MustCompile(`✓ \w+`)
 	for _, f := range frames {
-		assert.NotContains(t, f, "https://", "URLs should not appear in compact mode: %s", f)
-	}
-
-	// Compact: close summary with ✓ or ✗
-	hasSuccess := strings.Contains(allOutput, "✓") && strings.Contains(allOutput, "Used")
-	hasError := strings.Contains(allOutput, "✗") && strings.Contains(allOutput, "Stopped at")
-
-	if hasError {
-		assert.Contains(t, allOutput, "Error:")
-		assert.Contains(t, allOutput, "Hint:")
-		assert.Contains(t, allOutput, "Exit code:")
-	} else if hasSuccess {
-		assert.Contains(t, allOutput, "iterations")
-	} else {
-		t.Errorf("compact cast should contain ✓ Used or ✗ Stopped at\nframes:\n%s", allOutput)
-	}
-
-	// Counter consistency: spinner counter should match Close counter
-	closePattern := regexp.MustCompile(`(?:Used|Stopped at) (\d+)/(\d+)`)
-	spinnerPattern := regexp.MustCompile(`(\d+)/\d+\s+\(calling model`)
-	var closeStep string
-	for _, f := range frames {
-		if m := closePattern.FindStringSubmatch(f); m != nil {
-			closeStep = m[1]
+		if toolPattern.MatchString(f) {
+			return
 		}
 	}
-	if closeStep != "" {
-		for _, f := range frames {
-			if m := spinnerPattern.FindStringSubmatch(f); m != nil {
-				assert.LessOrEqual(t, m[1], closeStep,
-					"spinner counter %s should not exceed close counter %s in frame: %s", m[1], closeStep, f)
-			}
-		}
-	}
+	t.Error("verbose cast should have ✓ tool_name lines")
+}
 
-	// No duplicate consecutive static progress lines
-	counterPattern := regexp.MustCompile(`^\s*\w[\w\s]+\s+\d+/\d+$`)
-	var prevStatic string
+func assertCounterAlignment(t *testing.T, frames []string) {
+	t.Helper()
+	counterRe := regexp.MustCompile(`(\d+/\d+)\s*$`)
+	var positions []int
 	for _, f := range frames {
-		if counterPattern.MatchString(f) {
-			if f == prevStatic {
-				t.Errorf("duplicate static progress line: %s", f)
-			}
-			prevStatic = f
+		m := counterRe.FindStringIndex(f)
+		if m == nil || !strings.Contains(f, "✓") {
+			continue
+		}
+		col := utf8.RuneCountInString(f[:m[0]])
+		positions = append(positions, col)
+	}
+	if len(positions) <= 1 {
+		return
+	}
+	minPos, maxPos := positions[0], positions[0]
+	for _, p := range positions[1:] {
+		if p < minPos {
+			minPos = p
+		}
+		if p > maxPos {
+			maxPos = p
 		}
 	}
+	assert.Equal(t, 0, maxPos-minPos, "verbose counters must be exactly aligned (spread: %d)", maxPos-minPos)
 }
 
 func validateVerboseCast(t *testing.T, castFile string) {
@@ -272,43 +334,8 @@ func validateVerboseCast(t *testing.T, castFile string) {
 
 	allOutput := strings.Join(frames, "\n")
 
-	// Verbose: ✓ per tool call with tool name
-	toolPattern := regexp.MustCompile(`✓ \w+`)
-	hasToolLines := false
-	for _, f := range frames {
-		if toolPattern.MatchString(f) {
-			hasToolLines = true
-			break
-		}
-	}
-	assert.True(t, hasToolLines, "verbose cast should have ✓ tool_name lines")
-
-	// Verbose: ↳ stats lines
+	assertHasToolLines(t, frames)
 	assert.Contains(t, allOutput, "↳", "verbose cast should have ↳ stats lines")
-
-	// Verbose: done tool signals completion
 	assert.Contains(t, allOutput, "✓ done", "verbose cast should end with ✓ done")
-
-	// Verbose: counter alignment — all counters at similar display column
-	counterRe := regexp.MustCompile(`(\d+/\d+)\s*$`)
-	var positions []int
-	for _, f := range frames {
-		if m := counterRe.FindStringIndex(f); m != nil && strings.Contains(f, "✓") {
-			// Convert byte offset to rune (column) position
-			col := utf8.RuneCountInString(f[:m[0]])
-			positions = append(positions, col)
-		}
-	}
-	if len(positions) > 1 {
-		minPos, maxPos := positions[0], positions[0]
-		for _, p := range positions[1:] {
-			if p < minPos {
-				minPos = p
-			}
-			if p > maxPos {
-				maxPos = p
-			}
-		}
-		assert.Equal(t, 0, maxPos-minPos, "verbose counters must be exactly aligned (spread: %d)", maxPos-minPos)
-	}
+	assertCounterAlignment(t, frames)
 }

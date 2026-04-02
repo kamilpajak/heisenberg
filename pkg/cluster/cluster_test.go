@@ -7,6 +7,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const (
+	msgConnectionRefused = "connection refused"
+	testNameA            = "Test A"
+	testNameB            = "Test B"
+)
+
 func sig(category, normalized string) ErrorSignature {
 	return ErrorSignature{
 		Category:   category,
@@ -28,10 +34,10 @@ func fail(id int64, name string, s ErrorSignature) FailureInfo {
 
 func TestClusterFailures_ExactMatch(t *testing.T) {
 	failures := []FailureInfo{
-		fail(1, "E2E 1/4", sig("error_message", "connection refused")),
-		fail(2, "E2E 2/4", sig("error_message", "connection refused")),
-		fail(3, "E2E 3/4", sig("error_message", "connection refused")),
-		fail(4, "E2E 4/4", sig("error_message", "connection refused")),
+		fail(1, "E2E 1/4", sig("error_message", msgConnectionRefused)),
+		fail(2, "E2E 2/4", sig("error_message", msgConnectionRefused)),
+		fail(3, "E2E 3/4", sig("error_message", msgConnectionRefused)),
+		fail(4, "E2E 4/4", sig("error_message", msgConnectionRefused)),
 	}
 
 	result := ClusterFailures(failures)
@@ -45,8 +51,8 @@ func TestClusterFailures_ExactMatch(t *testing.T) {
 
 func TestClusterFailures_DistinctErrors(t *testing.T) {
 	failures := []FailureInfo{
-		fail(1, "E2E 1/4", sig("error_message", "connection refused")),
-		fail(2, "E2E 2/4", sig("error_message", "connection refused")),
+		fail(1, "E2E 1/4", sig("error_message", msgConnectionRefused)),
+		fail(2, "E2E 2/4", sig("error_message", msgConnectionRefused)),
 		fail(3, "Lint", sig("exit_code", "exit code 1")),
 		fail(4, "Type Check", sig("error_message", "type error in module foo")),
 	}
@@ -58,15 +64,15 @@ func TestClusterFailures_DistinctErrors(t *testing.T) {
 
 	// Largest cluster first
 	assert.Len(t, result.Clusters[0].Failures, 2)
-	assert.Contains(t, result.Clusters[0].Signature.Normalized, "connection refused")
+	assert.Contains(t, result.Clusters[0].Signature.Normalized, msgConnectionRefused)
 }
 
 func TestClusterFailures_JaccardMerge(t *testing.T) {
 	// Two nearly identical errors — only one word differs out of many
 	// Jaccard: 8/9 ≈ 0.89 > 0.8 threshold
 	failures := []FailureInfo{
-		fail(1, "Test A", sig("error_message", "expected submit button to be visible on checkout page after login complete")),
-		fail(2, "Test B", sig("error_message", "expected submit button to be visible on payment page after login complete")),
+		fail(1, testNameA, sig("error_message", "expected submit button to be visible on checkout page after login complete")),
+		fail(2, testNameB, sig("error_message", "expected submit button to be visible on payment page after login complete")),
 	}
 
 	result := ClusterFailures(failures)
@@ -78,8 +84,8 @@ func TestClusterFailures_JaccardMerge(t *testing.T) {
 func TestClusterFailures_JaccardNoMerge(t *testing.T) {
 	// Two very different errors that should NOT merge
 	failures := []FailureInfo{
-		fail(1, "Test A", sig("error_message", "connection refused at localhost port database")),
-		fail(2, "Test B", sig("error_message", "assertion failed expected value to equal target string")),
+		fail(1, testNameA, sig("error_message", "connection refused at localhost port database")),
+		fail(2, testNameB, sig("error_message", "assertion failed expected value to equal target string")),
 	}
 
 	result := ClusterFailures(failures)
@@ -108,15 +114,15 @@ func TestClusterFailures_SingleFailure(t *testing.T) {
 
 func TestClusterFailures_NoSignature_GoToUnclustered(t *testing.T) {
 	failures := []FailureInfo{
-		fail(1, "Test A", sig("error_message", "connection refused")),
-		fail(2, "Test B", ErrorSignature{}), // no signature
+		fail(1, testNameA, sig("error_message", msgConnectionRefused)),
+		fail(2, testNameB, ErrorSignature{}), // no signature
 	}
 
 	result := ClusterFailures(failures)
 
 	require.Len(t, result.Clusters, 1)
 	assert.Len(t, result.Unclustered, 1)
-	assert.Equal(t, "Test B", result.Unclustered[0].JobName)
+	assert.Equal(t, testNameB, result.Unclustered[0].JobName)
 }
 
 func TestClusterFailures_Cap10(t *testing.T) {
@@ -138,7 +144,7 @@ func TestClusterFailures_Cap10(t *testing.T) {
 }
 
 func TestClusterFailures_RepresentativeIsLongestLog(t *testing.T) {
-	s := sig("error_message", "connection refused")
+	s := sig("error_message", msgConnectionRefused)
 	failures := []FailureInfo{
 		{JobID: 1, JobName: "Short", Signature: s, LogTail: "short"},
 		{JobID: 2, JobName: "Long", Signature: s, LogTail: "this is a much longer log with more detail"},

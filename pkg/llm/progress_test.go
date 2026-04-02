@@ -10,6 +10,12 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+const (
+	msgReadingSource = "Reading source"
+	msgCallingModel  = "Calling model..."
+	msgAnalyzingRun  = "Analyzing run 123..."
+)
+
 func init() {
 	// Disable colors in tests for predictable output.
 	color.NoColor = true
@@ -27,8 +33,8 @@ func newCompactTestEmitter() (*TextEmitter, *bytes.Buffer) {
 
 func TestEmit_Step(t *testing.T) {
 	e, buf := newTestEmitter()
-	e.Emit(ProgressEvent{Type: "step", Step: 1, MaxStep: 10, Message: "Calling model..."})
-	assert.Contains(t, buf.String(), "Calling model...")
+	e.Emit(ProgressEvent{Type: "step", Step: 1, MaxStep: 10, Message: msgCallingModel})
+	assert.Contains(t, buf.String(), msgCallingModel)
 }
 
 func TestEmit_Tool(t *testing.T) {
@@ -77,8 +83,8 @@ func TestEmit_ResultModelOnly(t *testing.T) {
 
 func TestEmit_Info(t *testing.T) {
 	e, buf := newTestEmitter()
-	e.Emit(ProgressEvent{Type: "info", Message: "Analyzing run 123..."})
-	assert.Contains(t, buf.String(), "Analyzing run 123...")
+	e.Emit(ProgressEvent{Type: "info", Message: msgAnalyzingRun})
+	assert.Contains(t, buf.String(), msgAnalyzingRun)
 }
 
 func TestEmit_Error(t *testing.T) {
@@ -278,8 +284,8 @@ func TestToolPhase(t *testing.T) {
 		{"get_job_logs", "Reading logs"},
 		{"get_artifact", "Fetching artifacts"},
 		{"get_test_traces", "Analyzing traces"},
-		{"get_repo_file", "Reading source"},
-		{"get_workflow_file", "Reading source"},
+		{"get_repo_file", msgReadingSource},
+		{"get_workflow_file", msgReadingSource},
 		{"done", "Finalizing"},
 		{"unknown_tool", "Analyzing"},
 	}
@@ -296,7 +302,7 @@ func TestCompactMode_ToolShowsPhaseAndCounter(t *testing.T) {
 
 func TestCompactMode_StepIsQuietOnNonTTY(t *testing.T) {
 	e, buf := newCompactTestEmitter()
-	e.Emit(ProgressEvent{Type: "step", Step: 1, MaxStep: 30, Message: "Calling model..."})
+	e.Emit(ProgressEvent{Type: "step", Step: 1, MaxStep: 30, Message: msgCallingModel})
 	assert.Empty(t, buf.String(), "compact spinner is a no-op on non-TTY")
 }
 
@@ -326,13 +332,13 @@ func TestCompactMode_CloseError(t *testing.T) {
 func TestCompactMode_CloseError_AfterStepWithoutTool(t *testing.T) {
 	e, buf := newCompactTestEmitter()
 	// Step 1 + tool 1 complete
-	e.Emit(ProgressEvent{Type: "step", Step: 1, MaxStep: 30, Message: "Calling model..."})
+	e.Emit(ProgressEvent{Type: "step", Step: 1, MaxStep: 30, Message: msgCallingModel})
 	e.Emit(ProgressEvent{Type: "tool", Step: 1, MaxStep: 30, Tool: "get_artifact"})
 	// Step 2 + tool 2 complete
-	e.Emit(ProgressEvent{Type: "step", Step: 2, MaxStep: 30, Message: "Calling model..."})
+	e.Emit(ProgressEvent{Type: "step", Step: 2, MaxStep: 30, Message: msgCallingModel})
 	e.Emit(ProgressEvent{Type: "tool", Step: 2, MaxStep: 30, Tool: "get_job_logs"})
 	// Step 3 starts but model returns error — no tool event
-	e.Emit(ProgressEvent{Type: "step", Step: 3, MaxStep: 30, Message: "Calling model..."})
+	e.Emit(ProgressEvent{Type: "step", Step: 3, MaxStep: 30, Message: msgCallingModel})
 	e.MarkFailed()
 	buf.Reset()
 	e.Close()
@@ -341,8 +347,8 @@ func TestCompactMode_CloseError_AfterStepWithoutTool(t *testing.T) {
 
 func TestCompactMode_InfoStillPrints(t *testing.T) {
 	e, buf := newCompactTestEmitter()
-	e.Emit(ProgressEvent{Type: "info", Message: "Analyzing run 123..."})
-	assert.Contains(t, buf.String(), "Analyzing run 123...")
+	e.Emit(ProgressEvent{Type: "info", Message: msgAnalyzingRun})
+	assert.Contains(t, buf.String(), msgAnalyzingRun)
 }
 
 func TestCompactMode_ErrorStillPrints(t *testing.T) {
@@ -471,9 +477,9 @@ func TestCompactMode_NonTTY_RealisticSequence(t *testing.T) {
 	assert.Len(t, lines, 6, "9 tool events across 6 distinct steps should produce 6 lines")
 	assert.Contains(t, lines[0], "Reading logs")
 	assert.Contains(t, lines[0], "1/30")
-	assert.Contains(t, lines[1], "Reading source")
+	assert.Contains(t, lines[1], msgReadingSource)
 	assert.Contains(t, lines[1], "3/30")
-	assert.Contains(t, lines[4], "Reading source")
+	assert.Contains(t, lines[4], msgReadingSource)
 	assert.Contains(t, lines[4], "7/30")
 	assert.Contains(t, lines[5], "Finalizing")
 	assert.Contains(t, lines[5], "8/30")

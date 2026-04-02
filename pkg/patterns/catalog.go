@@ -1,7 +1,7 @@
 package patterns
 
 import (
-	_ "embed"
+	_ "embed" // required for go:embed directive to load catalog.json
 	"encoding/json"
 )
 
