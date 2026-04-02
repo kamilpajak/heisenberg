@@ -130,13 +130,11 @@ func (b *build) toCIRun() ci.Run {
 func mapStatus(status string) string {
 	switch status {
 	case "completed":
-		return "completed"
-	case "inProgress":
-		return "in_progress"
+		return ci.StatusCompleted
+	case "inProgress", "cancelling":
+		return ci.StatusInProgress
 	case "notStarted", "postponed", "none":
-		return "queued"
-	case "cancelling":
-		return "in_progress"
+		return ci.StatusQueued
 	default:
 		return status
 	}
@@ -145,9 +143,9 @@ func mapStatus(status string) string {
 func mapResult(result string) string {
 	switch result {
 	case "succeeded":
-		return "success"
+		return ci.ConclusionSuccess
 	case "failed", "partiallySucceeded":
-		return "failure"
+		return ci.ConclusionFailure
 	case "canceled":
 		return "cancelled"
 	default:

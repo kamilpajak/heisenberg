@@ -33,7 +33,7 @@ func Run(ctx context.Context, p Params) (*llm.AnalysisResult, error) {
 	// Resolve run ID
 	if p.RunID == 0 {
 		emitInfo(p.Emitter, fmt.Sprintf("Finding run to analyze for %s/%s...", p.Owner, p.Repo))
-		runs, err := p.CI.ListRuns(ctx, ci.RunFilter{Status: "completed", PerPage: 10})
+		runs, err := p.CI.ListRuns(ctx, ci.RunFilter{Status: ci.StatusCompleted, PerPage: 10})
 		if err != nil {
 			return nil, fmt.Errorf("failed to list runs: %w", err)
 		}
@@ -274,7 +274,7 @@ func fetchFailureLogs(ctx context.Context, p Params, failedJobs []ci.Job) []clus
 func filterFailed(jobs []ci.Job) []ci.Job {
 	var failed []ci.Job
 	for _, j := range jobs {
-		if j.Conclusion == "failure" {
+		if j.Conclusion == ci.ConclusionFailure {
 			failed = append(failed, j)
 		}
 	}
@@ -375,9 +375,9 @@ func validateRunStatus(run *ci.Run, jobs []ci.Job) error {
 	if run.Status == "" || run.IsCompleted() {
 		return nil
 	}
-	if run.Status == "in_progress" {
+	if run.Status == ci.StatusInProgress {
 		for _, j := range jobs {
-			if j.Status == "completed" && j.Conclusion == "failure" {
+			if j.Status == ci.StatusCompleted && j.Conclusion == ci.ConclusionFailure {
 				return nil
 			}
 		}
@@ -457,13 +457,13 @@ func findRunToAnalyze(runs []ci.Run) (runID int64, shouldSkip bool) {
 
 	// Check if the latest completed run is a success
 	latest := runs[0]
-	if latest.Conclusion == "success" {
+	if latest.Conclusion == ci.ConclusionSuccess {
 		return 0, true
 	}
 
 	// Find the first failure
 	for _, r := range runs {
-		if r.Conclusion == "failure" {
+		if r.Conclusion == ci.ConclusionFailure {
 			return r.ID, false
 		}
 	}

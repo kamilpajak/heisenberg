@@ -5,6 +5,20 @@ package ci
 
 import "context"
 
+// Normalized run/job status values. CI providers must map platform-specific
+// statuses to these constants (e.g., Azure "inProgress" → StatusInProgress).
+const (
+	StatusCompleted  = "completed"
+	StatusInProgress = "in_progress"
+	StatusQueued     = "queued"
+)
+
+// Normalized conclusion values.
+const (
+	ConclusionSuccess = "success"
+	ConclusionFailure = "failure"
+)
+
 // Provider abstracts CI platform operations needed for test failure analysis.
 // Implementations bind platform-specific identifiers (e.g., owner/repo for GitHub,
 // org/project for Azure DevOps) at construction time.
@@ -80,7 +94,7 @@ type Run struct {
 
 // IsCompleted returns true if the run has finished (not in progress or queued).
 func (r *Run) IsCompleted() bool {
-	return r.Status == "completed"
+	return r.Status == StatusCompleted
 }
 
 // Job represents a unit of work within a CI run.
