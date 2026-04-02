@@ -24,6 +24,7 @@ import (
 	"github.com/kamilpajak/heisenberg/pkg/config"
 	"github.com/kamilpajak/heisenberg/pkg/github"
 	"github.com/kamilpajak/heisenberg/pkg/llm"
+	"github.com/kamilpajak/heisenberg/pkg/patterns"
 	"github.com/kamilpajak/heisenberg/pkg/saas"
 	"github.com/kamilpajak/heisenberg/pkg/trace"
 	"github.com/spf13/cobra"
@@ -276,16 +277,19 @@ func run(cmd *cobra.Command, args []string) error {
 
 	ciProvider := buildProvider(target, cfg)
 
+	matcher, _ := patterns.NewStaticMatcher() // non-fatal: patterns are a nice-to-have
+
 	result, err := analysis.Run(context.Background(), analysis.Params{
-		Owner:        target.owner,
-		Repo:         target.repo,
-		RunID:        target.runID,
-		Verbose:      verbose,
-		Emitter:      emitter,
-		SnapshotHTML: trace.SnapshotHTML,
-		Model:        modelName,
-		CI:           ciProvider,
-		GoogleAPIKey: cfg.GoogleAPIKey,
+		Owner:          target.owner,
+		Repo:           target.repo,
+		RunID:          target.runID,
+		Verbose:        verbose,
+		Emitter:        emitter,
+		SnapshotHTML:   trace.SnapshotHTML,
+		Model:          modelName,
+		CI:             ciProvider,
+		GoogleAPIKey:   cfg.GoogleAPIKey,
+		PatternMatcher: matcher,
 	})
 	if err != nil {
 		textEmitter.MarkFailed()
@@ -796,6 +800,15 @@ func printStructuredRCA(w io.Writer, rca *llm.RootCauseAnalysis) {
 	_, _ = fixColor.Fprintln(w, fixLabel)
 	_, _ = dim.Fprintln(w, separator)
 	fmt.Fprintln(w, wrapBullets(rca.Remediation, maxLineWidth, "  "))
+
+	// Known pattern (if matched)
+	if len(rca.MatchedPatterns) > 0 {
+		fmt.Fprintln(w)
+		p := rca.MatchedPatterns[0] // show top match only
+		_, _ = dim.Fprintf(w, "  Known Pattern: %s\n", p.Name)
+		_, _ = dim.Fprintf(w, "  %s\n", p.Description)
+		_, _ = dim.Fprintf(w, "  %s\n", p.Frequency)
+	}
 }
 
 const maxLineWidth = 76 // 78 visible minus 2-char indent

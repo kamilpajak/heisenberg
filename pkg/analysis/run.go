@@ -10,19 +10,21 @@ import (
 	"github.com/kamilpajak/heisenberg/pkg/ci"
 	"github.com/kamilpajak/heisenberg/pkg/cluster"
 	"github.com/kamilpajak/heisenberg/pkg/llm"
+	"github.com/kamilpajak/heisenberg/pkg/patterns"
 )
 
 // Params configures an analysis run.
 type Params struct {
-	Owner        string
-	Repo         string
-	RunID        int64
-	Verbose      bool
-	Emitter      llm.ProgressEmitter
-	SnapshotHTML func([]byte) ([]byte, error)
-	Model        string // Gemini model override (empty = default)
-	CI           ci.Provider
-	GoogleAPIKey string // Google API key override (empty = env var)
+	Owner          string
+	Repo           string
+	RunID          int64
+	Verbose        bool
+	Emitter        llm.ProgressEmitter
+	SnapshotHTML   func([]byte) ([]byte, error)
+	Model          string // Gemini model override (empty = default)
+	CI             ci.Provider
+	GoogleAPIKey   string                  // Google API key override (empty = env var)
+	PatternMatcher patterns.PatternMatcher // nil = no pattern matching
 }
 
 // Run executes the full analysis pipeline: resolve run ID, fetch metadata, and
@@ -79,16 +81,27 @@ func Run(ctx context.Context, p Params) (*llm.AnalysisResult, error) {
 	// Clustering gate: if many failed jobs, use per-cluster analysis
 	const clusterThreshold = 6
 	failedJobs := filterFailed(jobs)
+
+	var result *llm.AnalysisResult
 	if len(failedJobs) > clusterThreshold {
-		result, err := runClustered(ctx, p, ciRun, jobs, failedJobs, artifacts)
-		stampRunMeta(result, p, ciRun)
-		return result, err
+		result, err = runClustered(ctx, p, ciRun, jobs, failedJobs, artifacts)
+	} else {
+		result, err = runSingle(ctx, p, ciRun, jobs, artifacts)
 	}
 
-	// Standard single-loop path (unchanged for <= threshold failures)
-	result, err := runSingle(ctx, p, ciRun, jobs, artifacts)
 	stampRunMeta(result, p, ciRun)
+	matchPatterns(ctx, p.PatternMatcher, result)
 	return result, err
+}
+
+// matchPatterns applies pattern matching to all RCAs in the result.
+func matchPatterns(ctx context.Context, matcher patterns.PatternMatcher, result *llm.AnalysisResult) {
+	if matcher == nil || result == nil {
+		return
+	}
+	for i := range result.RCAs {
+		result.RCAs[i].MatchedPatterns = matcher.Match(ctx, &result.RCAs[i])
+	}
 }
 
 // runSingle is the original single-agent-loop analysis path.

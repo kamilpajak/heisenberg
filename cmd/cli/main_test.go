@@ -1554,3 +1554,46 @@ func TestRun_ResolvesFormatBeforeError(t *testing.T) {
 	// format should already be resolved (not still "")
 	assert.NotEmpty(t, format, "format should be resolved before resolveTarget can fail")
 }
+
+// --- Pattern matching rendering ---
+
+func TestPrintStructuredRCA_WithMatchedPattern(t *testing.T) {
+	var buf bytes.Buffer
+	rca := &llm.RootCauseAnalysis{
+		Title:       "Timeout in beforeEach",
+		FailureType: llm.FailureTypeTimeout,
+		Location:    &llm.CodeLocation{FilePath: "tests/checkout.spec.ts", LineNumber: 28},
+		RootCause:   "Selector changed",
+		Remediation: "Update selector",
+		MatchedPatterns: []llm.MatchedPattern{
+			{
+				Name:        "playwright-beforeeach-timeout",
+				Description: "Typically caused by selector/DOM changes",
+				Similarity:  0.85,
+				Frequency:   "Common in Playwright test suites",
+			},
+		},
+	}
+
+	printStructuredRCA(&buf, rca)
+	out := buf.String()
+
+	assert.Contains(t, out, "Known Pattern: playwright-beforeeach-timeout")
+	assert.Contains(t, out, "Typically caused by selector/DOM changes")
+	assert.Contains(t, out, "Common in Playwright test suites")
+}
+
+func TestPrintStructuredRCA_NoMatchedPattern(t *testing.T) {
+	var buf bytes.Buffer
+	rca := &llm.RootCauseAnalysis{
+		Title:       "Assertion failed",
+		FailureType: llm.FailureTypeAssertion,
+		RootCause:   "Value mismatch",
+		Remediation: "Fix the test",
+	}
+
+	printStructuredRCA(&buf, rca)
+	out := buf.String()
+
+	assert.NotContains(t, out, "Known Pattern")
+}

@@ -35,17 +35,26 @@ const (
 
 // RootCauseAnalysis holds structured diagnosis information.
 type RootCauseAnalysis struct {
-	Title                 string        `json:"title"`                             // Short summary
-	FailureType           string        `json:"failure_type"`                      // timeout, assertion, network, infra, flake
-	Location              *CodeLocation `json:"location,omitempty"`                // Where the test failed
-	BugLocation           BugLocation   `json:"bug_location,omitempty"`            // Where the defect lives: test, production, infrastructure, unknown
-	BugLocationConfidence string        `json:"bug_location_confidence,omitempty"` // high, medium, low
-	BugCodeLocation       *CodeLocation `json:"bug_code_location,omitempty"`       // Suspected defect location (production/infra code)
-	Symptom               string        `json:"symptom"`                           // What failed
-	RootCause             string        `json:"root_cause"`                        // Why it failed
-	Evidence              []Evidence    `json:"evidence"`                          // Supporting data points
-	Remediation           string        `json:"remediation"`                       // How to fix it
-	FixConfidence         string        `json:"fix_confidence,omitempty"`          // high, medium, low
+	Title                 string           `json:"title"`                             // Short summary
+	FailureType           string           `json:"failure_type"`                      // timeout, assertion, network, infra, flake
+	Location              *CodeLocation    `json:"location,omitempty"`                // Where the test failed
+	BugLocation           BugLocation      `json:"bug_location,omitempty"`            // Where the defect lives: test, production, infrastructure, unknown
+	BugLocationConfidence string           `json:"bug_location_confidence,omitempty"` // high, medium, low
+	BugCodeLocation       *CodeLocation    `json:"bug_code_location,omitempty"`       // Suspected defect location (production/infra code)
+	Symptom               string           `json:"symptom"`                           // What failed
+	RootCause             string           `json:"root_cause"`                        // Why it failed
+	Evidence              []Evidence       `json:"evidence"`                          // Supporting data points
+	Remediation           string           `json:"remediation"`                       // How to fix it
+	FixConfidence         string           `json:"fix_confidence,omitempty"`          // high, medium, low
+	MatchedPatterns       []MatchedPattern `json:"matched_patterns,omitempty"`        // Known patterns that match this RCA
+}
+
+// MatchedPattern represents a known failure pattern that matched this RCA.
+type MatchedPattern struct {
+	Name        string  `json:"name"`        // e.g. "playwright-beforeeach-timeout"
+	Description string  `json:"description"` // e.g. "Typically caused by selector/DOM changes"
+	Similarity  float64 `json:"similarity"`  // 0.0-1.0
+	Frequency   string  `json:"frequency"`   // e.g. "Common in Playwright test suites"
 }
 
 // CodeLocation identifies a specific location in source code.
