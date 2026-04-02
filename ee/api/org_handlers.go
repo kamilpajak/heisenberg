@@ -3,8 +3,8 @@ package api
 import (
 	"net/http"
 
-	"github.com/kamilpajak/heisenberg/internal/auth"
-	"github.com/kamilpajak/heisenberg/internal/database"
+	"github.com/kamilpajak/heisenberg/ee/auth"
+	"github.com/kamilpajak/heisenberg/ee/database"
 )
 
 // handleListOrganizations returns all organizations the user belongs to.

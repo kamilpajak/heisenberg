@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-	"github.com/kamilpajak/heisenberg/internal/auth"
-	"github.com/kamilpajak/heisenberg/internal/database"
+	"github.com/kamilpajak/heisenberg/ee/auth"
+	"github.com/kamilpajak/heisenberg/ee/database"
 )
 
 // dbAPIKeyStore adapts *database.DB to auth.APIKeyStore.

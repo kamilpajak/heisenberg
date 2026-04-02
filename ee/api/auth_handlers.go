@@ -3,7 +3,7 @@ package api
 import (
 	"net/http"
 
-	"github.com/kamilpajak/heisenberg/internal/auth"
+	"github.com/kamilpajak/heisenberg/ee/auth"
 )
 
 // handleAuthSync syncs the authenticated user to the database.

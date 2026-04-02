@@ -9,10 +9,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/kamilpajak/heisenberg/internal/auth"
-	"github.com/kamilpajak/heisenberg/internal/billing"
-	"github.com/kamilpajak/heisenberg/internal/database"
-	"github.com/kamilpajak/heisenberg/internal/testutil"
+	"github.com/kamilpajak/heisenberg/ee/auth"
+	"github.com/kamilpajak/heisenberg/ee/billing"
+	"github.com/kamilpajak/heisenberg/ee/database"
+	"github.com/kamilpajak/heisenberg/ee/testutil"
 	"github.com/kamilpajak/heisenberg/pkg/llm"
 	"github.com/kamilpajak/heisenberg/pkg/saas"
 

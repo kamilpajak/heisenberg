@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/google/uuid"
-	"github.com/kamilpajak/heisenberg/internal/billing"
+	"github.com/kamilpajak/heisenberg/ee/billing"
 )
 
 // handleGetUsage returns usage statistics for an organization.

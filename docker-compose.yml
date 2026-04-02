@@ -22,7 +22,7 @@ services:
 
   web:
     build:
-      context: ./web
+      context: ./ee/web
     environment:
       - VITE_API_URL=https://api.heisenberg.dev
       - KINDE_CLIENT_ID=${KINDE_CLIENT_ID}
