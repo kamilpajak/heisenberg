@@ -12,6 +12,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const testOwner = "testowner"
+
 func TestNewClient_ReturnsNilWhenNotConfigured(t *testing.T) {
 	t.Setenv("HEISENBERG_API_URL", "")
 	t.Setenv("HEISENBERG_API_KEY", "")
@@ -36,7 +38,7 @@ func TestSubmitAnalysis_Success(t *testing.T) {
 		var body map[string]any
 		err := json.NewDecoder(r.Body).Decode(&body)
 		require.NoError(t, err)
-		assert.Equal(t, "testowner", body["owner"])
+		assert.Equal(t, testOwner, body["owner"])
 		assert.Equal(t, "testrepo", body["repo"])
 		assert.Equal(t, float64(12345), body["run_id"])
 
@@ -48,7 +50,7 @@ func TestSubmitAnalysis_Success(t *testing.T) {
 	c := &Client{baseURL: srv.URL, apiKey: "hb_test_key", http: http.DefaultClient}
 	id, err := c.SubmitAnalysis(context.Background(), SubmitParams{
 		OrgID: "org-123",
-		Owner: "testowner",
+		Owner: testOwner,
 		Repo:  "testrepo",
 		RunID: 12345,
 		Result: &llm.AnalysisResult{
@@ -110,7 +112,7 @@ func TestSubmitAnalysis_Unauthorized(t *testing.T) {
 	c := &Client{baseURL: srv.URL, apiKey: "bad_key", http: http.DefaultClient}
 	_, err := c.SubmitAnalysis(context.Background(), SubmitParams{
 		OrgID:  "org-123",
-		Owner:  "testowner",
+		Owner:  testOwner,
 		Repo:   "testrepo",
 		RunID:  12345,
 		Result: &llm.AnalysisResult{Text: "x", Category: "diagnosis"},
@@ -129,7 +131,7 @@ func TestSubmitAnalysis_Conflict(t *testing.T) {
 	c := &Client{baseURL: srv.URL, apiKey: "key", http: http.DefaultClient}
 	_, err := c.SubmitAnalysis(context.Background(), SubmitParams{
 		OrgID:  "org-123",
-		Owner:  "testowner",
+		Owner:  testOwner,
 		Repo:   "testrepo",
 		RunID:  12345,
 		Result: &llm.AnalysisResult{Text: "x", Category: "diagnosis"},

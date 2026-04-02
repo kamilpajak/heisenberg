@@ -15,9 +15,16 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const (
+	htmlReportName  = "html-report"
+	testReportLabel = "TEST REPORT"
+	e2eJobName      = "E2E 1/4"
+	testRunDate     = "2026-02-08"
+)
+
 func TestFormatRunDate_ValidRFC3339(t *testing.T) {
 	result := formatRunDate("2026-02-08T18:04:50Z")
-	assert.Equal(t, "2026-02-08", result)
+	assert.Equal(t, testRunDate, result)
 }
 
 func TestFormatRunDate_WithTimezone(t *testing.T) {
@@ -36,8 +43,8 @@ func TestFormatRunDate_InvalidFormat(t *testing.T) {
 }
 
 func TestFormatRunDate_PartialDate(t *testing.T) {
-	result := formatRunDate("2026-02-08")
-	assert.Equal(t, "2026-02-08", result)
+	result := formatRunDate(testRunDate)
+	assert.Equal(t, testRunDate, result)
 }
 
 func TestFindRunToAnalyze_LatestIsSuccess(t *testing.T) {
@@ -111,7 +118,7 @@ func TestBuildInitialContext_WithTestArtifacts(t *testing.T) {
 	ctx := buildInitialContext(run, jobs, artifacts)
 
 	// Should classify test artifacts
-	assert.Contains(t, ctx, "TEST REPORT")
+	assert.Contains(t, ctx, testReportLabel)
 	// Should have prioritized instruction
 	assert.Contains(t, ctx, "IMPORTANT")
 	assert.Contains(t, ctx, "get_artifact")
@@ -129,7 +136,7 @@ func TestBuildInitialContext_WithoutTestArtifacts(t *testing.T) {
 	ctx := buildInitialContext(run, jobs, artifacts)
 
 	assert.NotContains(t, ctx, "IMPORTANT")
-	assert.NotContains(t, ctx, "TEST REPORT")
+	assert.NotContains(t, ctx, testReportLabel)
 }
 
 func TestBuildInitialContext_NoArtifacts(t *testing.T) {
@@ -183,15 +190,15 @@ func TestBuildClusterContext(t *testing.T) {
 		ID:        1,
 		Signature: cluster.ErrorSignature{RawExcerpt: "net::ERR_CONNECTION_REFUSED"},
 		Failures: []cluster.FailureInfo{
-			{JobID: 101, JobName: "E2E 1/4", Conclusion: "failure"},
+			{JobID: 101, JobName: e2eJobName, Conclusion: "failure"},
 			{JobID: 102, JobName: "E2E 2/4", Conclusion: "failure"},
 		},
 		Representative: cluster.FailureInfo{
-			JobName: "E2E 1/4",
+			JobName: e2eJobName,
 			LogTail: "Error: connection refused at localhost:7745",
 		},
 	}
-	artifacts := []ci.Artifact{{Name: "html-report", SizeBytes: 5000}}
+	artifacts := []ci.Artifact{{Name: htmlReportName, SizeBytes: 5000}}
 
 	ctx := buildClusterContext(run, c, 1, 3, nil, artifacts)
 
@@ -200,10 +207,10 @@ func TestBuildClusterContext(t *testing.T) {
 	assert.Contains(t, ctx, "2 jobs")
 	assert.Contains(t, ctx, "ERR_CONNECTION_REFUSED")
 	assert.Contains(t, ctx, "specific cluster of related failures")
-	assert.Contains(t, ctx, "E2E 1/4")
+	assert.Contains(t, ctx, e2eJobName)
 	assert.Contains(t, ctx, "E2E 2/4")
 	assert.Contains(t, ctx, "connection refused at localhost:7745")
-	assert.Contains(t, ctx, "TEST REPORT")
+	assert.Contains(t, ctx, testReportLabel)
 	assert.Contains(t, ctx, "shared root cause")
 }
 
@@ -217,7 +224,7 @@ func TestBuildClusterContext_NoArtifacts(t *testing.T) {
 	ctx := buildClusterContext(run, c, 1, 1, nil, nil)
 
 	assert.Contains(t, ctx, "Cluster 1 of 1")
-	assert.NotContains(t, ctx, "TEST REPORT")
+	assert.NotContains(t, ctx, testReportLabel)
 }
 
 func TestBuildUnclusteredCluster(t *testing.T) {
@@ -289,18 +296,18 @@ func TestBuildClusterContext_ExpiredArtifactsSkipped(t *testing.T) {
 		Representative: cluster.FailureInfo{JobName: "Test", LogTail: "error"},
 	}
 	artifacts := []ci.Artifact{
-		{Name: "html-report", SizeBytes: 5000, Expired: true},
+		{Name: htmlReportName, SizeBytes: 5000, Expired: true},
 		{Name: "blob-report", SizeBytes: 3000, Expired: false},
 	}
 
 	ctx := buildClusterContext(run, c, 1, 1, nil, artifacts)
 
-	assert.NotContains(t, ctx, "html-report", "expired artifacts should be skipped")
+	assert.NotContains(t, ctx, htmlReportName, "expired artifacts should be skipped")
 	assert.Contains(t, ctx, "blob-report")
 }
 
 func TestIsTestArtifact(t *testing.T) {
-	assert.True(t, isTestArtifact("html-report"))
+	assert.True(t, isTestArtifact(htmlReportName))
 	assert.True(t, isTestArtifact("playwright-report"))
 	assert.True(t, isTestArtifact("test-results"))
 	assert.True(t, isTestArtifact("blob-report-1"))

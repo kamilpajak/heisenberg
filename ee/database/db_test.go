@@ -14,6 +14,12 @@ import (
 	"github.com/kamilpajak/heisenberg/pkg/llm"
 )
 
+const (
+	rcaTitleTimeout = "Timeout in checkout"
+	dbTestEmail     = "test@example.com"
+	dbTestOrgName   = "Test Org"
+)
+
 func testDB(t *testing.T) *database.DB {
 	t.Helper()
 	return testutil.NewTestDB(t)
@@ -34,11 +40,11 @@ func TestUserCRUD(t *testing.T) {
 
 	// Create
 	clerkID := "clerk_" + uuid.New().String()[:8]
-	user, err := db.CreateUser(ctx, clerkID, "test@example.com")
+	user, err := db.CreateUser(ctx, clerkID, dbTestEmail)
 	require.NoError(t, err)
 	assert.NotEqual(t, uuid.Nil, user.ID)
 	assert.Equal(t, clerkID, user.ClerkID)
-	assert.Equal(t, "test@example.com", user.Email)
+	assert.Equal(t, dbTestEmail, user.Email)
 
 	// Get by Clerk ID
 	found, err := db.GetUserByClerkID(ctx, clerkID)
@@ -89,10 +95,10 @@ func TestOrganizationCRUD(t *testing.T) {
 	t.Cleanup(func() { _ = db.DeleteUser(ctx, user.ID) })
 
 	// Create org with owner
-	org, err := db.CreateOrganizationWithOwner(ctx, "Test Org", user.ID)
+	org, err := db.CreateOrganizationWithOwner(ctx, dbTestOrgName, user.ID)
 	require.NoError(t, err)
 	assert.NotEqual(t, uuid.Nil, org.ID)
-	assert.Equal(t, "Test Org", org.Name)
+	assert.Equal(t, dbTestOrgName, org.Name)
 	assert.Equal(t, database.TierFree, org.Tier)
 	t.Cleanup(func() { _ = db.DeleteOrganization(ctx, org.ID) })
 
@@ -143,10 +149,10 @@ func TestRepositoryCRUD(t *testing.T) {
 
 	// Setup
 	clerkID := "clerk_" + uuid.New().String()[:8]
-	user, _ := db.CreateUser(ctx, clerkID, "test@example.com")
+	user, _ := db.CreateUser(ctx, clerkID, dbTestEmail)
 	t.Cleanup(func() { _ = db.DeleteUser(ctx, user.ID) })
 
-	org, _ := db.CreateOrganizationWithOwner(ctx, "Test Org", user.ID)
+	org, _ := db.CreateOrganizationWithOwner(ctx, dbTestOrgName, user.ID)
 	t.Cleanup(func() { _ = db.DeleteOrganization(ctx, org.ID) })
 
 	// Create
@@ -193,10 +199,10 @@ func TestAnalysisCRUD(t *testing.T) {
 
 	// Setup
 	clerkID := "clerk_" + uuid.New().String()[:8]
-	user, _ := db.CreateUser(ctx, clerkID, "test@example.com")
+	user, _ := db.CreateUser(ctx, clerkID, dbTestEmail)
 	t.Cleanup(func() { _ = db.DeleteUser(ctx, user.ID) })
 
-	org, _ := db.CreateOrganizationWithOwner(ctx, "Test Org", user.ID)
+	org, _ := db.CreateOrganizationWithOwner(ctx, dbTestOrgName, user.ID)
 	t.Cleanup(func() { _ = db.DeleteOrganization(ctx, org.ID) })
 
 	repo, _ := db.CreateRepository(ctx, org.ID, "owner", "repo")
@@ -206,7 +212,7 @@ func TestAnalysisCRUD(t *testing.T) {
 	sensitivity := "medium"
 	rcas := []llm.RootCauseAnalysis{
 		{
-			Title:       "Timeout in checkout",
+			Title:       rcaTitleTimeout,
 			FailureType: llm.FailureTypeTimeout,
 			Location: &llm.CodeLocation{
 				FilePath:   "tests/checkout.spec.ts",
@@ -238,7 +244,7 @@ func TestAnalysisCRUD(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "Analysis text", found.Text)
 	require.Len(t, found.RCAs, 1)
-	assert.Equal(t, "Timeout in checkout", found.RCAs[0].Title)
+	assert.Equal(t, rcaTitleTimeout, found.RCAs[0].Title)
 	assert.Len(t, found.RCAs[0].Evidence, 1)
 
 	// Get by run ID
@@ -345,7 +351,7 @@ func TestAnalysisCRUD_MultipleRCAs(t *testing.T) {
 	sensitivity := "low"
 	rcas := []llm.RootCauseAnalysis{
 		{
-			Title:       "Timeout in checkout",
+			Title:       rcaTitleTimeout,
 			FailureType: llm.FailureTypeTimeout,
 			Location:    &llm.CodeLocation{FilePath: "tests/checkout.spec.ts", LineNumber: 45},
 			BugLocation: llm.BugLocationTest,
@@ -377,7 +383,7 @@ func TestAnalysisCRUD_MultipleRCAs(t *testing.T) {
 	found, err := db.GetAnalysisByID(ctx, analysis.ID)
 	require.NoError(t, err)
 	require.Len(t, found.RCAs, 2)
-	assert.Equal(t, "Timeout in checkout", found.RCAs[0].Title)
+	assert.Equal(t, rcaTitleTimeout, found.RCAs[0].Title)
 	assert.Equal(t, llm.FailureTypeTimeout, found.RCAs[0].FailureType)
 	assert.Equal(t, llm.BugLocationTest, found.RCAs[0].BugLocation)
 	assert.Len(t, found.RCAs[0].Evidence, 1)

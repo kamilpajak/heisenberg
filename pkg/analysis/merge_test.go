@@ -9,6 +9,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const (
+	dbConnectionRefused = "DB connection refused"
+)
+
 func TestMergeClusterResults_TwoClusters(t *testing.T) {
 	results := []clusterAnalysis{
 		{
@@ -59,7 +63,7 @@ func TestMergeClusterResults_DeduplicateIdenticalRootCauses(t *testing.T) {
 				Category:   llm.CategoryDiagnosis,
 				Confidence: 85,
 				RCAs: []llm.RootCauseAnalysis{
-					{Title: "DB connection refused", RootCause: "database not running"},
+					{Title: dbConnectionRefused, RootCause: "database not running"},
 				},
 			},
 		},
@@ -69,7 +73,7 @@ func TestMergeClusterResults_DeduplicateIdenticalRootCauses(t *testing.T) {
 				Category:   llm.CategoryDiagnosis,
 				Confidence: 80,
 				RCAs: []llm.RootCauseAnalysis{
-					{Title: "DB connection refused", RootCause: "database not running"},
+					{Title: dbConnectionRefused, RootCause: "database not running"},
 				},
 			},
 		},
@@ -79,7 +83,7 @@ func TestMergeClusterResults_DeduplicateIdenticalRootCauses(t *testing.T) {
 
 	// Same root cause → deduplicated to 1 RCA
 	require.Len(t, merged.RCAs, 1)
-	assert.Equal(t, "DB connection refused", merged.RCAs[0].Title)
+	assert.Equal(t, dbConnectionRefused, merged.RCAs[0].Title)
 }
 
 func TestMergeClusterResults_SingleCluster(t *testing.T) {

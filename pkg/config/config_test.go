@@ -9,6 +9,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const testConfigFile = "config.yaml"
+
 func TestLoadFrom_NoFile(t *testing.T) {
 	cfg, err := LoadFrom(filepath.Join(t.TempDir(), "nonexistent.yaml"))
 	require.NoError(t, err)
@@ -16,7 +18,7 @@ func TestLoadFrom_NoFile(t *testing.T) {
 }
 
 func TestLoadFrom_ValidYAML(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "config.yaml")
+	path := filepath.Join(t.TempDir(), testConfigFile)
 	content := "model: gemini-2.5-pro\ngithub_token: gh_abc\ngoogle_api_key: gk_xyz\n"
 	require.NoError(t, os.WriteFile(path, []byte(content), 0o644))
 
@@ -28,7 +30,7 @@ func TestLoadFrom_ValidYAML(t *testing.T) {
 }
 
 func TestLoadFrom_InvalidYAML(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "config.yaml")
+	path := filepath.Join(t.TempDir(), testConfigFile)
 	require.NoError(t, os.WriteFile(path, []byte("model: [invalid"), 0o644))
 
 	_, err := LoadFrom(path)
@@ -37,7 +39,7 @@ func TestLoadFrom_InvalidYAML(t *testing.T) {
 }
 
 func TestLoadFrom_PartialConfig(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "config.yaml")
+	path := filepath.Join(t.TempDir(), testConfigFile)
 	require.NoError(t, os.WriteFile(path, []byte("model: gemini-2.5-flash\n"), 0o644))
 
 	cfg, err := LoadFrom(path)
@@ -48,7 +50,7 @@ func TestLoadFrom_PartialConfig(t *testing.T) {
 }
 
 func TestLoadFrom_AzureDevOpsPAT(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "config.yaml")
+	path := filepath.Join(t.TempDir(), testConfigFile)
 	content := "azure_devops_pat: test-pat-123\n"
 	require.NoError(t, os.WriteFile(path, []byte(content), 0o644))
 
@@ -61,5 +63,5 @@ func TestPath(t *testing.T) {
 	path := Path()
 	assert.Contains(t, path, "heisenberg")
 	assert.True(t, filepath.IsAbs(path))
-	assert.Equal(t, "config.yaml", filepath.Base(path))
+	assert.Equal(t, testConfigFile, filepath.Base(path))
 }

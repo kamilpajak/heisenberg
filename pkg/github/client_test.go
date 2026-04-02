@@ -13,6 +13,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const (
+	headerContentType  = "Content-Type"
+	contentTypeJSON    = "application/json"
+	artifactHTMLReport = "html-report"
+	artifactBlobReport = "blob-report"
+	testGitHubAPIURL   = "https://api.github.com/test"
+)
+
 func TestClassifyArtifact(t *testing.T) {
 	tests := []struct {
 		name string
@@ -41,18 +49,18 @@ func TestClassifyArtifact(t *testing.T) {
 
 func TestNewAPIRequest(t *testing.T) {
 	c := &Client{token: "test-token"}
-	req, err := c.newAPIRequest(context.Background(), "https://api.github.com/test")
+	req, err := c.newAPIRequest(context.Background(), testGitHubAPIURL)
 
 	require.NoError(t, err)
 	assert.Equal(t, "GET", req.Method)
-	assert.Equal(t, "https://api.github.com/test", req.URL.String())
+	assert.Equal(t, testGitHubAPIURL, req.URL.String())
 	assert.Equal(t, "Bearer test-token", req.Header.Get("Authorization"))
 	assert.Equal(t, "application/vnd.github+json", req.Header.Get("Accept"))
 }
 
 func TestNewAPIRequestNoToken(t *testing.T) {
 	c := &Client{token: ""}
-	req, err := c.newAPIRequest(context.Background(), "https://api.github.com/test")
+	req, err := c.newAPIRequest(context.Background(), testGitHubAPIURL)
 
 	require.NoError(t, err)
 	assert.Empty(t, req.Header.Get("Authorization"))
@@ -75,8 +83,8 @@ func buildZip(t *testing.T, files map[string][]byte) []byte {
 
 func TestCheckArtifacts_AllExpired(t *testing.T) {
 	artifacts := []ci.Artifact{
-		{ID: 1, Name: "html-report", Expired: true},
-		{ID: 2, Name: "blob-report", Expired: true},
+		{ID: 1, Name: artifactHTMLReport, Expired: true},
+		{ID: 2, Name: artifactBlobReport, Expired: true},
 	}
 
 	status := ci.CheckArtifacts(artifacts)
@@ -90,8 +98,8 @@ func TestCheckArtifacts_AllExpired(t *testing.T) {
 
 func TestCheckArtifacts_SomeExpired(t *testing.T) {
 	artifacts := []ci.Artifact{
-		{ID: 1, Name: "html-report", Expired: true},
-		{ID: 2, Name: "blob-report", Expired: false},
+		{ID: 1, Name: artifactHTMLReport, Expired: true},
+		{ID: 2, Name: artifactBlobReport, Expired: false},
 	}
 
 	status := ci.CheckArtifacts(artifacts)
@@ -105,8 +113,8 @@ func TestCheckArtifacts_SomeExpired(t *testing.T) {
 
 func TestCheckArtifacts_NoneExpired(t *testing.T) {
 	artifacts := []ci.Artifact{
-		{ID: 1, Name: "html-report", Expired: false},
-		{ID: 2, Name: "blob-report", Expired: false},
+		{ID: 1, Name: artifactHTMLReport, Expired: false},
+		{ID: 2, Name: artifactBlobReport, Expired: false},
 	}
 
 	status := ci.CheckArtifacts(artifacts)
@@ -130,7 +138,7 @@ func TestCheckArtifacts_Empty(t *testing.T) {
 
 func TestListDirectory(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set(headerContentType, contentTypeJSON)
 		w.Write([]byte(`[
 			{"name": "e2e", "type": "dir"},
 			{"name": "setup.ts", "type": "file"},
@@ -161,7 +169,7 @@ func TestListDirectory_NotFound(t *testing.T) {
 func TestGetChangedFiles_PR(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/repos/owner/repo/pulls/42/files", r.URL.Path)
-		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set(headerContentType, contentTypeJSON)
 		w.Write([]byte(`[
 			{"filename": "src/pricing.ts", "status": "modified", "additions": 20, "deletions": 5, "patch": "@@ -40,6 +40,7 @@\n+  return 0"},
 			{"filename": "tests/checkout.spec.ts", "status": "modified", "additions": 3, "deletions": 1, "patch": "@@ -10,3 +10,5 @@"}
@@ -185,7 +193,7 @@ func TestGetChangedFiles_PR(t *testing.T) {
 func TestGetChangedFiles_Compare(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/repos/owner/repo/compare/main...abc123", r.URL.Path)
-		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set(headerContentType, contentTypeJSON)
 		w.Write([]byte(`{
 			"files": [
 				{"filename": "src/app.ts", "status": "added", "additions": 50, "deletions": 0, "patch": "@@ -0,0 +1,50 @@"}
@@ -206,7 +214,7 @@ func TestGetChangedFiles_Compare(t *testing.T) {
 
 func TestGetRun_PullRequests(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set(headerContentType, contentTypeJSON)
 		w.Write([]byte(`{
 			"id": 123,
 			"head_branch": "feature/test",

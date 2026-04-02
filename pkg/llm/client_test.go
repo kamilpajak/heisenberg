@@ -13,6 +13,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const (
+	testModel         = "test-model"
+	testKey           = "test-key"
+	testFile1         = "file1.ts"
+	testFile2         = "file2.ts"
+	testFile3         = "file3.ts"
+	testFile4         = "file4.ts"
+	contentTypeJSON   = "application/json"
+	headerContentType = "Content-Type"
+)
+
 func TestPreviewExcerpt_Short(t *testing.T) {
 	assert.Equal(t, "short text", previewExcerpt("short text", 200))
 }
@@ -119,8 +130,8 @@ func TestDescribeEmptyResponse_WithBlockedSafety(t *testing.T) {
 func TestGenerate_Success(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "POST", r.Method)
-		assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
-		assert.Contains(t, r.URL.Path, "/models/test-model:generateContent")
+		assert.Equal(t, contentTypeJSON, r.Header.Get(headerContentType))
+		assert.Contains(t, r.URL.Path, "/models/"+testModel+":generateContent")
 
 		resp := GenerateResponse{
 			Candidates: []Candidate{{
@@ -133,12 +144,12 @@ func TestGenerate_Success(t *testing.T) {
 				TotalTokenCount:      150,
 			},
 		}
-		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set(headerContentType, contentTypeJSON)
 		_ = json.NewEncoder(w).Encode(resp)
 	}))
 	defer ts.Close()
 
-	c := &Client{apiKey: "test-key", baseURL: ts.URL, model: "test-model"}
+	c := &Client{apiKey: testKey, baseURL: ts.URL, model: testModel}
 	resp, err := c.generate(context.Background(), []Content{}, nil, nil)
 
 	require.NoError(t, err)
@@ -169,7 +180,7 @@ func TestGenerate_InvalidJSON(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	c := &Client{apiKey: "test-key", baseURL: ts.URL, model: "test-model"}
+	c := &Client{apiKey: testKey, baseURL: ts.URL, model: testModel}
 	_, err := c.generate(context.Background(), []Content{}, nil, nil)
 
 	require.Error(t, err)
@@ -186,7 +197,7 @@ func TestGenerate_ContextCancelled(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // Cancel immediately
 
-	c := &Client{apiKey: "test-key", baseURL: ts.URL, model: "test-model"}
+	c := &Client{apiKey: testKey, baseURL: ts.URL, model: testModel}
 	_, err := c.generate(ctx, []Content{}, nil, nil)
 
 	require.Error(t, err)
@@ -204,7 +215,7 @@ func TestGenerate_SendsRequestBody(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	c := &Client{apiKey: "test-key", baseURL: ts.URL, model: "test-model"}
+	c := &Client{apiKey: testKey, baseURL: ts.URL, model: testModel}
 	_, err := c.generate(context.Background(), []Content{{Role: "user", Parts: []Part{{Text: "test"}}}}, nil, nil)
 	require.NoError(t, err)
 }
@@ -217,17 +228,17 @@ func TestNewClient_MissingAPIKey(t *testing.T) {
 }
 
 func TestNewClient_Success(t *testing.T) {
-	t.Setenv("GOOGLE_API_KEY", "test-key")
+	t.Setenv("GOOGLE_API_KEY", testKey)
 	c, err := NewClient("", "")
 	require.NoError(t, err)
-	assert.Equal(t, "test-key", c.apiKey)
+	assert.Equal(t, testKey, c.apiKey)
 	assert.Equal(t, DefaultModel, c.model)
 	assert.NotNil(t, c.httpClient, "should have an HTTP client")
 	assert.NotNil(t, c.limiter, "should have a rate limiter")
 }
 
 func TestNewClient_CustomModel(t *testing.T) {
-	t.Setenv("GOOGLE_API_KEY", "test-key")
+	t.Setenv("GOOGLE_API_KEY", testKey)
 	c, err := NewClient("gemini-2.5-pro", "")
 	require.NoError(t, err)
 	assert.Equal(t, "gemini-2.5-pro", c.model)
@@ -391,9 +402,9 @@ func TestGenerate_RetriesRespectContext(t *testing.T) {
 // and minimal backoff delays for fast tests.
 func newTestClient(baseURL string) *Client {
 	return &Client{
-		apiKey:         "test-key",
+		apiKey:         testKey,
 		baseURL:        baseURL,
-		model:          "test-model",
+		model:          testModel,
 		httpClient:     &http.Client{Timeout: 5 * time.Second},
 		retryBaseDelay: time.Millisecond, // fast retries in tests
 	}
@@ -402,7 +413,9 @@ func newTestClient(baseURL string) *Client {
 // noopEmitter discards all progress events.
 type noopEmitter struct{}
 
-func (noopEmitter) Emit(ProgressEvent) {}
+func (noopEmitter) Emit(ProgressEvent) {
+	// no-op: test double that discards all progress events
+}
 
 // mockToolHandler is a test double for ToolExecutor that handles the done tool.
 type mockToolHandler struct {
@@ -462,7 +475,7 @@ func mockServer(t *testing.T, responses []GenerateResponse) *httptest.Server {
 		if call >= len(responses) {
 			t.Fatalf("unexpected call %d (only %d responses)", call, len(responses))
 		}
-		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set(headerContentType, contentTypeJSON)
 		_ = json.NewEncoder(w).Encode(responses[call])
 		call++
 	}))
@@ -666,7 +679,7 @@ func TestRunAgentLoop_NoCandidates(t *testing.T) {
 func TestRunAgentLoop_ToolCallVerbose(t *testing.T) {
 	call := 0
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set(headerContentType, contentTypeJSON)
 		var resp GenerateResponse
 		switch call {
 		case 0:
@@ -718,7 +731,7 @@ func TestRunAgentLoop_ToolCallVerbose(t *testing.T) {
 func TestRunAgentLoop_DoneNudgeFallback(t *testing.T) {
 	call := 0
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set(headerContentType, contentTypeJSON)
 		var resp GenerateResponse
 		switch call {
 		case 0:
@@ -776,7 +789,7 @@ func TestRunAgentLoop_GenerateErrorMidLoop(t *testing.T) {
 				}}}}},
 				UsageMetadata: &UsageMetadata{PromptTokenCount: 500},
 			}
-			w.Header().Set("Content-Type", "application/json")
+			w.Header().Set(headerContentType, contentTypeJSON)
 			_ = json.NewEncoder(w).Encode(resp)
 			call++
 			return
@@ -798,7 +811,7 @@ func TestRunAgentLoop_GenerateErrorMidLoop(t *testing.T) {
 	// Even on error, result should carry EvalMeta for eval logging
 	require.NotNil(t, result, "error path should still return result with EvalMeta")
 	require.NotNil(t, result.Eval)
-	assert.Equal(t, "test-model", result.Eval.Model)
+	assert.Equal(t, testModel, result.Eval.Model)
 	assert.Positive(t, result.Eval.Iterations)
 	assert.Positive(t, result.Eval.WallMs)
 }
@@ -886,7 +899,7 @@ func TestCallKey_SameArgsSameKey(t *testing.T) {
 func TestRunAgentLoop_DuplicateCallDetection(t *testing.T) {
 	call := 0
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set(headerContentType, contentTypeJSON)
 		var resp GenerateResponse
 		switch call {
 		case 0:
@@ -936,7 +949,7 @@ func TestRunAgentLoop_DuplicateCallDetection(t *testing.T) {
 func TestRunAgentLoop_DuplicateCallAllowsDifferentArgs(t *testing.T) {
 	call := 0
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set(headerContentType, contentTypeJSON)
 		var resp GenerateResponse
 		switch call {
 		case 0:
@@ -1001,7 +1014,7 @@ func (m *mockToolHandlerWithTraces) Execute(_ context.Context, call FunctionCall
 func TestRunAgentLoop_ForceTraces(t *testing.T) {
 	call := 0
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set(headerContentType, contentTypeJSON)
 		var resp GenerateResponse
 		switch call {
 		case 0:
@@ -1038,7 +1051,7 @@ func TestRunAgentLoop_ForceTraces(t *testing.T) {
 func TestRunAgentLoop_DoneWithPendingTraces(t *testing.T) {
 	call := 0
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set(headerContentType, contentTypeJSON)
 		var resp GenerateResponse
 		switch call {
 		case 0:
@@ -1081,7 +1094,7 @@ func TestRunAgentLoop_DoneWithPendingTraces(t *testing.T) {
 func TestRunAgentLoop_GenerateFinalEmptyResponse(t *testing.T) {
 	call := 0
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set(headerContentType, contentTypeJSON)
 		var resp GenerateResponse
 		switch call {
 		case 0:
@@ -1102,10 +1115,10 @@ func TestRunAgentLoop_GenerateFinalEmptyResponse(t *testing.T) {
 				UsageMetadata: &UsageMetadata{PromptTokenCount: 600},
 			}
 		default:
-			// Retry also returns empty
+			// Retry also returns empty (with incremented token count reflecting the retry prompt)
 			resp = GenerateResponse{
 				Candidates:    []Candidate{{Content: Content{Parts: []Part{{}}}, FinishReason: "STOP"}},
-				UsageMetadata: &UsageMetadata{PromptTokenCount: 600},
+				UsageMetadata: &UsageMetadata{PromptTokenCount: 700},
 			}
 		}
 		_ = json.NewEncoder(w).Encode(resp)
@@ -1177,10 +1190,10 @@ func TestCircuitBreaker_FiresAfter3ConsecutiveReads(t *testing.T) {
 
 	// 4 consecutive get_repo_file calls — 4th should be intercepted
 	calls := []FunctionCall{
-		{Name: "get_repo_file", Args: map[string]any{"path": "file1.ts"}},
-		{Name: "get_repo_file", Args: map[string]any{"path": "file2.ts"}},
-		{Name: "get_repo_file", Args: map[string]any{"path": "file3.ts"}},
-		{Name: "get_repo_file", Args: map[string]any{"path": "file4.ts"}},
+		{Name: "get_repo_file", Args: map[string]any{"path": testFile1}},
+		{Name: "get_repo_file", Args: map[string]any{"path": testFile2}},
+		{Name: "get_repo_file", Args: map[string]any{"path": testFile3}},
+		{Name: "get_repo_file", Args: map[string]any{"path": testFile4}},
 	}
 
 	parts, _, err := c.executeCalls(context.Background(), s, handler, calls, si)
@@ -1203,11 +1216,11 @@ func TestCircuitBreaker_ResetsOnArtifactFetch(t *testing.T) {
 
 	// 2 file reads, then artifact, then 2 more file reads — no circuit breaker
 	calls := []FunctionCall{
-		{Name: "get_repo_file", Args: map[string]any{"path": "file1.ts"}},
-		{Name: "get_repo_file", Args: map[string]any{"path": "file2.ts"}},
+		{Name: "get_repo_file", Args: map[string]any{"path": testFile1}},
+		{Name: "get_repo_file", Args: map[string]any{"path": testFile2}},
 		{Name: "get_artifact", Args: map[string]any{"artifact_name": "report"}},
-		{Name: "get_repo_file", Args: map[string]any{"path": "file3.ts"}},
-		{Name: "get_repo_file", Args: map[string]any{"path": "file4.ts"}},
+		{Name: "get_repo_file", Args: map[string]any{"path": testFile3}},
+		{Name: "get_repo_file", Args: map[string]any{"path": testFile4}},
 	}
 
 	parts, _, err := c.executeCalls(context.Background(), s, handler, calls, si)
@@ -1228,10 +1241,10 @@ func TestCircuitBreaker_NoFireWithoutArtifacts(t *testing.T) {
 	si := &stepInfo{step: 1}
 
 	calls := []FunctionCall{
-		{Name: "get_repo_file", Args: map[string]any{"path": "file1.ts"}},
-		{Name: "get_repo_file", Args: map[string]any{"path": "file2.ts"}},
-		{Name: "get_repo_file", Args: map[string]any{"path": "file3.ts"}},
-		{Name: "get_repo_file", Args: map[string]any{"path": "file4.ts"}},
+		{Name: "get_repo_file", Args: map[string]any{"path": testFile1}},
+		{Name: "get_repo_file", Args: map[string]any{"path": testFile2}},
+		{Name: "get_repo_file", Args: map[string]any{"path": testFile3}},
+		{Name: "get_repo_file", Args: map[string]any{"path": testFile4}},
 		{Name: "get_repo_file", Args: map[string]any{"path": "file5.ts"}},
 	}
 

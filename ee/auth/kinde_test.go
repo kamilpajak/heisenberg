@@ -12,6 +12,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+const (
+	skipMockJWKS = "Requires mock JWKS server - covered by integration tests"
+)
+
 func TestExtractBearerToken(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -222,7 +226,7 @@ func TestMiddleware_InvalidToken_WithVerifier(t *testing.T) {
 	// This test uses a real-ish verifier structure but will fail on invalid tokens
 	// We can't easily test Verify without a real JWKS endpoint, but we can test
 	// that the middleware properly handles the error case
-	t.Skip("Requires mock JWKS server - covered by integration tests")
+	t.Skip(skipMockJWKS)
 }
 
 func TestVerifier_StartBackgroundRefresh(t *testing.T) {
@@ -246,7 +250,7 @@ func TestVerifier_StartBackgroundRefresh(t *testing.T) {
 func TestMiddleware_InvalidToken_PanicsWithNilJWKS(t *testing.T) {
 	// Verifier with nil JWKS will panic - this is expected behavior
 	// In production, NewVerifier always initializes JWKS
-	t.Skip("Requires mock JWKS server - covered by integration tests")
+	t.Skip(skipMockJWKS)
 }
 
 func TestIsAPIKey(t *testing.T) {
@@ -351,5 +355,5 @@ func TestMiddleware_APIKey_NoStore(t *testing.T) {
 
 func TestOptionalMiddleware_InvalidToken_PanicsWithNilJWKS(t *testing.T) {
 	// Same as above - nil JWKS causes panic
-	t.Skip("Requires mock JWKS server - covered by integration tests")
+	t.Skip(skipMockJWKS)
 }

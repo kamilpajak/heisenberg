@@ -14,18 +14,23 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const (
+	testBaseURL  = "http://localhost"
+	testFilePath = "src/main.ts"
+)
+
 // Compile-time interface checks
 var _ ci.Provider = (*Client)(nil)
 var _ ci.CrossRepoProvider = (*Client)(nil)
 var _ ci.TestResultsProvider = (*Client)(nil)
 
 func TestName(t *testing.T) {
-	c := NewTestClient("myorg", "myproject", "http://localhost", http.DefaultClient)
+	c := NewTestClient("myorg", "myproject", testBaseURL, http.DefaultClient)
 	assert.Equal(t, "azure", c.Name())
 }
 
 func TestAnalysisHints(t *testing.T) {
-	c := NewTestClient("myorg", "myproject", "http://localhost", http.DefaultClient)
+	c := NewTestClient("myorg", "myproject", testBaseURL, http.DefaultClient)
 	hints := c.AnalysisHints()
 	assert.Contains(t, hints, "get_test_results")
 	assert.Contains(t, hints, "Azure")
@@ -224,7 +229,7 @@ func TestGetJobLogs(t *testing.T) {
 }
 
 func TestGetJobLogs_NoLog(t *testing.T) {
-	c := NewTestClient("myorg", "myproject", "http://localhost", http.DefaultClient)
+	c := NewTestClient("myorg", "myproject", testBaseURL, http.DefaultClient)
 	// logID=0 → no logs
 	jobID := int64(200) << 32
 	_, err := c.GetJobLogs(context.Background(), jobID)
@@ -283,7 +288,7 @@ func TestDownloadArtifact(t *testing.T) {
 }
 
 func TestDownloadArtifact_NotCached(t *testing.T) {
-	c := NewTestClient("myorg", "myproject", "http://localhost", http.DefaultClient)
+	c := NewTestClient("myorg", "myproject", testBaseURL, http.DefaultClient)
 	_, err := c.DownloadArtifact(context.Background(), 1)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "not found")
@@ -292,13 +297,13 @@ func TestDownloadArtifact_NotCached(t *testing.T) {
 func TestGetRepoFile(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Contains(t, r.URL.Path, "/_apis/git/repositories/myproject/items")
-		assert.Equal(t, "src/main.ts", r.URL.Query().Get("path"))
+		assert.Equal(t, testFilePath, r.URL.Query().Get("path"))
 		w.Write([]byte(`export function main() { console.log("hello"); }`))
 	}))
 	defer srv.Close()
 
 	c := NewTestClient("myorg", "myproject", srv.URL, srv.Client())
-	content, err := c.GetRepoFile(context.Background(), "src/main.ts")
+	content, err := c.GetRepoFile(context.Background(), testFilePath)
 	require.NoError(t, err)
 	assert.Contains(t, content, "main()")
 }
@@ -390,12 +395,12 @@ func TestGetChangedFiles_PR(t *testing.T) {
 	files, err := c.GetChangedFiles(context.Background(), ci.ChangeRef{PRNumber: 42})
 	require.NoError(t, err)
 	assert.Len(t, files, 2)
-	assert.Equal(t, "src/main.ts", files[0].Path)
+	assert.Equal(t, testFilePath, files[0].Path)
 	assert.Equal(t, "modified", files[0].Status)
 }
 
 func TestGetChangedFiles_NoRef(t *testing.T) {
-	c := NewTestClient("myorg", "myproject", "http://localhost", http.DefaultClient)
+	c := NewTestClient("myorg", "myproject", testBaseURL, http.DefaultClient)
 	_, err := c.GetChangedFiles(context.Background(), ci.ChangeRef{})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "no commit SHA or PR number")

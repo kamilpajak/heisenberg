@@ -18,6 +18,24 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const (
+	emailDomain         = "@example.com"
+	contentTypeJSON     = "application/json"
+	headerContentType   = "Content-Type"
+	pathOrgPrefix       = "/api/organizations/"
+	pathAPIKeys         = "/api-keys"
+	pathAnalyses        = "/analyses"
+	msgInvalidBody      = "invalid request body"
+	pathHealth          = "/health"
+	pathRepositories    = "/repositories/"
+	pathMe              = "/api/me"
+	pathAuthSync        = "/api/auth/sync"
+	pathOrganizations   = "/api/organizations"
+	msgInvalidOrgID     = "invalid org ID"
+	pathBillingCheckout = "/api/billing/checkout"
+	pathBillingPortal   = "/api/billing/portal"
+)
+
 func testDB(t *testing.T) *database.DB {
 	t.Helper()
 	return testutil.NewTestDB(t)
@@ -78,7 +96,7 @@ func TestHealthEndpoint(t *testing.T) {
 	db := testDB(t)
 	server := testServer(t, db)
 
-	req := httptest.NewRequest(http.MethodGet, "/health", nil)
+	req := httptest.NewRequest(http.MethodGet, pathHealth, nil)
 	rec := httptest.NewRecorder()
 
 	server.ServeHTTP(rec, req)
@@ -96,7 +114,7 @@ func TestCORS(t *testing.T) {
 	server := testServer(t, db)
 
 	t.Run("OPTIONS request returns 200", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodOptions, "/api/me", nil)
+		req := httptest.NewRequest(http.MethodOptions, pathMe, nil)
 		rec := httptest.NewRecorder()
 
 		server.ServeHTTP(rec, req)
@@ -106,7 +124,7 @@ func TestCORS(t *testing.T) {
 	})
 
 	t.Run("CORS headers on regular request", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/health", nil)
+		req := httptest.NewRequest(http.MethodGet, pathHealth, nil)
 		rec := httptest.NewRecorder()
 
 		server.ServeHTTP(rec, req)
@@ -122,10 +140,10 @@ func TestAuthSync(t *testing.T) {
 	server := testServer(t, db)
 
 	kindeUserID := "kp_" + uuid.New().String()[:8]
-	email := "sync-" + uuid.New().String()[:8] + "@example.com"
+	email := "sync-" + uuid.New().String()[:8] + emailDomain
 
 	t.Run("creates new user", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodPost, "/api/auth/sync", nil)
+		req := httptest.NewRequest(http.MethodPost, pathAuthSync, nil)
 		req = withAuthContext(req, kindeUserID, email)
 		rec := httptest.NewRecorder()
 
@@ -141,7 +159,7 @@ func TestAuthSync(t *testing.T) {
 	})
 
 	t.Run("returns existing user", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodPost, "/api/auth/sync", nil)
+		req := httptest.NewRequest(http.MethodPost, pathAuthSync, nil)
 		req = withAuthContext(req, kindeUserID, email)
 		rec := httptest.NewRecorder()
 
@@ -164,13 +182,13 @@ func TestGetMe(t *testing.T) {
 
 	// Create user
 	kindeUserID := "kp_" + uuid.New().String()[:8]
-	email := "me-" + uuid.New().String()[:8] + "@example.com"
+	email := "me-" + uuid.New().String()[:8] + emailDomain
 	user, err := db.CreateUser(ctx, kindeUserID, email)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.DeleteUser(ctx, user.ID) })
 
 	t.Run("returns user info", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/api/me", nil)
+		req := httptest.NewRequest(http.MethodGet, pathMe, nil)
 		req = withAuthContext(req, kindeUserID, email)
 		rec := httptest.NewRecorder()
 
@@ -188,7 +206,7 @@ func TestGetMe(t *testing.T) {
 	})
 
 	t.Run("returns 404 for non-existent user", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/api/me", nil)
+		req := httptest.NewRequest(http.MethodGet, pathMe, nil)
 		req = withAuthContext(req, "kp_nonexistent", "ghost@example.com")
 		rec := httptest.NewRecorder()
 
@@ -205,7 +223,7 @@ func TestOrganizations(t *testing.T) {
 
 	// Create user
 	kindeUserID := "kp_" + uuid.New().String()[:8]
-	email := "org-" + uuid.New().String()[:8] + "@example.com"
+	email := "org-" + uuid.New().String()[:8] + emailDomain
 	user, err := db.CreateUser(ctx, kindeUserID, email)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.DeleteUser(ctx, user.ID) })
@@ -214,8 +232,8 @@ func TestOrganizations(t *testing.T) {
 
 	t.Run("create organization", func(t *testing.T) {
 		body := bytes.NewBufferString(`{"name": "Test Organization"}`)
-		req := httptest.NewRequest(http.MethodPost, "/api/organizations", body)
-		req.Header.Set("Content-Type", "application/json")
+		req := httptest.NewRequest(http.MethodPost, pathOrganizations, body)
+		req.Header.Set(headerContentType, contentTypeJSON)
 		req = withAuthContext(req, kindeUserID, email)
 		rec := httptest.NewRecorder()
 
@@ -238,7 +256,7 @@ func TestOrganizations(t *testing.T) {
 	})
 
 	t.Run("list organizations", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/api/organizations", nil)
+		req := httptest.NewRequest(http.MethodGet, pathOrganizations, nil)
 		req = withAuthContext(req, kindeUserID, email)
 		rec := httptest.NewRecorder()
 
@@ -253,7 +271,7 @@ func TestOrganizations(t *testing.T) {
 	})
 
 	t.Run("get organization", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/api/organizations/"+orgID.String(), nil)
+		req := httptest.NewRequest(http.MethodGet, pathOrgPrefix+orgID.String(), nil)
 		req = withAuthContext(req, kindeUserID, email)
 		rec := httptest.NewRecorder()
 
@@ -268,7 +286,7 @@ func TestOrganizations(t *testing.T) {
 	})
 
 	t.Run("get organization - forbidden for non-member", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/api/organizations/"+orgID.String(), nil)
+		req := httptest.NewRequest(http.MethodGet, pathOrgPrefix+orgID.String(), nil)
 		req = withAuthContext(req, "kp_other", "other@example.com")
 		rec := httptest.NewRecorder()
 
@@ -280,8 +298,8 @@ func TestOrganizations(t *testing.T) {
 
 	t.Run("create organization - empty name", func(t *testing.T) {
 		body := bytes.NewBufferString(`{"name": ""}`)
-		req := httptest.NewRequest(http.MethodPost, "/api/organizations", body)
-		req.Header.Set("Content-Type", "application/json")
+		req := httptest.NewRequest(http.MethodPost, pathOrganizations, body)
+		req.Header.Set(headerContentType, contentTypeJSON)
 		req = withAuthContext(req, kindeUserID, email)
 		rec := httptest.NewRecorder()
 
@@ -298,7 +316,7 @@ func TestRepositories(t *testing.T) {
 
 	// Setup
 	kindeUserID := "kp_" + uuid.New().String()[:8]
-	email := "repo-" + uuid.New().String()[:8] + "@example.com"
+	email := "repo-" + uuid.New().String()[:8] + emailDomain
 	user, err := db.CreateUser(ctx, kindeUserID, email)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.DeleteUser(ctx, user.ID) })
@@ -311,7 +329,7 @@ func TestRepositories(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("list repositories", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/api/organizations/"+org.ID.String()+"/repositories", nil)
+		req := httptest.NewRequest(http.MethodGet, pathOrgPrefix+org.ID.String()+"/repositories", nil)
 		req = withAuthContext(req, kindeUserID, email)
 		rec := httptest.NewRecorder()
 
@@ -327,7 +345,7 @@ func TestRepositories(t *testing.T) {
 	})
 
 	t.Run("get repository", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/api/organizations/"+org.ID.String()+"/repositories/"+repo.ID.String(), nil)
+		req := httptest.NewRequest(http.MethodGet, pathOrgPrefix+org.ID.String()+pathRepositories+repo.ID.String(), nil)
 		req = withAuthContext(req, kindeUserID, email)
 		rec := httptest.NewRecorder()
 
@@ -343,7 +361,7 @@ func TestRepositories(t *testing.T) {
 
 	t.Run("get repository - not found", func(t *testing.T) {
 		fakeID := uuid.New()
-		req := httptest.NewRequest(http.MethodGet, "/api/organizations/"+org.ID.String()+"/repositories/"+fakeID.String(), nil)
+		req := httptest.NewRequest(http.MethodGet, pathOrgPrefix+org.ID.String()+pathRepositories+fakeID.String(), nil)
 		req = withAuthContext(req, kindeUserID, email)
 		rec := httptest.NewRecorder()
 
@@ -360,7 +378,7 @@ func TestAnalyses(t *testing.T) {
 
 	// Setup
 	kindeUserID := "kp_" + uuid.New().String()[:8]
-	email := "analysis-" + uuid.New().String()[:8] + "@example.com"
+	email := "analysis-" + uuid.New().String()[:8] + emailDomain
 	user, err := db.CreateUser(ctx, kindeUserID, email)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.DeleteUser(ctx, user.ID) })
@@ -381,7 +399,7 @@ func TestAnalyses(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("list analyses", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/api/organizations/"+org.ID.String()+"/repositories/"+repo.ID.String()+"/analyses", nil)
+		req := httptest.NewRequest(http.MethodGet, pathOrgPrefix+org.ID.String()+pathRepositories+repo.ID.String()+pathAnalyses, nil)
 		req = withAuthContext(req, kindeUserID, email)
 		rec := httptest.NewRecorder()
 
@@ -397,7 +415,7 @@ func TestAnalyses(t *testing.T) {
 	})
 
 	t.Run("list analyses with pagination", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/api/organizations/"+org.ID.String()+"/repositories/"+repo.ID.String()+"/analyses?limit=10&offset=0", nil)
+		req := httptest.NewRequest(http.MethodGet, pathOrgPrefix+org.ID.String()+pathRepositories+repo.ID.String()+pathAnalyses+"?limit=10&offset=0", nil)
 		req = withAuthContext(req, kindeUserID, email)
 		rec := httptest.NewRecorder()
 
@@ -413,7 +431,7 @@ func TestAnalyses(t *testing.T) {
 	})
 
 	t.Run("get analysis", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/api/organizations/"+org.ID.String()+"/analyses/"+analysis.ID.String(), nil)
+		req := httptest.NewRequest(http.MethodGet, pathOrgPrefix+org.ID.String()+pathAnalyses+"/"+analysis.ID.String(), nil)
 		req = withAuthContext(req, kindeUserID, email)
 		rec := httptest.NewRecorder()
 
@@ -430,7 +448,7 @@ func TestAnalyses(t *testing.T) {
 
 	t.Run("get analysis - not found", func(t *testing.T) {
 		fakeID := uuid.New()
-		req := httptest.NewRequest(http.MethodGet, "/api/organizations/"+org.ID.String()+"/analyses/"+fakeID.String(), nil)
+		req := httptest.NewRequest(http.MethodGet, pathOrgPrefix+org.ID.String()+pathAnalyses+"/"+fakeID.String(), nil)
 		req = withAuthContext(req, kindeUserID, email)
 		rec := httptest.NewRecorder()
 
@@ -447,7 +465,7 @@ func TestCreateAnalysis(t *testing.T) {
 
 	// Setup
 	kindeUserID := "kp_" + uuid.New().String()[:8]
-	email := "create-analysis-" + uuid.New().String()[:8] + "@example.com"
+	email := "create-analysis-" + uuid.New().String()[:8] + emailDomain
 	user, err := db.CreateUser(ctx, kindeUserID, email)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.DeleteUser(ctx, user.ID) })
@@ -468,8 +486,8 @@ func TestCreateAnalysis(t *testing.T) {
 			"sensitivity": "medium",
 			"text": "Root cause analysis text"
 		}`)
-		req := httptest.NewRequest(http.MethodPost, "/api/organizations/"+org.ID.String()+"/analyses", body)
-		req.Header.Set("Content-Type", "application/json")
+		req := httptest.NewRequest(http.MethodPost, pathOrgPrefix+org.ID.String()+pathAnalyses, body)
+		req.Header.Set(headerContentType, contentTypeJSON)
 		req = withAuthContext(req, kindeUserID, email)
 		rec := httptest.NewRecorder()
 
@@ -491,8 +509,8 @@ func TestCreateAnalysis(t *testing.T) {
 			"category": "diagnosis",
 			"text": "Duplicate"
 		}`)
-		req := httptest.NewRequest(http.MethodPost, "/api/organizations/"+org.ID.String()+"/analyses", body)
-		req.Header.Set("Content-Type", "application/json")
+		req := httptest.NewRequest(http.MethodPost, pathOrgPrefix+org.ID.String()+pathAnalyses, body)
+		req.Header.Set(headerContentType, contentTypeJSON)
 		req = withAuthContext(req, kindeUserID, email)
 		rec := httptest.NewRecorder()
 
@@ -501,10 +519,10 @@ func TestCreateAnalysis(t *testing.T) {
 		assert.Equal(t, http.StatusConflict, rec.Code)
 	})
 
-	t.Run("invalid request body", func(t *testing.T) {
+	t.Run(msgInvalidBody, func(t *testing.T) {
 		body := bytes.NewBufferString(`not json`)
-		req := httptest.NewRequest(http.MethodPost, "/api/organizations/"+org.ID.String()+"/analyses", body)
-		req.Header.Set("Content-Type", "application/json")
+		req := httptest.NewRequest(http.MethodPost, pathOrgPrefix+org.ID.String()+pathAnalyses, body)
+		req.Header.Set(headerContentType, contentTypeJSON)
 		req = withAuthContext(req, kindeUserID, email)
 		rec := httptest.NewRecorder()
 
@@ -515,8 +533,8 @@ func TestCreateAnalysis(t *testing.T) {
 
 	t.Run("missing required fields", func(t *testing.T) {
 		body := bytes.NewBufferString(`{"owner": "testowner"}`)
-		req := httptest.NewRequest(http.MethodPost, "/api/organizations/"+org.ID.String()+"/analyses", body)
-		req.Header.Set("Content-Type", "application/json")
+		req := httptest.NewRequest(http.MethodPost, pathOrgPrefix+org.ID.String()+pathAnalyses, body)
+		req.Header.Set(headerContentType, contentTypeJSON)
 		req = withAuthContext(req, kindeUserID, email)
 		rec := httptest.NewRecorder()
 
@@ -527,7 +545,7 @@ func TestCreateAnalysis(t *testing.T) {
 
 	t.Run("non-member forbidden", func(t *testing.T) {
 		otherUserID := "kp_" + uuid.New().String()[:8]
-		otherEmail := "other-" + uuid.New().String()[:8] + "@example.com"
+		otherEmail := "other-" + uuid.New().String()[:8] + emailDomain
 		_, err := db.CreateUser(ctx, otherUserID, otherEmail)
 		require.NoError(t, err)
 
@@ -538,8 +556,8 @@ func TestCreateAnalysis(t *testing.T) {
 			"category": "diagnosis",
 			"text": "Should fail"
 		}`)
-		req := httptest.NewRequest(http.MethodPost, "/api/organizations/"+org.ID.String()+"/analyses", body)
-		req.Header.Set("Content-Type", "application/json")
+		req := httptest.NewRequest(http.MethodPost, pathOrgPrefix+org.ID.String()+pathAnalyses, body)
+		req.Header.Set(headerContentType, contentTypeJSON)
 		req = withAuthContext(req, otherUserID, otherEmail)
 		rec := httptest.NewRecorder()
 
@@ -556,7 +574,7 @@ func TestUsage(t *testing.T) {
 
 	// Setup
 	kindeUserID := "kp_" + uuid.New().String()[:8]
-	email := "usage-" + uuid.New().String()[:8] + "@example.com"
+	email := "usage-" + uuid.New().String()[:8] + emailDomain
 	user, err := db.CreateUser(ctx, kindeUserID, email)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.DeleteUser(ctx, user.ID) })
@@ -566,7 +584,7 @@ func TestUsage(t *testing.T) {
 	t.Cleanup(func() { _ = db.DeleteOrganization(ctx, org.ID) })
 
 	t.Run("get usage stats", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/api/organizations/"+org.ID.String()+"/usage", nil)
+		req := httptest.NewRequest(http.MethodGet, pathOrgPrefix+org.ID.String()+"/usage", nil)
 		req = withAuthContext(req, kindeUserID, email)
 		rec := httptest.NewRecorder()
 
@@ -591,7 +609,7 @@ func TestInvalidUUIDs(t *testing.T) {
 
 	// Setup user and org for auth
 	kindeUserID := "kp_" + uuid.New().String()[:8]
-	email := "invalid-" + uuid.New().String()[:8] + "@example.com"
+	email := "invalid-" + uuid.New().String()[:8] + emailDomain
 	user, err := db.CreateUser(ctx, kindeUserID, email)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.DeleteUser(ctx, user.ID) })
@@ -604,9 +622,9 @@ func TestInvalidUUIDs(t *testing.T) {
 		name string
 		path string
 	}{
-		{"invalid org ID", "/api/organizations/not-a-uuid"},
-		{"invalid repo ID", "/api/organizations/" + org.ID.String() + "/repositories/not-a-uuid"},
-		{"invalid analysis ID", "/api/organizations/" + org.ID.String() + "/analyses/not-a-uuid"},
+		{msgInvalidOrgID, pathOrgPrefix + "not-a-uuid"},
+		{"invalid repo ID", pathOrgPrefix + org.ID.String() + pathRepositories + "not-a-uuid"},
+		{"invalid analysis ID", pathOrgPrefix + org.ID.String() + pathAnalyses + "/not-a-uuid"},
 	}
 
 	for _, tt := range tests {
@@ -629,7 +647,7 @@ func TestBillingCheckout(t *testing.T) {
 
 	// Setup
 	kindeUserID := "kp_" + uuid.New().String()[:8]
-	email := "checkout-" + uuid.New().String()[:8] + "@example.com"
+	email := "checkout-" + uuid.New().String()[:8] + emailDomain
 	user, err := db.CreateUser(ctx, kindeUserID, email)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.DeleteUser(ctx, user.ID) })
@@ -638,10 +656,10 @@ func TestBillingCheckout(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.DeleteOrganization(ctx, org.ID) })
 
-	t.Run("invalid request body", func(t *testing.T) {
+	t.Run(msgInvalidBody, func(t *testing.T) {
 		body := bytes.NewBufferString(`not valid json`)
-		req := httptest.NewRequest(http.MethodPost, "/api/billing/checkout", body)
-		req.Header.Set("Content-Type", "application/json")
+		req := httptest.NewRequest(http.MethodPost, pathBillingCheckout, body)
+		req.Header.Set(headerContentType, contentTypeJSON)
 		req = withAuthContext(req, kindeUserID, email)
 		rec := httptest.NewRecorder()
 
@@ -650,15 +668,15 @@ func TestBillingCheckout(t *testing.T) {
 		assert.Equal(t, http.StatusBadRequest, rec.Code)
 	})
 
-	t.Run("invalid org ID", func(t *testing.T) {
+	t.Run(msgInvalidOrgID, func(t *testing.T) {
 		body := bytes.NewBufferString(`{
 			"org_id": "not-a-uuid",
 			"tier": "team",
 			"success_url": "https://example.com/success",
 			"cancel_url": "https://example.com/cancel"
 		}`)
-		req := httptest.NewRequest(http.MethodPost, "/api/billing/checkout", body)
-		req.Header.Set("Content-Type", "application/json")
+		req := httptest.NewRequest(http.MethodPost, pathBillingCheckout, body)
+		req.Header.Set(headerContentType, contentTypeJSON)
 		req = withAuthContext(req, kindeUserID, email)
 		rec := httptest.NewRecorder()
 
@@ -670,7 +688,7 @@ func TestBillingCheckout(t *testing.T) {
 	t.Run("non-admin cannot create checkout", func(t *testing.T) {
 		// Create another user who is not an admin
 		otherKindeID := "kp_" + uuid.New().String()[:8]
-		otherEmail := "other-" + uuid.New().String()[:8] + "@example.com"
+		otherEmail := "other-" + uuid.New().String()[:8] + emailDomain
 		otherUser, err := db.CreateUser(ctx, otherKindeID, otherEmail)
 		require.NoError(t, err)
 		t.Cleanup(func() { _ = db.DeleteUser(ctx, otherUser.ID) })
@@ -685,8 +703,8 @@ func TestBillingCheckout(t *testing.T) {
 			"success_url": "https://example.com/success",
 			"cancel_url": "https://example.com/cancel"
 		}`)
-		req := httptest.NewRequest(http.MethodPost, "/api/billing/checkout", body)
-		req.Header.Set("Content-Type", "application/json")
+		req := httptest.NewRequest(http.MethodPost, pathBillingCheckout, body)
+		req.Header.Set(headerContentType, contentTypeJSON)
 		req = withAuthContext(req, otherKindeID, otherEmail)
 		rec := httptest.NewRecorder()
 
@@ -702,8 +720,8 @@ func TestBillingCheckout(t *testing.T) {
 			"success_url": "https://example.com/success",
 			"cancel_url": "https://example.com/cancel"
 		}`)
-		req := httptest.NewRequest(http.MethodPost, "/api/billing/checkout", body)
-		req.Header.Set("Content-Type", "application/json")
+		req := httptest.NewRequest(http.MethodPost, pathBillingCheckout, body)
+		req.Header.Set(headerContentType, contentTypeJSON)
 		req = withAuthContext(req, kindeUserID, email)
 		rec := httptest.NewRecorder()
 
@@ -721,7 +739,7 @@ func TestBillingPortal(t *testing.T) {
 
 	// Setup
 	kindeUserID := "kp_" + uuid.New().String()[:8]
-	email := "portal-" + uuid.New().String()[:8] + "@example.com"
+	email := "portal-" + uuid.New().String()[:8] + emailDomain
 	user, err := db.CreateUser(ctx, kindeUserID, email)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.DeleteUser(ctx, user.ID) })
@@ -730,10 +748,10 @@ func TestBillingPortal(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.DeleteOrganization(ctx, org.ID) })
 
-	t.Run("invalid request body", func(t *testing.T) {
+	t.Run(msgInvalidBody, func(t *testing.T) {
 		body := bytes.NewBufferString(`not valid json`)
-		req := httptest.NewRequest(http.MethodPost, "/api/billing/portal", body)
-		req.Header.Set("Content-Type", "application/json")
+		req := httptest.NewRequest(http.MethodPost, pathBillingPortal, body)
+		req.Header.Set(headerContentType, contentTypeJSON)
 		req = withAuthContext(req, kindeUserID, email)
 		rec := httptest.NewRecorder()
 
@@ -742,13 +760,13 @@ func TestBillingPortal(t *testing.T) {
 		assert.Equal(t, http.StatusBadRequest, rec.Code)
 	})
 
-	t.Run("invalid org ID", func(t *testing.T) {
+	t.Run(msgInvalidOrgID, func(t *testing.T) {
 		body := bytes.NewBufferString(`{
 			"org_id": "not-a-uuid",
 			"return_url": "https://example.com/settings"
 		}`)
-		req := httptest.NewRequest(http.MethodPost, "/api/billing/portal", body)
-		req.Header.Set("Content-Type", "application/json")
+		req := httptest.NewRequest(http.MethodPost, pathBillingPortal, body)
+		req.Header.Set(headerContentType, contentTypeJSON)
 		req = withAuthContext(req, kindeUserID, email)
 		rec := httptest.NewRecorder()
 
@@ -762,8 +780,8 @@ func TestBillingPortal(t *testing.T) {
 			"org_id": "` + org.ID.String() + `",
 			"return_url": "https://example.com/settings"
 		}`)
-		req := httptest.NewRequest(http.MethodPost, "/api/billing/portal", body)
-		req.Header.Set("Content-Type", "application/json")
+		req := httptest.NewRequest(http.MethodPost, pathBillingPortal, body)
+		req.Header.Set(headerContentType, contentTypeJSON)
 		req = withAuthContext(req, kindeUserID, email)
 		rec := httptest.NewRecorder()
 
@@ -777,7 +795,7 @@ func TestBillingPortal(t *testing.T) {
 	t.Run("non-admin cannot access portal", func(t *testing.T) {
 		// Create another user who is not an admin
 		otherKindeID := "kp_" + uuid.New().String()[:8]
-		otherEmail := "other-portal-" + uuid.New().String()[:8] + "@example.com"
+		otherEmail := "other-portal-" + uuid.New().String()[:8] + emailDomain
 		otherUser, err := db.CreateUser(ctx, otherKindeID, otherEmail)
 		require.NoError(t, err)
 		t.Cleanup(func() { _ = db.DeleteUser(ctx, otherUser.ID) })
@@ -790,8 +808,8 @@ func TestBillingPortal(t *testing.T) {
 			"org_id": "` + org.ID.String() + `",
 			"return_url": "https://example.com/settings"
 		}`)
-		req := httptest.NewRequest(http.MethodPost, "/api/billing/portal", body)
-		req.Header.Set("Content-Type", "application/json")
+		req := httptest.NewRequest(http.MethodPost, pathBillingPortal, body)
+		req.Header.Set(headerContentType, contentTypeJSON)
 		req = withAuthContext(req, otherKindeID, otherEmail)
 		rec := httptest.NewRecorder()
 
@@ -806,7 +824,7 @@ func TestAuthSyncMissingClaims(t *testing.T) {
 	server := testServer(t, db)
 
 	// Request without auth context
-	req := httptest.NewRequest(http.MethodPost, "/api/auth/sync", nil)
+	req := httptest.NewRequest(http.MethodPost, pathAuthSync, nil)
 	rec := httptest.NewRecorder()
 
 	server.mux.ServeHTTP(rec, req)
@@ -819,7 +837,7 @@ func TestGetMeMissingClaims(t *testing.T) {
 	server := testServer(t, db)
 
 	// Request without auth context
-	req := httptest.NewRequest(http.MethodGet, "/api/me", nil)
+	req := httptest.NewRequest(http.MethodGet, pathMe, nil)
 	rec := httptest.NewRecorder()
 
 	server.mux.ServeHTTP(rec, req)
@@ -832,7 +850,7 @@ func TestOrganizationsMissingClaims(t *testing.T) {
 	server := testServer(t, db)
 
 	t.Run("list without auth", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/api/organizations", nil)
+		req := httptest.NewRequest(http.MethodGet, pathOrganizations, nil)
 		rec := httptest.NewRecorder()
 
 		server.mux.ServeHTTP(rec, req)
@@ -842,8 +860,8 @@ func TestOrganizationsMissingClaims(t *testing.T) {
 
 	t.Run("create without auth", func(t *testing.T) {
 		body := bytes.NewBufferString(`{"name": "Test Org"}`)
-		req := httptest.NewRequest(http.MethodPost, "/api/organizations", body)
-		req.Header.Set("Content-Type", "application/json")
+		req := httptest.NewRequest(http.MethodPost, pathOrganizations, body)
+		req.Header.Set(headerContentType, contentTypeJSON)
 		rec := httptest.NewRecorder()
 
 		server.mux.ServeHTTP(rec, req)
@@ -881,7 +899,7 @@ func TestNewServer(t *testing.T) {
 	assert.NotNil(t, server.usageChecker)
 
 	// Server should be able to handle requests
-	req := httptest.NewRequest(http.MethodGet, "/health", nil)
+	req := httptest.NewRequest(http.MethodGet, pathHealth, nil)
 	rec := httptest.NewRecorder()
 	server.ServeHTTP(rec, req)
 	assert.Equal(t, http.StatusOK, rec.Code)
@@ -892,7 +910,7 @@ func TestWriteJSON(t *testing.T) {
 	writeJSON(rec, http.StatusCreated, map[string]string{"key": "value"})
 
 	assert.Equal(t, http.StatusCreated, rec.Code)
-	assert.Equal(t, "application/json", rec.Header().Get("Content-Type"))
+	assert.Equal(t, contentTypeJSON, rec.Header().Get(headerContentType))
 	assert.Contains(t, rec.Body.String(), `"key":"value"`)
 }
 
@@ -938,7 +956,7 @@ func TestListAnalysesFilterByCategory(t *testing.T) {
 
 	// Setup
 	kindeUserID := "kp_" + uuid.New().String()[:8]
-	email := "filter-" + uuid.New().String()[:8] + "@example.com"
+	email := "filter-" + uuid.New().String()[:8] + emailDomain
 	user, err := db.CreateUser(ctx, kindeUserID, email)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.DeleteUser(ctx, user.ID) })
@@ -968,7 +986,7 @@ func TestListAnalysesFilterByCategory(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("filter by category", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/api/organizations/"+org.ID.String()+"/repositories/"+repo.ID.String()+"/analyses?category=diagnosis", nil)
+		req := httptest.NewRequest(http.MethodGet, pathOrgPrefix+org.ID.String()+pathRepositories+repo.ID.String()+pathAnalyses+"?category=diagnosis", nil)
 		req = withAuthContext(req, kindeUserID, email)
 		rec := httptest.NewRecorder()
 
@@ -990,7 +1008,7 @@ func TestGetOrganizationNotMember(t *testing.T) {
 
 	// Create owner user
 	kindeUserID := "kp_" + uuid.New().String()[:8]
-	email := "owner-" + uuid.New().String()[:8] + "@example.com"
+	email := "owner-" + uuid.New().String()[:8] + emailDomain
 	user, err := db.CreateUser(ctx, kindeUserID, email)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.DeleteUser(ctx, user.ID) })
@@ -1002,13 +1020,13 @@ func TestGetOrganizationNotMember(t *testing.T) {
 
 	// Create another user who is NOT a member
 	otherKindeID := "kp_" + uuid.New().String()[:8]
-	otherEmail := "notmember-" + uuid.New().String()[:8] + "@example.com"
+	otherEmail := "notmember-" + uuid.New().String()[:8] + emailDomain
 	otherUser, err := db.CreateUser(ctx, otherKindeID, otherEmail)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.DeleteUser(ctx, otherUser.ID) })
 
 	// Try to access org as non-member
-	req := httptest.NewRequest(http.MethodGet, "/api/organizations/"+org.ID.String(), nil)
+	req := httptest.NewRequest(http.MethodGet, pathOrgPrefix+org.ID.String(), nil)
 	req = withAuthContext(req, otherKindeID, otherEmail)
 	rec := httptest.NewRecorder()
 
@@ -1036,7 +1054,7 @@ func TestAPIKeys(t *testing.T) {
 
 	// Setup
 	kindeUserID := "kp_" + uuid.New().String()[:8]
-	email := "apikeys-" + uuid.New().String()[:8] + "@example.com"
+	email := "apikeys-" + uuid.New().String()[:8] + emailDomain
 	user, err := db.CreateUser(ctx, kindeUserID, email)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.DeleteUser(ctx, user.ID) })
@@ -1049,8 +1067,8 @@ func TestAPIKeys(t *testing.T) {
 
 	t.Run("create API key", func(t *testing.T) {
 		body := bytes.NewBufferString(`{"name": "CI Key"}`)
-		req := httptest.NewRequest(http.MethodPost, "/api/organizations/"+org.ID.String()+"/api-keys", body)
-		req.Header.Set("Content-Type", "application/json")
+		req := httptest.NewRequest(http.MethodPost, pathOrgPrefix+org.ID.String()+pathAPIKeys, body)
+		req.Header.Set(headerContentType, contentTypeJSON)
 		req = withAuthContext(req, kindeUserID, email)
 		rec := httptest.NewRecorder()
 
@@ -1076,8 +1094,8 @@ func TestAPIKeys(t *testing.T) {
 
 	t.Run("create API key - missing name", func(t *testing.T) {
 		body := bytes.NewBufferString(`{}`)
-		req := httptest.NewRequest(http.MethodPost, "/api/organizations/"+org.ID.String()+"/api-keys", body)
-		req.Header.Set("Content-Type", "application/json")
+		req := httptest.NewRequest(http.MethodPost, pathOrgPrefix+org.ID.String()+pathAPIKeys, body)
+		req.Header.Set(headerContentType, contentTypeJSON)
 		req = withAuthContext(req, kindeUserID, email)
 		rec := httptest.NewRecorder()
 
@@ -1087,7 +1105,7 @@ func TestAPIKeys(t *testing.T) {
 	})
 
 	t.Run("list API keys", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/api/organizations/"+org.ID.String()+"/api-keys", nil)
+		req := httptest.NewRequest(http.MethodGet, pathOrgPrefix+org.ID.String()+pathAPIKeys, nil)
 		req = withAuthContext(req, kindeUserID, email)
 		rec := httptest.NewRecorder()
 
@@ -1111,7 +1129,7 @@ func TestAPIKeys(t *testing.T) {
 	})
 
 	t.Run("delete API key", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodDelete, "/api/organizations/"+org.ID.String()+"/api-keys/"+createdKeyID, nil)
+		req := httptest.NewRequest(http.MethodDelete, pathOrgPrefix+org.ID.String()+pathAPIKeys+"/"+createdKeyID, nil)
 		req = withAuthContext(req, kindeUserID, email)
 		rec := httptest.NewRecorder()
 
@@ -1120,7 +1138,7 @@ func TestAPIKeys(t *testing.T) {
 		assert.Equal(t, http.StatusNoContent, rec.Code)
 
 		// Verify deleted
-		listReq := httptest.NewRequest(http.MethodGet, "/api/organizations/"+org.ID.String()+"/api-keys", nil)
+		listReq := httptest.NewRequest(http.MethodGet, pathOrgPrefix+org.ID.String()+pathAPIKeys, nil)
 		listReq = withAuthContext(listReq, kindeUserID, email)
 		listRec := httptest.NewRecorder()
 		server.mux.ServeHTTP(listRec, listReq)
@@ -1133,10 +1151,10 @@ func TestAPIKeys(t *testing.T) {
 
 	t.Run("non-member forbidden", func(t *testing.T) {
 		otherUserID := "kp_" + uuid.New().String()[:8]
-		otherEmail := "other-ak-" + uuid.New().String()[:8] + "@example.com"
+		otherEmail := "other-ak-" + uuid.New().String()[:8] + emailDomain
 		_, _ = db.CreateUser(ctx, otherUserID, otherEmail)
 
-		req := httptest.NewRequest(http.MethodGet, "/api/organizations/"+org.ID.String()+"/api-keys", nil)
+		req := httptest.NewRequest(http.MethodGet, pathOrgPrefix+org.ID.String()+pathAPIKeys, nil)
 		req = withAuthContext(req, otherUserID, otherEmail)
 		rec := httptest.NewRecorder()
 
@@ -1147,15 +1165,15 @@ func TestAPIKeys(t *testing.T) {
 
 	t.Run("member cannot create API key", func(t *testing.T) {
 		memberUserID := "kp_" + uuid.New().String()[:8]
-		memberEmail := "member-ak-" + uuid.New().String()[:8] + "@example.com"
+		memberEmail := "member-ak-" + uuid.New().String()[:8] + emailDomain
 		memberUser, err := db.CreateUser(ctx, memberUserID, memberEmail)
 		require.NoError(t, err)
 		t.Cleanup(func() { _ = db.DeleteUser(ctx, memberUser.ID) })
 		_ = db.AddOrgMember(ctx, org.ID, memberUser.ID, database.RoleMember)
 
 		body := bytes.NewBufferString(`{"name": "Member Key"}`)
-		req := httptest.NewRequest(http.MethodPost, "/api/organizations/"+org.ID.String()+"/api-keys", body)
-		req.Header.Set("Content-Type", "application/json")
+		req := httptest.NewRequest(http.MethodPost, pathOrgPrefix+org.ID.String()+pathAPIKeys, body)
+		req.Header.Set(headerContentType, contentTypeJSON)
 		req = withAuthContext(req, memberUserID, memberEmail)
 		rec := httptest.NewRecorder()
 
@@ -1166,13 +1184,13 @@ func TestAPIKeys(t *testing.T) {
 
 	t.Run("member cannot delete API key", func(t *testing.T) {
 		memberUserID := "kp_" + uuid.New().String()[:8]
-		memberEmail := "member-del-" + uuid.New().String()[:8] + "@example.com"
+		memberEmail := "member-del-" + uuid.New().String()[:8] + emailDomain
 		memberUser, err := db.CreateUser(ctx, memberUserID, memberEmail)
 		require.NoError(t, err)
 		t.Cleanup(func() { _ = db.DeleteUser(ctx, memberUser.ID) })
 		_ = db.AddOrgMember(ctx, org.ID, memberUser.ID, database.RoleMember)
 
-		req := httptest.NewRequest(http.MethodDelete, "/api/organizations/"+org.ID.String()+"/api-keys/"+uuid.New().String(), nil)
+		req := httptest.NewRequest(http.MethodDelete, pathOrgPrefix+org.ID.String()+pathAPIKeys+"/"+uuid.New().String(), nil)
 		req = withAuthContext(req, memberUserID, memberEmail)
 		rec := httptest.NewRecorder()
 

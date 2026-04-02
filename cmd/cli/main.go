@@ -44,6 +44,17 @@ const (
 	exitConfigError = 4 // missing or invalid configuration
 )
 
+const (
+	indentedStrFmt        = "  %s\n"
+	visualStudioComSuffix = ".visualstudio.com"
+	flagFromEnv           = "from-env"
+	flagRunID             = "run-id"
+	flagAzureOrg          = "azure-org"
+	flagAzureProject      = "azure-project"
+	flagAzureTestRepo     = "azure-test-repo"
+	flagTestRepo          = "test-repo"
+)
+
 var (
 	verbose      bool
 	jsonOutput   bool
@@ -125,40 +136,40 @@ func init() {
 	_ = rootCmd.PersistentFlags().MarkHidden("json") // backward compat alias
 
 	// Analyze-specific flags (on analyzeCmd)
-	analyzeCmd.Flags().BoolVar(&fromEnv, "from-env", false, "Read repo/run from CI environment variables (GitHub Actions or Azure Pipelines)")
+	analyzeCmd.Flags().BoolVar(&fromEnv, flagFromEnv, false, "Read repo/run from CI environment variables (GitHub Actions or Azure Pipelines)")
 	analyzeCmd.Flags().StringVarP(&runURL, "run", "r", "", "CI run URL (GitHub Actions or Azure Pipelines)")
-	analyzeCmd.Flags().Int64Var(&runID, "run-id", 0, "Specific workflow run ID to analyze")
+	analyzeCmd.Flags().Int64Var(&runID, flagRunID, 0, "Specific workflow run ID to analyze")
 	analyzeCmd.Flags().StringVar(&modelName, "model", "", "Gemini model name (env: HEISENBERG_MODEL, default: "+llm.DefaultModel+")")
 	analyzeCmd.Flags().StringVar(&providerFlag, "provider", "", "CI provider: github or azure (default: auto-detect)")
-	analyzeCmd.Flags().StringVar(&azureOrg, "azure-org", "", "Azure DevOps organization")
-	analyzeCmd.Flags().StringVar(&azureProject, "azure-project", "", "Azure DevOps project")
-	analyzeCmd.Flags().StringVar(&testRepo, "azure-test-repo", "", "Additional repository for test code (project/repo)")
+	analyzeCmd.Flags().StringVar(&azureOrg, flagAzureOrg, "", "Azure DevOps organization")
+	analyzeCmd.Flags().StringVar(&azureProject, flagAzureProject, "", "Azure DevOps project")
+	analyzeCmd.Flags().StringVar(&testRepo, flagAzureTestRepo, "", "Additional repository for test code (project/repo)")
 
 	// Deprecated aliases for renamed flags (on analyzeCmd)
 	analyzeCmd.Flags().StringVar(&azureOrg, "org", "", "Azure DevOps organization")
 	analyzeCmd.Flags().StringVar(&azureProject, "project", "", "Azure DevOps project")
-	analyzeCmd.Flags().StringVar(&testRepo, "test-repo", "", "Additional repository for test code (project/repo)")
+	analyzeCmd.Flags().StringVar(&testRepo, flagTestRepo, "", "Additional repository for test code (project/repo)")
 	_ = analyzeCmd.Flags().MarkDeprecated("org", "use --azure-org instead")
 	_ = analyzeCmd.Flags().MarkDeprecated("project", "use --azure-project instead")
-	_ = analyzeCmd.Flags().MarkDeprecated("test-repo", "use --azure-test-repo instead")
+	_ = analyzeCmd.Flags().MarkDeprecated(flagTestRepo, "use --azure-test-repo instead")
 
 	// Hidden copies on rootCmd for backward compat (heisenberg owner/repo --from-env etc.)
-	rootCmd.Flags().BoolVar(&fromEnv, "from-env", false, "")
+	rootCmd.Flags().BoolVar(&fromEnv, flagFromEnv, false, "")
 	rootCmd.Flags().StringVarP(&runURL, "run", "r", "", "")
-	rootCmd.Flags().Int64Var(&runID, "run-id", 0, "")
+	rootCmd.Flags().Int64Var(&runID, flagRunID, 0, "")
 	rootCmd.Flags().StringVar(&modelName, "model", "", "")
 	rootCmd.Flags().StringVar(&providerFlag, "provider", "", "")
-	rootCmd.Flags().StringVar(&azureOrg, "azure-org", "", "")
-	rootCmd.Flags().StringVar(&azureProject, "azure-project", "", "")
-	rootCmd.Flags().StringVar(&testRepo, "azure-test-repo", "", "")
+	rootCmd.Flags().StringVar(&azureOrg, flagAzureOrg, "", "")
+	rootCmd.Flags().StringVar(&azureProject, flagAzureProject, "", "")
+	rootCmd.Flags().StringVar(&testRepo, flagAzureTestRepo, "", "")
 	rootCmd.Flags().StringVar(&azureOrg, "org", "", "")
 	rootCmd.Flags().StringVar(&azureProject, "project", "", "")
-	rootCmd.Flags().StringVar(&testRepo, "test-repo", "", "")
+	rootCmd.Flags().StringVar(&testRepo, flagTestRepo, "", "")
 	_ = rootCmd.Flags().MarkDeprecated("org", "use --azure-org instead")
 	_ = rootCmd.Flags().MarkDeprecated("project", "use --azure-project instead")
-	_ = rootCmd.Flags().MarkDeprecated("test-repo", "use --azure-test-repo instead")
-	hideRootFlags("from-env", "run", "run-id", "model", "provider",
-		"azure-org", "azure-project", "azure-test-repo")
+	_ = rootCmd.Flags().MarkDeprecated(flagTestRepo, "use --azure-test-repo instead")
+	hideRootFlags(flagFromEnv, "run", flagRunID, "model", "provider",
+		flagAzureOrg, flagAzureProject, flagAzureTestRepo)
 
 	serveCmd.Flags().IntVarP(&port, "port", "p", 8080, "Port to listen on")
 	rootCmd.AddCommand(analyzeCmd)
@@ -458,8 +469,8 @@ func extractAzureOrg(uri string) string {
 	if err != nil || u.Host == "" {
 		return ""
 	}
-	if strings.HasSuffix(u.Host, ".visualstudio.com") {
-		return strings.TrimSuffix(u.Host, ".visualstudio.com")
+	if strings.HasSuffix(u.Host, visualStudioComSuffix) {
+		return strings.TrimSuffix(u.Host, visualStudioComSuffix)
 	}
 	parts := strings.Split(strings.Trim(u.Path, "/"), "/")
 	if len(parts) > 0 && parts[0] != "" {
@@ -491,7 +502,7 @@ func parseRunURL(rawURL string) (*targetInfo, error) {
 	if strings.Contains(u.Host, "dev.azure.com") {
 		return parseAzureDevURL(u)
 	}
-	if strings.HasSuffix(u.Host, ".visualstudio.com") {
+	if strings.HasSuffix(u.Host, visualStudioComSuffix) {
 		return parseAzureVSURL(u)
 	}
 
@@ -517,7 +528,7 @@ func parseAzureDevURL(u *url.URL) (*targetInfo, error) {
 
 // parseAzureVSURL parses https://{org}.visualstudio.com/{project}/_build/results?buildId=123
 func parseAzureVSURL(u *url.URL) (*targetInfo, error) {
-	org := strings.TrimSuffix(u.Host, ".visualstudio.com")
+	org := strings.TrimSuffix(u.Host, visualStudioComSuffix)
 	parts := strings.Split(strings.Trim(u.Path, "/"), "/")
 	if len(parts) < 1 || parts[0] == "" {
 		return nil, fmt.Errorf("invalid Azure DevOps URL: expected {org}.visualstudio.com/{project}")
@@ -654,7 +665,7 @@ func printRunHeader(w io.Writer, r *llm.AnalysisResult) {
 		meta = append(meta, "Event: "+r.Event)
 	}
 	meta = append(meta, "Status: "+r.Category)
-	_, _ = dim.Fprintf(w, "  %s\n", strings.Join(meta, "   "))
+	_, _ = dim.Fprintf(w, indentedStrFmt, strings.Join(meta, "   "))
 
 	_, _ = dim.Fprintln(w, "  "+strings.Repeat("━", 50))
 }
@@ -806,8 +817,8 @@ func printStructuredRCA(w io.Writer, rca *llm.RootCauseAnalysis) {
 		fmt.Fprintln(w)
 		p := rca.MatchedPatterns[0] // show top match only
 		_, _ = dim.Fprintf(w, "  Known Pattern: %s\n", p.Name)
-		_, _ = dim.Fprintf(w, "  %s\n", p.Description)
-		_, _ = dim.Fprintf(w, "  %s\n", p.Frequency)
+		_, _ = dim.Fprintf(w, indentedStrFmt, p.Description)
+		_, _ = dim.Fprintf(w, indentedStrFmt, p.Frequency)
 	}
 }
 
