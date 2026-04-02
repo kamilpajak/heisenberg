@@ -8,6 +8,7 @@ import (
 	"math"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 	"time"
 
@@ -482,9 +483,15 @@ func TestE2E_PatternSearch(t *testing.T) {
 	analysisID, _ := uuid.Parse(id)
 	waitForEmbeddings(t, db, analysisID, 1)
 
-	// Search for patterns
-	searchURL := fmt.Sprintf("%s/api/organizations/%s/patterns/search?q=timeout+selector&limit=5",
-		ts.URL, orgID)
+	// Search using text matching the stored embedding to guarantee high cosine similarity.
+	// ComputeEmbeddingText produces "failure_type: timeout\nroot_cause: waitForSelector timed out\n"
+	// so we use the same text to get similarity ≈ 1.0 from the mock server.
+	searchQuery := eepatterns.ComputeEmbeddingText(&llm.RootCauseAnalysis{
+		FailureType: llm.FailureTypeTimeout,
+		RootCause:   "waitForSelector timed out",
+	})
+	searchURL := fmt.Sprintf("%s/api/organizations/%s/patterns/search?q=%s&limit=5",
+		ts.URL, orgID, url.QueryEscape(searchQuery))
 	req, _ := http.NewRequest("GET", searchURL, nil)
 	req.Header.Set("Authorization", e2eAuthBearer+apiKey)
 	resp, err := http.DefaultClient.Do(req)
