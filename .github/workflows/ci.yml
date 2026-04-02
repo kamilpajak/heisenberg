@@ -7,6 +7,26 @@ on:
     branches: [main]
 
 jobs:
+  license-boundary:
+    name: License Boundary
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Verify OSS code does not import commercial (ee/) packages
+        run: |
+          VIOLATIONS=$(grep -rn '"github.com/kamilpajak/heisenberg/ee/' \
+            pkg/ cmd/cli/ internal/ 2>/dev/null || true)
+          if [ -n "$VIOLATIONS" ]; then
+            echo "::error::OSS code imports commercial (ee/) packages:"
+            echo "$VIOLATIONS"
+            exit 1
+          fi
+          echo "License boundary check passed"
+
   lint:
     name: Lint
     runs-on: ubuntu-latest
@@ -66,7 +86,7 @@ jobs:
       - name: Run migrations
         env:
           DATABASE_URL: postgres://${{ env.POSTGRES_USER }}:${{ env.POSTGRES_PASSWORD }}@localhost:5432/${{ env.POSTGRES_DB }}?sslmode=disable
-        run: go run ./cmd/server migrate
+        run: go run ./ee/cmd/server migrate
 
       - name: Run tests with coverage
         env:

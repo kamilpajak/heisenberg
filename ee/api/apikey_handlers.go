@@ -6,8 +6,8 @@ import (
 	"net/http"
 
 	"github.com/google/uuid"
-	"github.com/kamilpajak/heisenberg/internal/auth"
-	"github.com/kamilpajak/heisenberg/internal/database"
+	"github.com/kamilpajak/heisenberg/ee/auth"
+	"github.com/kamilpajak/heisenberg/ee/database"
 )
 
 // handleCreateAPIKey generates a new API key for the organization. Requires admin or owner role.

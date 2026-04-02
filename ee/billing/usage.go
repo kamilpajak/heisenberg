@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/kamilpajak/heisenberg/internal/database"
+	"github.com/kamilpajak/heisenberg/ee/database"
 )
 
 // UsageDB defines the database operations needed by UsageChecker.

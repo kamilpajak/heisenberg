@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/kamilpajak/heisenberg/internal/auth"
-	"github.com/kamilpajak/heisenberg/internal/billing"
-	"github.com/kamilpajak/heisenberg/internal/database"
+	"github.com/kamilpajak/heisenberg/ee/auth"
+	"github.com/kamilpajak/heisenberg/ee/billing"
+	"github.com/kamilpajak/heisenberg/ee/database"
 )
 
 // Server is the API server.

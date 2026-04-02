@@ -13,7 +13,7 @@ import (
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
 	"github.com/testcontainers/testcontainers-go/wait"
 
-	"github.com/kamilpajak/heisenberg/internal/database"
+	"github.com/kamilpajak/heisenberg/ee/database"
 )
 
 const (

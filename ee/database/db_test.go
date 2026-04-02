@@ -9,8 +9,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/kamilpajak/heisenberg/internal/database"
-	"github.com/kamilpajak/heisenberg/internal/testutil"
+	"github.com/kamilpajak/heisenberg/ee/database"
+	"github.com/kamilpajak/heisenberg/ee/testutil"
 	"github.com/kamilpajak/heisenberg/pkg/llm"
 )
 

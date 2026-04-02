@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/kamilpajak/heisenberg/internal/database"
+	"github.com/kamilpajak/heisenberg/ee/database"
 	"github.com/stripe/stripe-go/v76"
 )
 

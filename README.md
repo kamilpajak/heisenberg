@@ -316,10 +316,10 @@ This project uses a dual-license model:
 
 | Component | License | What's included |
 |-----------|---------|-----------------|
-| CLI, analysis engine | [Apache 2.0](LICENSE) | `cmd/cli`, `pkg/*` — everything you need to run `heisenberg` locally and in CI |
-| SaaS components | [BSL 1.1](LICENSE_ENTERPRISE) | `internal/auth`, `internal/billing`, `internal/database`, `cmd/server` |
+| CLI, analysis engine | [Apache 2.0](LICENSE) | `cmd/cli/`, `pkg/`, `internal/` — everything you need to run `heisenberg` locally and in CI |
+| SaaS components | [BSL 1.1](ee/LICENSE) | `ee/` — authentication, billing, database, API server, web dashboard |
 
-**The Apache 2.0 CLI will remain fully usable forever.** SaaS features (multi-user collaboration, history, hosted automation) live behind the BSL and cannot be used to operate a competing commercial service. After 4 years, SaaS components convert to Apache 2.0.
+**The Apache 2.0 CLI will remain fully usable forever.** SaaS features (multi-user collaboration, history, hosted automation) live in the `ee/` directory under BSL and cannot be used to operate a competing commercial service. After 4 years, SaaS components convert to Apache 2.0.
 
 For most users, only the Apache 2.0 license applies.
 
