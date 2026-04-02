@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-04-02
+
+### Added
+
+- **Pattern recognition** — identifies known failure patterns in RCA output (12 curated patterns covering Playwright timeouts, assertion mismatches, DB connection issues, dependency conflicts, flaky tests, CI resource exhaustion, and more)
+- `matched_patterns` field in JSON output (`omitempty` — backward compatible)
+- Inline "Known Pattern" display in CLI after remediation section
+- `PatternMatcher` interface for future SaaS tier (pgvector in Phase 2)
+
+### Changed
+
+- Repository restructured: commercial code moved to `ee/` directory (BSL-1.1), OSS code in `cmd/cli/`, `pkg/`, `internal/` (Apache-2.0)
+- License Boundary CI check blocks PRs if OSS code imports from `ee/`
+- Dockerfile.api updated to Go 1.25
+
 ## [0.4.0] - 2026-04-01
 
 ### Added

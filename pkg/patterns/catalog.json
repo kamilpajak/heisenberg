@@ -1,0 +1,98 @@
+[
+  {
+    "name": "playwright-beforeeach-timeout",
+    "description": "Typically caused by selector or DOM changes after a UI update",
+    "failure_type": "timeout",
+    "file_patterns": ["*.ts", "*.js", "*.tsx"],
+    "error_tokens": ["timeout", "beforeeach", "waitforselector", "locator", "selector", "hook"],
+    "frequency": "Common in Playwright test suites"
+  },
+  {
+    "name": "playwright-assertion-text-mismatch",
+    "description": "Expected text changed — often after copy or label updates",
+    "failure_type": "assertion",
+    "file_patterns": ["*.ts", "*.tsx", "*.js"],
+    "error_tokens": ["expect", "tocontain", "tohavetext", "received", "expected", "text", "mismatch"],
+    "frequency": "Common in UI component tests"
+  },
+  {
+    "name": "playwright-navigation-timeout",
+    "description": "Page navigation timed out — often caused by slow CI environments or changed routes",
+    "failure_type": "timeout",
+    "file_patterns": ["*.ts", "*.js"],
+    "error_tokens": ["navigation", "timeout", "goto", "page", "load", "waitforurl"],
+    "frequency": "Common in E2E test suites"
+  },
+  {
+    "name": "database-connection-refused",
+    "description": "Database not available — check CI service containers or connection string",
+    "failure_type": "network",
+    "file_patterns": ["*.go", "*.ts", "*.py", "*.java"],
+    "error_tokens": ["connection", "refused", "database", "postgres", "mysql", "econnrefused", "5432", "3306"],
+    "frequency": "Common in integration tests with database dependencies"
+  },
+  {
+    "name": "auth-token-expired",
+    "description": "Authentication token expired or invalid — check CI secrets and token rotation",
+    "failure_type": "assertion",
+    "file_patterns": ["*.ts", "*.go", "*.py"],
+    "error_tokens": ["unauthorized", "401", "token", "expired", "authentication", "forbidden", "403"],
+    "frequency": "Common in tests using external auth services"
+  },
+  {
+    "name": "dependency-version-mismatch",
+    "description": "Package version conflict — lock file may be out of sync with package manifest",
+    "failure_type": "infra",
+    "file_patterns": [],
+    "error_tokens": ["version", "incompatible", "dependency", "resolve", "conflict", "peer", "mismatch", "module"],
+    "frequency": "Common after dependency updates"
+  },
+  {
+    "name": "flaky-timing-race",
+    "description": "Non-deterministic timing failure — consider adding explicit waits or retry logic",
+    "failure_type": "flake",
+    "file_patterns": ["*.ts", "*.js", "*.go", "*.py"],
+    "error_tokens": ["flaky", "intermittent", "race", "timing", "sometimes", "retry", "eventually"],
+    "frequency": "Common in async and concurrent tests"
+  },
+  {
+    "name": "ci-resource-exhaustion",
+    "description": "CI runner ran out of resources — memory, disk, or process limits exceeded",
+    "failure_type": "infra",
+    "file_patterns": [],
+    "error_tokens": ["killed", "oom", "memory", "disk", "space", "resource", "exceeded", "limit", "enomem"],
+    "frequency": "Common in large test suites or resource-heavy builds"
+  },
+  {
+    "name": "network-dns-timeout",
+    "description": "DNS resolution failed — common in CI environments with restricted networking",
+    "failure_type": "network",
+    "file_patterns": [],
+    "error_tokens": ["dns", "resolution", "timeout", "enotfound", "getaddrinfo", "lookup", "unreachable"],
+    "frequency": "Common in CI environments with network restrictions"
+  },
+  {
+    "name": "screenshot-visual-regression",
+    "description": "Visual snapshot comparison failed — review updated screenshots for intentional changes",
+    "failure_type": "assertion",
+    "file_patterns": ["*.ts", "*.js"],
+    "error_tokens": ["screenshot", "snapshot", "visual", "pixel", "diff", "mismatch", "toMatchSnapshot", "comparison"],
+    "frequency": "Common in visual regression test suites"
+  },
+  {
+    "name": "api-rate-limit",
+    "description": "External API rate limit hit — add retry with backoff or mock the API in tests",
+    "failure_type": "network",
+    "file_patterns": ["*.ts", "*.go", "*.py"],
+    "error_tokens": ["rate", "limit", "429", "throttle", "exceeded", "quota", "retry"],
+    "frequency": "Common in tests calling external APIs"
+  },
+  {
+    "name": "go-test-race-detector",
+    "description": "Go race detector found concurrent access — fix synchronization in the flagged code",
+    "failure_type": "flake",
+    "file_patterns": ["*.go"],
+    "error_tokens": ["race", "data", "goroutine", "previous", "write", "read", "concurrent"],
+    "frequency": "Common in Go projects using -race flag"
+  }
+]
