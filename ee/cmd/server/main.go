@@ -25,7 +25,7 @@ func main() {
 	)
 	flag.Parse()
 
-	// Handle subcommand style: `go run ./cmd/server migrate`
+	// Handle subcommand style: `go run ./ee/cmd/server migrate`
 	if len(flag.Args()) > 0 && flag.Args()[0] == "migrate" {
 		*migrateOnly = true
 	}
