@@ -14,6 +14,9 @@ import (
 	"time"
 
 	"github.com/kamilpajak/heisenberg/pkg/analysis"
+	"github.com/kamilpajak/heisenberg/pkg/azure"
+	"github.com/kamilpajak/heisenberg/pkg/ci"
+	"github.com/kamilpajak/heisenberg/pkg/github"
 	"github.com/kamilpajak/heisenberg/pkg/llm"
 	"github.com/kamilpajak/heisenberg/pkg/trace"
 	"github.com/stretchr/testify/assert"
@@ -29,6 +32,9 @@ const (
 type groundTruth struct {
 	Repo                  string             `json:"repo"`
 	RunID                 int64              `json:"run_id"`
+	Provider              string             `json:"provider,omitempty"`      // "github" (default) or "azure"
+	AzureOrg              string             `json:"azure_org,omitempty"`     // Azure DevOps organization
+	AzureProject          string             `json:"azure_project,omitempty"` // Azure DevOps project
 	ExpectedCategory      string             `json:"expected_category"`
 	MinConfidence         int                `json:"min_confidence"`
 	ExpectedAnalysesCount int                `json:"expected_analyses_count"` // 0 = any count
@@ -60,14 +66,33 @@ type evalEntry struct {
 	RCAs       []llm.RootCauseAnalysis `json:"rca_details"`
 }
 
+// buildEvalProvider creates the appropriate CI provider from ground truth config.
+func buildEvalProvider(t *testing.T, gt groundTruth) ci.Provider {
+	t.Helper()
+	switch gt.Provider {
+	case "azure":
+		pat := os.Getenv("AZURE_DEVOPS_PAT")
+		if pat == "" {
+			t.Skip("AZURE_DEVOPS_PAT not set")
+		}
+		return azure.NewClient(gt.AzureOrg, gt.AzureProject, pat)
+	default: // "github" or empty
+		token := os.Getenv("GITHUB_TOKEN")
+		if token == "" {
+			t.Skip("GITHUB_TOKEN not set")
+		}
+		parts := strings.SplitN(gt.Repo, "/", 2)
+		require.Len(t, parts, 2, "repo must be owner/name")
+		return github.NewClient(parts[0], parts[1], token)
+	}
+}
+
 func requireEnv(t *testing.T) {
 	t.Helper()
-	if os.Getenv("GITHUB_TOKEN") == "" {
-		t.Skip("GITHUB_TOKEN not set")
-	}
 	if os.Getenv("GOOGLE_API_KEY") == "" {
 		t.Skip("GOOGLE_API_KEY not set")
 	}
+	// Provider-specific tokens are checked per-case in buildEvalProvider.
 }
 
 func loadGroundTruth(t *testing.T) []groundTruth {
@@ -134,10 +159,14 @@ func TestEval_Suite(t *testing.T) {
 
 	for _, gt := range cases {
 		gt := gt
-		parts := strings.SplitN(gt.Repo, "/", 2)
-		require.Len(t, parts, 2)
+		name := fmt.Sprintf("%s/%d", gt.Repo, gt.RunID)
 
-		t.Run(gt.Repo, func(t *testing.T) {
+		t.Run(name, func(t *testing.T) {
+			provider := buildEvalProvider(t, gt)
+
+			parts := strings.SplitN(gt.Repo, "/", 2)
+			require.Len(t, parts, 2)
+
 			emitter := llm.NewTextEmitter(os.Stderr, false)
 			result, err := analysis.Run(context.Background(), analysis.Params{
 				Owner:        parts[0],
@@ -147,6 +176,7 @@ func TestEval_Suite(t *testing.T) {
 				Emitter:      emitter,
 				SnapshotHTML: trace.SnapshotHTML,
 				Model:        model,
+				CI:           provider,
 			})
 			emitter.Close()
 			require.NoError(t, err)
