@@ -42,6 +42,9 @@ e2e-integration.log
 *.cast
 testdata/e2e/eval.jsonl
 
+# Private/corporate ground truth (not for public repo)
+testdata/e2e/ground-truth/azure_*
+
 # Web frontend (SvelteKit)
 web/node_modules/
 web/.svelte-kit/
