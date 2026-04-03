@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"sort"
 	"strconv"
 
 	"github.com/google/uuid"
@@ -278,25 +279,35 @@ func (s *Server) handleSimilarAnalyses(w http.ResponseWriter, r *http.Request) {
 func (s *Server) collectSimilar(ctx context.Context, orgID, excludeID uuid.UUID,
 	embeddings []database.RCAEmbedding, limit int, threshold float64) []database.SimilarRCA {
 
-	seen := make(map[uuid.UUID]struct{})
-	all := make([]database.SimilarRCA, 0)
+	var all []database.SimilarRCA
 	for _, emb := range embeddings {
 		similar, err := s.db.FindSimilarRCAs(ctx, orgID, emb.Embedding, excludeID, limit, threshold)
 		if err != nil {
 			log.Printf("FindSimilarRCAs failed for embedding %s: %v", emb.ID, err)
 			continue
 		}
-		for _, sr := range similar {
-			if _, exists := seen[sr.ID]; !exists {
-				seen[sr.ID] = struct{}{}
-				all = append(all, sr)
-			}
+		all = append(all, similar...)
+	}
+	return mergeSimilarResults(all, limit)
+}
+
+// mergeSimilarResults deduplicates by ID, sorts by similarity descending, and caps at limit.
+func mergeSimilarResults(results []database.SimilarRCA, limit int) []database.SimilarRCA {
+	seen := make(map[uuid.UUID]struct{})
+	deduped := make([]database.SimilarRCA, 0, len(results))
+	for _, r := range results {
+		if _, exists := seen[r.ID]; !exists {
+			seen[r.ID] = struct{}{}
+			deduped = append(deduped, r)
 		}
 	}
-	if len(all) > limit {
-		all = all[:limit]
+	sort.Slice(deduped, func(i, j int) bool {
+		return deduped[i].Similarity > deduped[j].Similarity
+	})
+	if len(deduped) > limit {
+		deduped = deduped[:limit]
 	}
-	return all
+	return deduped
 }
 
 // handlePatternSearch searches historical patterns by free-text query.
