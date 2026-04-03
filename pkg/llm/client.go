@@ -244,6 +244,20 @@ Confidence scoring (0-100):
   - 40-79: Likely cause identified but some ambiguity remains
   - 0-39: Uncertain, multiple possible causes or insufficient evidence
 
+  IMPORTANT: Before finalizing your diagnosis, consider whether the root cause
+  could be EXTERNAL to this repository:
+  - External service outage or configuration change
+  - Environment/infrastructure issue not visible in logs
+  - Upstream API contract change managed by a different team
+
+  If many failed tests share the same error pattern (e.g., same HTTP status code,
+  same TypeError), this strongly suggests a systemic issue rather than a code
+  regression. In that case, prefer bug_location="infrastructure" and lower your
+  confidence unless you have direct evidence linking the PR diff to the error.
+
+  Do NOT assume the PR diff caused the failure just because code changed and
+  tests failed at the same time. Correlation is not causation.
+
 Missing information sensitivity:
   - high: Backend logs, Docker state, or CI environment data would likely reveal the root cause
   - medium: Additional data might help but current evidence is reasonable

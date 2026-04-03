@@ -112,18 +112,20 @@ const SchemaV1 = "1"
 
 // AnalysisResult holds the final output from the agent loop.
 type AnalysisResult struct {
-	Text        string              `json:"text"`
-	Category    string              `json:"category"`             // "diagnosis", "no_failures", "not_supported", or "" (model skipped done)
-	Confidence  int                 `json:"confidence"`           // 0-100, meaningful only for "diagnosis"
-	Sensitivity string              `json:"sensitivity"`          // "high", "medium", "low", meaningful only for "diagnosis"
-	RCAs        []RootCauseAnalysis `json:"analyses,omitempty"`   // Structured diagnoses, one per failing test
-	RunID       int64               `json:"run_id,omitempty"`     // GitHub workflow run ID
-	Owner       string              `json:"owner,omitempty"`      // Repository owner
-	Repo        string              `json:"repo,omitempty"`       // Repository name
-	Branch      string              `json:"branch,omitempty"`     // Git branch name
-	CommitSHA   string              `json:"commit_sha,omitempty"` // Git commit SHA
-	Event       string              `json:"event,omitempty"`      // GitHub event type (push, pull_request)
-	Eval        *EvalMeta           `json:"eval,omitempty"`       // Performance metadata for eval
+	Text               string              `json:"text"`
+	Category           string              `json:"category"`                      // "diagnosis", "no_failures", "not_supported", or "" (model skipped done)
+	Confidence         int                 `json:"confidence"`                    // 0-100, meaningful only for "diagnosis"
+	Sensitivity        string              `json:"sensitivity"`                   // "high", "medium", "low", meaningful only for "diagnosis"
+	RCAs               []RootCauseAnalysis `json:"analyses,omitempty"`            // Structured diagnoses, one per failing test
+	RunID              int64               `json:"run_id,omitempty"`              // GitHub workflow run ID
+	Owner              string              `json:"owner,omitempty"`               // Repository owner
+	Repo               string              `json:"repo,omitempty"`                // Repository name
+	Branch             string              `json:"branch,omitempty"`              // Git branch name
+	CommitSHA          string              `json:"commit_sha,omitempty"`          // Git commit SHA
+	Event              string              `json:"event,omitempty"`               // GitHub event type (push, pull_request)
+	Eval               *EvalMeta           `json:"eval,omitempty"`                // Performance metadata for eval
+	OriginalConfidence int                 `json:"original_confidence,omitempty"` // Pre-calibration confidence (0 = not adjusted)
+	CalibrationReason  string              `json:"calibration_reason,omitempty"`  // Why confidence was capped
 }
 
 // EvalMeta captures performance metrics from the agent loop for evaluation.
