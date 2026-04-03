@@ -268,6 +268,22 @@ func TestIsRetryable(t *testing.T) {
 	}
 }
 
+func TestSystemPrompt_ContainsExternalCauseGuidance(t *testing.T) {
+	prompt := systemPrompt("")
+	text := prompt.Parts[0].Text
+
+	assert.Contains(t, text, "EXTERNAL", "should mention external root causes")
+	assert.Contains(t, text, "Correlation is not causation", "should warn about false correlations")
+	assert.Contains(t, text, "infrastructure", "should mention infrastructure as alternative")
+}
+
+func TestSystemPrompt_IncludesProviderHints(t *testing.T) {
+	prompt := systemPrompt("Use get_test_results for Azure")
+	text := prompt.Parts[0].Text
+
+	assert.Contains(t, text, "Use get_test_results for Azure")
+}
+
 // gemini429Body is a real Gemini API 429 response captured from production.
 const gemini429Body = `{"error":{"code":429,"message":"You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit.\n\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_requests_per_model_per_day, limit: 250, model: gemini-3.1-pro\n\nPlease retry in 4h59m27.724879759s.","status":"RESOURCE_EXHAUSTED"}}`
 

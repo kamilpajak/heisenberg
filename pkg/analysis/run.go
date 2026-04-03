@@ -98,6 +98,7 @@ func Run(ctx context.Context, p Params) (*llm.AnalysisResult, error) {
 	}
 
 	stampRunMeta(result, p, ciRun)
+	calibrateResult(ctx, result, p.CI, jobs, ciRun)
 	matchPatterns(ctx, p.PatternMatcher, result)
 	return result, err
 }
@@ -177,7 +178,7 @@ func runClustered(ctx context.Context, p Params,
 		emitInfo(p.Emitter, fmt.Sprintf("[Cluster %d/%d] Analyzing %d jobs (%s)...",
 			i+1, len(cr.Clusters), len(c.Failures), truncate(c.Signature.RawExcerpt, 60)))
 
-		clusterCtx := buildClusterContext(ciRun, c, i+1, len(cr.Clusters), allJobs, artifacts)
+		clusterCtx := buildClusterContext(ciRun, c, i+1, len(cr.Clusters), cr.TotalFailed, allJobs, artifacts)
 
 		handler := &ToolHandler{
 			CI:           p.CI,
@@ -202,7 +203,7 @@ func runClustered(ctx context.Context, p Params,
 		emitInfo(p.Emitter, fmt.Sprintf("[Other] Analyzing %d unclustered jobs...", len(cr.Unclustered)))
 
 		uc := buildUnclusteredCluster(cr.Unclustered, len(cr.Clusters)+1)
-		clusterCtx := buildClusterContext(ciRun, uc, uc.ID, len(cr.Clusters)+1, allJobs, artifacts)
+		clusterCtx := buildClusterContext(ciRun, uc, uc.ID, len(cr.Clusters)+1, cr.TotalFailed, allJobs, artifacts)
 		ucHandler := &ToolHandler{
 			CI:    p.CI,
 			RunID: p.RunID, PRNumber: prNumber, HeadSHA: ciRun.CommitSHA,
@@ -283,7 +284,7 @@ func filterFailed(jobs []ci.Job) []ci.Job {
 
 // buildClusterContext creates a focused initial context for one cluster.
 func buildClusterContext(run *ci.Run, c cluster.Cluster,
-	clusterNum, totalClusters int, allJobs []ci.Job, artifacts []ci.Artifact) string {
+	clusterNum, totalClusters, totalFailed int, allJobs []ci.Job, artifacts []ci.Artifact) string {
 
 	var b strings.Builder
 
@@ -299,6 +300,15 @@ func buildClusterContext(run *ci.Run, c cluster.Cluster,
 	b.WriteString("\nYou are analyzing a specific cluster of related failures. ")
 	b.WriteString("Do not assume these are the only failures in this run. ")
 	b.WriteString("Focus on the root cause shared by this cluster.\n")
+
+	if totalFailed > 0 {
+		blastPct := float64(len(c.Failures)) / float64(totalFailed) * 100
+		if blastPct > 25 {
+			fmt.Fprintf(&b, "\nSYSTEM NOTE: %.0f%% of all failed jobs (%d of %d) share this "+
+				"exact error pattern. This strongly indicates a systemic infrastructure or "+
+				"environment issue rather than a localized code regression.\n", blastPct, len(c.Failures), totalFailed)
+		}
+	}
 
 	b.WriteString("\n### Affected Jobs\n")
 	for _, f := range c.Failures {

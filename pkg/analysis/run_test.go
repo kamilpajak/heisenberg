@@ -203,7 +203,7 @@ func TestBuildClusterContext(t *testing.T) {
 	}
 	artifacts := []ci.Artifact{{Name: htmlReportName, SizeBytes: 5000}}
 
-	ctx := buildClusterContext(run, c, 1, 3, nil, artifacts)
+	ctx := buildClusterContext(run, c, 1, 3, 0, nil, artifacts)
 
 	assert.Contains(t, ctx, "Run ID: 12345")
 	assert.Contains(t, ctx, "Cluster 1 of 3")
@@ -217,6 +217,35 @@ func TestBuildClusterContext(t *testing.T) {
 	assert.Contains(t, ctx, "shared root cause")
 }
 
+func TestBuildClusterContext_BlastRadiusWarning(t *testing.T) {
+	run := &ci.Run{ID: 1, Conclusion: "failure"}
+	c := cluster.Cluster{
+		Failures: []cluster.FailureInfo{
+			{JobID: 1, JobName: "Test 1"},
+			{JobID: 2, JobName: "Test 2"},
+			{JobID: 3, JobName: "Test 3"},
+		},
+		Representative: cluster.FailureInfo{JobName: "Test 1", LogTail: "error"},
+	}
+
+	// 3 of 4 total failed jobs (75%) in this cluster → blast radius warning
+	ctx := buildClusterContext(run, c, 1, 1, 4, nil, nil)
+	assert.Contains(t, ctx, "SYSTEM NOTE")
+	assert.Contains(t, ctx, "75%")
+}
+
+func TestBuildClusterContext_NoBlastRadiusWarning(t *testing.T) {
+	run := &ci.Run{ID: 1, Conclusion: "failure"}
+	c := cluster.Cluster{
+		Failures:       []cluster.FailureInfo{{JobID: 1, JobName: "Test"}},
+		Representative: cluster.FailureInfo{JobName: "Test", LogTail: "error"},
+	}
+
+	// 1 of 10 total failed jobs (10%) — no warning
+	ctx := buildClusterContext(run, c, 1, 5, 10, nil, nil)
+	assert.NotContains(t, ctx, "SYSTEM NOTE")
+}
+
 func TestBuildClusterContext_NoArtifacts(t *testing.T) {
 	run := &ci.Run{ID: 1, Conclusion: "failure"}
 	c := cluster.Cluster{
@@ -224,7 +253,7 @@ func TestBuildClusterContext_NoArtifacts(t *testing.T) {
 		Representative: cluster.FailureInfo{JobName: "Test", LogTail: "error"},
 	}
 
-	ctx := buildClusterContext(run, c, 1, 1, nil, nil)
+	ctx := buildClusterContext(run, c, 1, 1, 0, nil, nil)
 
 	assert.Contains(t, ctx, "Cluster 1 of 1")
 	assert.NotContains(t, ctx, testReportLabel)
@@ -303,7 +332,7 @@ func TestBuildClusterContext_ExpiredArtifactsSkipped(t *testing.T) {
 		{Name: "blob-report", SizeBytes: 3000, Expired: false},
 	}
 
-	ctx := buildClusterContext(run, c, 1, 1, nil, artifacts)
+	ctx := buildClusterContext(run, c, 1, 1, 0, nil, artifacts)
 
 	assert.NotContains(t, ctx, htmlReportName, "expired artifacts should be skipped")
 	assert.Contains(t, ctx, "blob-report")
