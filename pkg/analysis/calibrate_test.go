@@ -9,6 +9,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+const testPricingFile = "src/pricing.ts"
+
 func TestApplyConfidenceCaps_ProductionBugNoDiffIntersection(t *testing.T) {
 	result := &llm.AnalysisResult{Confidence: 95, Category: llm.CategoryDiagnosis}
 	signals := CalibrationSignals{
@@ -131,7 +133,7 @@ func TestComputeSignals_BlastRadius(t *testing.T) {
 func TestComputeSignals_DiffIntersection(t *testing.T) {
 	diff := &mockDiffProvider{
 		files: []ci.ChangedFile{
-			{Path: "src/pricing.ts"},
+			{Path: testPricingFile},
 			{Path: "tests/pricing.test.ts"},
 		},
 	}
@@ -139,7 +141,7 @@ func TestComputeSignals_DiffIntersection(t *testing.T) {
 		RCAs: []llm.RootCauseAnalysis{
 			{
 				BugLocation:     llm.BugLocationProduction,
-				BugCodeLocation: &llm.CodeLocation{FilePath: "src/pricing.ts"},
+				BugCodeLocation: &llm.CodeLocation{FilePath: testPricingFile},
 			},
 		},
 	}
@@ -159,7 +161,7 @@ func TestComputeSignals_NoDiffIntersection(t *testing.T) {
 		RCAs: []llm.RootCauseAnalysis{
 			{
 				BugLocation:     llm.BugLocationProduction,
-				BugCodeLocation: &llm.CodeLocation{FilePath: "src/pricing.ts"},
+				BugCodeLocation: &llm.CodeLocation{FilePath: testPricingFile},
 			},
 		},
 	}

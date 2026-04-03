@@ -64,63 +64,62 @@ const (
 	capAmbiguous = 49 // low end of "likely" tier
 )
 
+// capRule holds a confidence ceiling and the reason for applying it.
+type capRule struct {
+	ceiling int
+	reason  string
+}
+
 // applyConfidenceCaps enforces hard confidence ceilings when the LLM's
 // structured output contradicts deterministic pipeline signals.
 func applyConfidenceCaps(result *llm.AnalysisResult, s CalibrationSignals) {
-	cap := 100
-	reason := ""
+	rules := evaluateRules(s)
+
+	best := capRule{ceiling: 100}
+	for _, r := range rules {
+		if r.ceiling < best.ceiling {
+			best = r
+		}
+	}
+
+	if result.Confidence > best.ceiling {
+		result.OriginalConfidence = result.Confidence
+		result.CalibrationReason = best.reason
+		result.Confidence = best.ceiling
+	}
+}
+
+// evaluateRules returns all cap rules that fire for the given signals.
+func evaluateRules(s CalibrationSignals) []capRule {
+	var rules []capRule
 
 	// Rule 1: Claims production bug but diff doesn't touch the blamed files.
-	// The LLM is correlating symptoms with unrelated code changes.
 	if s.BugLocationIsCode && !s.DiffIntersection {
-		if capUncertain < cap {
-			cap = capUncertain
-			reason = "production_bug_no_diff_intersection"
-		}
+		rules = append(rules, capRule{capUncertain, "production_bug_no_diff_intersection"})
 	}
 
-	// Rule 2: >50% of jobs failed with same pattern — almost certainly systemic,
-	// not a localized code regression.
+	// Rule 2: >50% of jobs failed — almost certainly systemic, not localized.
 	if s.BlastRadius > 0.5 && s.BugLocationIsCode {
-		if capUncertain < cap {
-			cap = capUncertain
-			reason = "high_blast_radius_code_blame"
-		}
+		rules = append(rules, capRule{capUncertain, "high_blast_radius_code_blame"})
 	}
 
-	// Rule 3: All RCAs are network errors blamed on code — strong infrastructure signal.
+	// Rule 3: All RCAs are network errors blamed on code.
 	if s.HasNetworkErrors && s.AllSameErrorType && s.BugLocationIsCode {
-		if capAmbiguous < cap {
-			cap = capAmbiguous
-			reason = "uniform_network_errors_code_blame"
-		}
+		rules = append(rules, capRule{capAmbiguous, "uniform_network_errors_code_blame"})
 	}
 
-	// Rule 5: LLM classified as code bug but its own evidence mentions HTTP/network
-	// errors — it's confusing a proximal UI crash with an underlying API failure.
-	// Exception: if the PR diff touches error handling / API code, the HTTP error
-	// may be a legitimate code bug (the PR broke the error handler).
+	// Rule 5: Evidence mentions HTTP/API errors but classified as code bug.
+	// Exception: skipped when PR diff touches error handling code.
 	if s.BugLocationIsCode && s.HasHiddenInfraEvidence && !s.HasNetworkErrors && !s.DiffTouchesErrorPaths {
-		if capAmbiguous < cap {
-			cap = capAmbiguous
-			reason = "evidence_contradicts_classification"
-		}
+		rules = append(rules, capRule{capAmbiguous, "evidence_contradicts_classification"})
 	}
 
-	// Rule 4: LLM itself is uncertain about bug location — can't be 80+ confident
-	// about the diagnosis if you don't know where the bug lives.
+	// Rule 4: LLM itself uncertain about bug location.
 	if s.BugLocConfLow {
-		if capAmbiguous < cap {
-			cap = capAmbiguous
-			reason = "low_bug_location_confidence"
-		}
+		rules = append(rules, capRule{capAmbiguous, "low_bug_location_confidence"})
 	}
 
-	if result.Confidence > cap {
-		result.OriginalConfidence = result.Confidence
-		result.CalibrationReason = reason
-		result.Confidence = cap
-	}
+	return rules
 }
 
 // computeSignals extracts deterministic calibration signals from the analysis
@@ -132,20 +131,42 @@ func computeSignals(ctx context.Context, result *llm.AnalysisResult,
 		DiffIntersection: true, // assume intersection unless proven otherwise
 	}
 
-	// Blast radius: fraction of jobs that failed
-	if len(jobs) > 0 {
-		failed := 0
-		for _, j := range jobs {
-			if j.Conclusion == ci.ConclusionFailure {
-				failed++
-			}
-		}
-		s.BlastRadius = float64(failed) / float64(len(jobs))
+	s.BlastRadius = computeBlastRadius(jobs)
+	extractRCASignals(&s, result.RCAs)
+
+	if s.BugLocationIsCode && !s.HasNetworkErrors {
+		s.HasHiddenInfraEvidence = anyRCAContainsInfraEvidence(result.RCAs)
 	}
 
-	// RCA-level signals
-	failureTypes := map[string]struct{}{}
-	for _, rca := range result.RCAs {
+	if diff != nil && run != nil && s.BugLocationIsCode {
+		files, err := diff.GetChangedFiles(ctx, ci.ChangeRef{HeadSHA: run.CommitSHA})
+		if err == nil && len(files) > 0 {
+			s.DiffIntersection = checkDiffIntersectionFromFiles(result, files)
+			s.DiffTouchesErrorPaths = checkErrorPaths(files)
+		}
+	}
+
+	return s
+}
+
+// computeBlastRadius returns the fraction of jobs that failed.
+func computeBlastRadius(jobs []ci.Job) float64 {
+	if len(jobs) == 0 {
+		return 0
+	}
+	failed := 0
+	for _, j := range jobs {
+		if j.Conclusion == ci.ConclusionFailure {
+			failed++
+		}
+	}
+	return float64(failed) / float64(len(jobs))
+}
+
+// extractRCASignals populates RCA-level flags from the analyses array.
+func extractRCASignals(s *CalibrationSignals, rcas []llm.RootCauseAnalysis) {
+	failureTypes := make(map[string]struct{}, len(rcas))
+	for _, rca := range rcas {
 		if rca.BugLocation == llm.BugLocationProduction {
 			s.BugLocationIsCode = true
 		}
@@ -159,29 +180,18 @@ func computeSignals(ctx context.Context, result *llm.AnalysisResult,
 			s.HasNetworkErrors = true
 		}
 	}
-	s.AllSameErrorType = len(failureTypes) == 1 && len(result.RCAs) > 0
+	s.AllSameErrorType = len(failureTypes) == 1 && len(rcas) > 0
+}
 
-	// Hidden infra evidence: LLM's own text mentions HTTP/network errors
-	// but failure_type is not "network" — cognitive dissonance.
-	if s.BugLocationIsCode && !s.HasNetworkErrors {
-		for _, rca := range result.RCAs {
-			if containsInfraEvidence(rca) {
-				s.HasHiddenInfraEvidence = true
-				break
-			}
+// anyRCAContainsInfraEvidence checks if any RCA's text mentions infrastructure
+// signals (HTTP errors, connection failures) that the LLM didn't classify.
+func anyRCAContainsInfraEvidence(rcas []llm.RootCauseAnalysis) bool {
+	for _, rca := range rcas {
+		if containsInfraEvidence(rca) {
+			return true
 		}
 	}
-
-	// Diff-fault intersection and error path detection
-	if diff != nil && run != nil && s.BugLocationIsCode {
-		files, err := diff.GetChangedFiles(ctx, ci.ChangeRef{HeadSHA: run.CommitSHA})
-		if err == nil && len(files) > 0 {
-			s.DiffIntersection = checkDiffIntersectionFromFiles(result, files)
-			s.DiffTouchesErrorPaths = checkErrorPaths(files)
-		}
-	}
-
-	return s
+	return false
 }
 
 // errorPathRe matches file paths likely related to error handling or API client code.
