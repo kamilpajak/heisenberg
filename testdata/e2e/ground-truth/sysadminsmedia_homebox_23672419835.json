@@ -1,13 +1,26 @@
 {
+  "case_id": "gh-homebox-go-generate",
   "repo": "sysadminsmedia/homebox",
   "run_id": 23672419835,
-  "expected_category": "diagnosis",
-  "min_confidence": 70,
-  "expected_analyses_count": 0,
-  "expected_analyses": [
-    {
-      "failure_type": "infra"
-    }
-  ],
-  "notes": "6 failing jobs all share one root cause: go generate not run after schema change. Model should group into 1 RCA. expected_analyses_count=0 means any count is acceptable."
+  "tags": ["github", "go", "infra"],
+  "ground_truth": {
+    "actual_cause": "go generate not run after schema change — generated code out of sync",
+    "observable_by_tool": true
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 70,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "infra"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-03-29",
+    "original_model": "gemini-2.5-pro",
+    "notes": "6 failing jobs all share one root cause. Model should group into 1 RCA."
+  }
 }
