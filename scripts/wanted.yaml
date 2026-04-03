@@ -1,0 +1,52 @@
+# Coverage matrix for ground truth mining.
+# Each bucket defines a target count for a specific combination.
+# The script stops adding candidates to a bucket when target is reached.
+
+buckets:
+  # TypeScript — primary focus (Playwright, Jest)
+  - language: typescript
+    failure_type: assertion
+    bug_location: production
+    target: 5
+  - language: typescript
+    failure_type: assertion
+    bug_location: test
+    target: 3
+  - language: typescript
+    failure_type: timeout
+    target: 3
+
+  # Python — pytest, Django, FastAPI
+  - language: python
+    failure_type: assertion
+    bug_location: production
+    target: 5
+  - language: python
+    failure_type: timeout
+    target: 3
+
+  # Go — go test
+  - language: go
+    failure_type: assertion
+    target: 3
+  - language: go
+    failure_type: infra
+    target: 3
+
+  # Java — JUnit, Gradle
+  - language: java
+    failure_type: assertion
+    target: 3
+
+  # Infrastructure across languages
+  - language: "*"
+    failure_type: infra
+    target: 5
+  - language: "*"
+    failure_type: network
+    target: 3
+
+  # Catch-all for unexpected categories
+  - language: "*"
+    failure_type: "*"
+    target: 5
