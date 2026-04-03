@@ -92,6 +92,42 @@ func withAuthContext(r *http.Request, userID, email string) *http.Request {
 	return r.WithContext(ctx)
 }
 
+func TestMergeSimilarResults_SortsBySimiliarity(t *testing.T) {
+	id1, id2, id3 := uuid.New(), uuid.New(), uuid.New()
+	results := []database.SimilarRCA{
+		{ID: id1, Similarity: 0.6},
+		{ID: id2, Similarity: 0.9},
+		{ID: id3, Similarity: 0.75},
+	}
+
+	merged := mergeSimilarResults(results, 2)
+
+	require.Len(t, merged, 2)
+	assert.Equal(t, id2, merged[0].ID, "highest similarity first")
+	assert.Equal(t, id3, merged[1].ID, "second highest next")
+}
+
+func TestMergeSimilarResults_Deduplicates(t *testing.T) {
+	id := uuid.New()
+	results := []database.SimilarRCA{
+		{ID: id, Similarity: 0.8},
+		{ID: id, Similarity: 0.9}, // duplicate
+	}
+
+	merged := mergeSimilarResults(results, 10)
+	assert.Len(t, merged, 1, "duplicates should be removed")
+}
+
+func TestMergeSimilarResults_NoTruncation(t *testing.T) {
+	results := []database.SimilarRCA{
+		{ID: uuid.New(), Similarity: 0.8},
+		{ID: uuid.New(), Similarity: 0.6},
+	}
+
+	merged := mergeSimilarResults(results, 10)
+	assert.Len(t, merged, 2, "should not truncate when under limit")
+}
+
 func TestHealthEndpoint(t *testing.T) {
 	db := testDB(t)
 	server := testServer(t, db)
