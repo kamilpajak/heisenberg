@@ -28,24 +28,47 @@ const (
 	valueFmt = "  %-20s"
 )
 
-// groundTruth defines expected results for a test case.
+// groundTruth defines expected results for an eval test case.
+// Separates "what actually happened" (GroundTruth) from "what the tool
+// should produce" (ExpectedOutput).
 type groundTruth struct {
-	Repo                  string             `json:"repo"`
-	RunID                 int64              `json:"run_id"`
-	Provider              string             `json:"provider,omitempty"`      // "github" (default) or "azure"
-	AzureOrg              string             `json:"azure_org,omitempty"`     // Azure DevOps organization
-	AzureProject          string             `json:"azure_project,omitempty"` // Azure DevOps project
-	ExpectedCategory      string             `json:"expected_category"`
-	MinConfidence         int                `json:"min_confidence"`
-	ExpectedAnalysesCount int                `json:"expected_analyses_count"` // 0 = any count
-	ExpectedAnalyses      []expectedAnalysis `json:"expected_analyses"`
-	Notes                 string             `json:"notes"`
+	CaseID       string         `json:"case_id"`
+	Repo         string         `json:"repo"`
+	RunID        int64          `json:"run_id"`
+	Provider     string         `json:"provider,omitempty"`
+	AzureOrg     string         `json:"azure_org,omitempty"`
+	AzureProject string         `json:"azure_project,omitempty"`
+	Tags         []string       `json:"tags,omitempty"`
+	Truth        truthInfo      `json:"ground_truth"`
+	Expected     expectedOutput `json:"expected_output"`
+	Metadata     evalMetadata   `json:"metadata,omitempty"`
+}
+
+type truthInfo struct {
+	ActualCause      string `json:"actual_cause"`
+	ObservableByTool bool   `json:"observable_by_tool"`
+	IssueURL         string `json:"issue_url,omitempty"`
+}
+
+type expectedOutput struct {
+	Category          string             `json:"category"`
+	ConfidenceMin     int                `json:"confidence_min"`
+	ConfidenceMax     int                `json:"confidence_max"` // 0 = no upper bound
+	Analyses          []expectedAnalysis `json:"analyses"`
+	AnalysesCount     int                `json:"analyses_count,omitempty"` // 0 = any count
+	AllowPartialMatch bool               `json:"allow_partial_match"`
 }
 
 type expectedAnalysis struct {
 	FilePathContains string `json:"file_path_contains"`
 	FailureType      string `json:"failure_type"`
 	BugLocation      string `json:"bug_location"`
+}
+
+type evalMetadata struct {
+	ValidatedDate string `json:"validated_date,omitempty"`
+	OriginalModel string `json:"original_model,omitempty"`
+	Notes         string `json:"notes,omitempty"`
 }
 
 // evalEntry is one line in eval.jsonl.
@@ -87,6 +110,52 @@ func buildEvalProvider(t *testing.T, gt groundTruth) ci.Provider {
 	}
 }
 
+func TestConfidenceInRange(t *testing.T) {
+	tests := []struct {
+		name       string
+		confidence int
+		min, max   int
+		want       bool
+	}{
+		{"within range", 85, 80, 100, true},
+		{"below min", 30, 80, 100, false},
+		{"above max", 95, 0, 49, false},
+		{"exact min", 80, 80, 100, true},
+		{"exact max", 100, 80, 100, true},
+		{"no upper bound (max=0)", 95, 80, 0, true},
+		{"no upper bound, below min", 30, 80, 0, false},
+		{"full range (0-100)", 50, 0, 100, true},
+		{"zero confidence in low range", 0, 0, 49, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := confidenceInRange(tt.confidence, tt.min, tt.max)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestScoreResult_PartialMatch(t *testing.T) {
+	gt := groundTruth{
+		Expected: expectedOutput{
+			Analyses: []expectedAnalysis{
+				{FailureType: "network"},
+			},
+			AllowPartialMatch: true,
+		},
+	}
+	result := &llm.AnalysisResult{
+		RCAs: []llm.RootCauseAnalysis{
+			{FailureType: "network"},
+			{FailureType: "timeout"}, // extra RCA — allowed with partial match
+		},
+	}
+
+	matched, expected := scoreResult(gt, result)
+	assert.Equal(t, 1, matched)
+	assert.Equal(t, 1, expected)
+}
+
 func requireEnv(t *testing.T) {
 	t.Helper()
 	if os.Getenv("GOOGLE_API_KEY") == "" {
@@ -113,10 +182,22 @@ func loadGroundTruth(t *testing.T) []groundTruth {
 	return cases
 }
 
+// confidenceInRange checks if confidence falls within [min, max].
+// max=0 means no upper bound.
+func confidenceInRange(confidence, min, max int) bool {
+	if confidence < min {
+		return false
+	}
+	if max > 0 && confidence > max {
+		return false
+	}
+	return true
+}
+
 // scoreResult checks how many expected analyses match actual RCAs.
 func scoreResult(gt groundTruth, result *llm.AnalysisResult) (matched, expected int) {
-	expected = len(gt.ExpectedAnalyses)
-	for _, exp := range gt.ExpectedAnalyses {
+	expected = len(gt.Expected.Analyses)
+	for _, exp := range gt.Expected.Analyses {
 		for _, rca := range result.RCAs {
 			if matchesExpected(exp, rca) {
 				matched++
@@ -185,10 +266,12 @@ func TestEval_Suite(t *testing.T) {
 			matched, expected := scoreResult(gt, result)
 
 			// Assertions
-			assert.Equal(t, gt.ExpectedCategory, result.Category, "category mismatch")
-			assert.GreaterOrEqual(t, result.Confidence, gt.MinConfidence, "confidence too low")
-			if gt.ExpectedAnalysesCount > 0 {
-				assert.Equal(t, gt.ExpectedAnalysesCount, len(result.RCAs), "analyses count mismatch")
+			assert.Equal(t, gt.Expected.Category, result.Category, "category mismatch")
+			assert.True(t, confidenceInRange(result.Confidence, gt.Expected.ConfidenceMin, gt.Expected.ConfidenceMax),
+				"confidence %d outside expected range [%d, %d]",
+				result.Confidence, gt.Expected.ConfidenceMin, gt.Expected.ConfidenceMax)
+			if gt.Expected.AnalysesCount > 0 {
+				assert.Equal(t, gt.Expected.AnalysesCount, len(result.RCAs), "analyses count mismatch")
 			}
 			assert.Equal(t, expected, matched, "ground truth match: %d/%d", matched, expected)
 
