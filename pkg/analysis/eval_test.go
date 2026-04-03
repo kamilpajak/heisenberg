@@ -73,20 +73,23 @@ type evalMetadata struct {
 
 // evalEntry is one line in eval.jsonl.
 type evalEntry struct {
-	Timestamp  string                  `json:"timestamp"`
-	Model      string                  `json:"model"`
-	Repo       string                  `json:"repo"`
-	RunID      int64                   `json:"run_id"`
-	Category   string                  `json:"category"`
-	Confidence int                     `json:"confidence"`
-	Analyses   int                     `json:"analyses_count"`
-	Iterations int                     `json:"iterations"`
-	ModelMs    int                     `json:"model_ms"`
-	Tokens     int                     `json:"tokens"`
-	WallMs     int                     `json:"wall_ms"`
-	Matched    int                     `json:"ground_truth_matched"`
-	Expected   int                     `json:"ground_truth_expected"`
-	RCAs       []llm.RootCauseAnalysis `json:"rca_details"`
+	CaseID           string                  `json:"case_id,omitempty"`
+	Timestamp        string                  `json:"timestamp"`
+	Model            string                  `json:"model"`
+	Repo             string                  `json:"repo"`
+	RunID            int64                   `json:"run_id"`
+	Category         string                  `json:"category"`
+	Confidence       int                     `json:"confidence"`
+	Analyses         int                     `json:"analyses_count"`
+	Iterations       int                     `json:"iterations"`
+	ModelMs          int                     `json:"model_ms"`
+	Tokens           int                     `json:"tokens"`
+	WallMs           int                     `json:"wall_ms"`
+	Matched          int                     `json:"ground_truth_matched"`
+	Expected         int                     `json:"ground_truth_expected"`
+	ObservableByTool bool                    `json:"observable_by_tool"`
+	Tags             []string                `json:"tags,omitempty"`
+	RCAs             []llm.RootCauseAnalysis `json:"rca_details"`
 }
 
 // buildEvalProvider creates the appropriate CI provider from ground truth config.
@@ -156,6 +159,26 @@ func TestScoreResult_PartialMatch(t *testing.T) {
 	assert.Equal(t, 1, expected)
 }
 
+func TestScoreResult_NoDuplicateCounting(t *testing.T) {
+	gt := groundTruth{
+		Expected: expectedOutput{
+			Analyses: []expectedAnalysis{
+				{FailureType: "network"},
+				{FailureType: "network"}, // two expected, both "network"
+			},
+		},
+	}
+	result := &llm.AnalysisResult{
+		RCAs: []llm.RootCauseAnalysis{
+			{FailureType: "network"}, // only one actual
+		},
+	}
+
+	matched, expected := scoreResult(gt, result)
+	assert.Equal(t, 2, expected)
+	assert.Equal(t, 1, matched, "same RCA should not be counted twice")
+}
+
 func requireEnv(t *testing.T) {
 	t.Helper()
 	if os.Getenv("GOOGLE_API_KEY") == "" {
@@ -195,12 +218,15 @@ func confidenceInRange(confidence, min, max int) bool {
 }
 
 // scoreResult checks how many expected analyses match actual RCAs.
+// Each actual RCA can only be consumed once to prevent double-counting.
 func scoreResult(gt groundTruth, result *llm.AnalysisResult) (matched, expected int) {
 	expected = len(gt.Expected.Analyses)
+	used := make(map[int]bool)
 	for _, exp := range gt.Expected.Analyses {
-		for _, rca := range result.RCAs {
-			if matchesExpected(exp, rca) {
+		for i, rca := range result.RCAs {
+			if !used[i] && matchesExpected(exp, rca) {
 				matched++
+				used[i] = true
 				break
 			}
 		}
@@ -273,6 +299,9 @@ func TestEval_Suite(t *testing.T) {
 			if gt.Expected.AnalysesCount > 0 {
 				assert.Equal(t, gt.Expected.AnalysesCount, len(result.RCAs), "analyses count mismatch")
 			}
+			if !gt.Expected.AllowPartialMatch && expected > 0 {
+				assert.Equal(t, expected, len(result.RCAs), "exact match required but got extra analyses")
+			}
 			assert.Equal(t, expected, matched, "ground truth match: %d/%d", matched, expected)
 
 			// Log results
@@ -282,20 +311,23 @@ func TestEval_Suite(t *testing.T) {
 
 			// Append to eval.jsonl
 			entry := evalEntry{
-				Timestamp:  time.Now().UTC().Format(time.RFC3339),
-				Model:      model,
-				Repo:       gt.Repo,
-				RunID:      gt.RunID,
-				Category:   result.Category,
-				Confidence: result.Confidence,
-				Analyses:   len(result.RCAs),
-				Iterations: evalIterations(result),
-				ModelMs:    evalModelMs(result),
-				Tokens:     evalTokens(result),
-				WallMs:     evalWallMs(result),
-				Matched:    matched,
-				Expected:   expected,
-				RCAs:       result.RCAs,
+				CaseID:           gt.CaseID,
+				Timestamp:        time.Now().UTC().Format(time.RFC3339),
+				Model:            model,
+				Repo:             gt.Repo,
+				RunID:            gt.RunID,
+				Category:         result.Category,
+				Confidence:       result.Confidence,
+				Analyses:         len(result.RCAs),
+				Iterations:       evalIterations(result),
+				ModelMs:          evalModelMs(result),
+				Tokens:           evalTokens(result),
+				WallMs:           evalWallMs(result),
+				Matched:          matched,
+				Expected:         expected,
+				ObservableByTool: gt.Truth.ObservableByTool,
+				Tags:             gt.Tags,
+				RCAs:             result.RCAs,
 			}
 			appendEvalLog(t, logPath, entry)
 		})
