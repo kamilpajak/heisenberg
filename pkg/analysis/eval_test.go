@@ -475,67 +475,7 @@ func TestEval_Suite(t *testing.T) {
 				return
 			}
 
-			// Category match (logged, not asserted per-case)
-			categoryMatch := result.Category == gt.Expected.Category
-			report.addCategoryResult(categoryMatch)
-
-			// Weighted scoring per RCA
-			bestScore := 0.0
-			for _, exp := range gt.Expected.Analyses {
-				for _, rca := range result.RCAs {
-					s := scoreCase(exp, rca)
-					if s > bestScore {
-						bestScore = s
-					}
-				}
-			}
-			if len(gt.Expected.Analyses) == 0 {
-				bestScore = 1.0 // no expectations = pass
-			}
-			report.addCaseScore(bestScore)
-
-			// Confidence tracking (separate from pass/fail)
-			isCorrect := bestScore > 0.5
-			report.addConfidence(result.Confidence, isCorrect)
-
-			// Per-case log (not assert)
-			icon := "✓"
-			if bestScore < 0.5 {
-				icon = "✗"
-			}
-			t.Logf("%s score=%.2f category=%s confidence=%d analyses=%d iterations=%d",
-				icon, bestScore, result.Category, result.Confidence, len(result.RCAs),
-				evalIterations(result))
-
-			// Legacy: still log matched count for eval.jsonl
-			matched, expected := scoreResult(gt, result)
-
-			// Log results
-			t.Logf("category=%s confidence=%d analyses=%d matched=%d/%d iterations=%d",
-				result.Category, result.Confidence, len(result.RCAs), matched, expected,
-				evalIterations(result))
-
-			// Append to eval.jsonl
-			entry := evalEntry{
-				CaseID:           gt.CaseID,
-				Timestamp:        time.Now().UTC().Format(time.RFC3339),
-				Model:            model,
-				Repo:             gt.Repo,
-				RunID:            gt.RunID,
-				Category:         result.Category,
-				Confidence:       result.Confidence,
-				Analyses:         len(result.RCAs),
-				Iterations:       evalIterations(result),
-				ModelMs:          evalModelMs(result),
-				Tokens:           evalTokens(result),
-				WallMs:           evalWallMs(result),
-				Matched:          matched,
-				Expected:         expected,
-				ObservableByTool: gt.Truth.ObservableByTool,
-				Tags:             gt.Tags,
-				RCAs:             result.RCAs,
-			}
-			appendEvalLog(t, logPath, entry)
+			scoreAndLog(t, gt, result, model, logPath, &report)
 		})
 	}
 
@@ -550,6 +490,68 @@ func TestEval_Suite(t *testing.T) {
 	// Aggregate threshold assertion — catches regressions
 	assert.GreaterOrEqual(t, report.meanScore(), 0.3,
 		"aggregate score below minimum threshold — possible regression")
+}
+
+// scoreAndLog scores one eval case, logs per-case results, and appends to eval.jsonl.
+func scoreAndLog(t *testing.T, gt groundTruth, result *llm.AnalysisResult,
+	model, logPath string, report *evalReport) {
+	t.Helper()
+
+	report.addCategoryResult(result.Category == gt.Expected.Category)
+
+	bestScore := bestRCAScore(gt.Expected.Analyses, result.RCAs)
+	report.addCaseScore(bestScore)
+	report.addConfidence(result.Confidence, bestScore > 0.5)
+
+	icon := "✓"
+	if bestScore < 0.5 {
+		icon = "✗"
+	}
+	t.Logf("%s score=%.2f category=%s confidence=%d analyses=%d iterations=%d",
+		icon, bestScore, result.Category, result.Confidence, len(result.RCAs),
+		evalIterations(result))
+
+	matched, expected := scoreResult(gt, result)
+	t.Logf("category=%s confidence=%d analyses=%d matched=%d/%d iterations=%d",
+		result.Category, result.Confidence, len(result.RCAs), matched, expected,
+		evalIterations(result))
+
+	entry := evalEntry{
+		CaseID:           gt.CaseID,
+		Timestamp:        time.Now().UTC().Format(time.RFC3339),
+		Model:            model,
+		Repo:             gt.Repo,
+		RunID:            gt.RunID,
+		Category:         result.Category,
+		Confidence:       result.Confidence,
+		Analyses:         len(result.RCAs),
+		Iterations:       evalIterations(result),
+		ModelMs:          evalModelMs(result),
+		Tokens:           evalTokens(result),
+		WallMs:           evalWallMs(result),
+		Matched:          matched,
+		Expected:         expected,
+		ObservableByTool: gt.Truth.ObservableByTool,
+		Tags:             gt.Tags,
+		RCAs:             result.RCAs,
+	}
+	appendEvalLog(t, logPath, entry)
+}
+
+// bestRCAScore finds the highest weighted score across all expected × actual RCA pairs.
+func bestRCAScore(expected []expectedAnalysis, rcas []llm.RootCauseAnalysis) float64 {
+	if len(expected) == 0 {
+		return 1.0
+	}
+	best := 0.0
+	for _, exp := range expected {
+		for _, rca := range rcas {
+			if s := scoreCase(exp, rca); s > best {
+				best = s
+			}
+		}
+	}
+	return best
 }
 
 func evalIterations(r *llm.AnalysisResult) int {
