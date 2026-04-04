@@ -475,6 +475,38 @@ class TestBucketControl:
 # --- Output generation ---
 
 
+class TestSaveCandidateSkipsExisting:
+    def test_skips_existing_directory(self, tmp_path):
+        from mine_ground_truth import save_candidate
+
+        candidate = {
+            "case_id": "test",
+            "repo": "owner/repo",
+            "run_id": 123,
+        }
+
+        # First save — should create
+        result1 = save_candidate(str(tmp_path), candidate)
+        assert result1 is not None
+
+        # Second save — should skip and return None
+        result2 = save_candidate(str(tmp_path), candidate)
+        assert result2 is None
+
+    def test_creates_new_directory(self, tmp_path):
+        from mine_ground_truth import save_candidate
+
+        candidate = {
+            "case_id": "new-case",
+            "repo": "owner/repo",
+            "run_id": 456,
+        }
+
+        result = save_candidate(str(tmp_path), candidate)
+        assert result is not None
+        assert "owner_repo_456" in result
+
+
 class TestGenerateCandidate:
     def test_has_required_fields(self):
         candidate = generate_candidate(

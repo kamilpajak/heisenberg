@@ -414,9 +414,11 @@ def generate_candidate(repo, run_id, transition, classification, difficulty):
 
 
 def save_candidate(output_dir, candidate, diff_patch="", run_metadata=None, log_excerpt=""):
-    """Write candidate directory with all files."""
+    """Write candidate directory with all files. Returns None if already exists."""
     case_dir = Path(output_dir) / f"{candidate['repo'].replace('/', '_')}_{candidate['run_id']}"
-    case_dir.mkdir(parents=True, exist_ok=True)
+    if case_dir.exists():
+        return None
+    case_dir.mkdir(parents=True)
 
     with open(case_dir / "candidate.json", "w") as f:
         json.dump(candidate, f, indent=2)
@@ -565,6 +567,9 @@ def main():
             )
 
             case_dir = save_candidate(args.output, candidate, diff_text, log_excerpt=log_text)
+            if case_dir is None:
+                print(f"    ⏭ Already exists, skipping")
+                continue
             update_bucket(wanted, lang, failure_type, classification["bug_location"])
             total_candidates += 1
             print(f"    ✓ Saved: {case_dir}")
