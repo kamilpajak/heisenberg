@@ -449,6 +449,42 @@ class TestEstimateDifficulty:
 # --- Diversity control ---
 
 
+class TestExcludeRules:
+    def test_excluded_failure_type(self):
+        from mine_ground_truth import is_excluded
+        excludes = [{"failure_type": "network"}, {"bug_location": "unknown"}]
+        assert is_excluded(excludes, failure_type="network", bug_location="production")
+
+    def test_excluded_bug_location(self):
+        from mine_ground_truth import is_excluded
+        excludes = [{"failure_type": "network"}, {"bug_location": "unknown"}]
+        assert is_excluded(excludes, failure_type="assertion", bug_location="unknown")
+
+    def test_not_excluded(self):
+        from mine_ground_truth import is_excluded
+        excludes = [{"failure_type": "network"}, {"bug_location": "unknown"}]
+        assert not is_excluded(excludes, failure_type="assertion", bug_location="production")
+
+    def test_empty_excludes(self):
+        from mine_ground_truth import is_excluded
+        assert not is_excluded([], failure_type="network", bug_location="unknown")
+
+    def test_load_wanted_with_excludes(self):
+        from mine_ground_truth import load_wanted
+        import tempfile, yaml
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+            yaml.dump({
+                "exclude": [{"failure_type": "network"}],
+                "buckets": [{"language": "python", "failure_type": "assertion", "target": 3}],
+            }, f)
+            path = f.name
+        buckets, excludes = load_wanted(path)
+        assert len(excludes) == 1
+        assert excludes[0]["failure_type"] == "network"
+        assert len(buckets) == 1
+        import os; os.unlink(path)
+
+
 class TestBucketControl:
     def test_has_room(self):
         wanted = [{"language": "python", "failure_type": "timeout", "target": 5, "found": 3}]

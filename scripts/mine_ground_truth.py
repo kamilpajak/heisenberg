@@ -391,13 +391,27 @@ def estimate_difficulty(diff_files, diff_lines):
 
 
 def load_wanted(path):
-    """Load wanted.yaml coverage matrix."""
+    """Load wanted.yaml coverage matrix and exclude rules.
+
+    Returns (buckets, excludes) tuple.
+    """
     with open(path) as f:
         data = yaml.safe_load(f)
     buckets = data.get("buckets", [])
     for b in buckets:
         b.setdefault("found", 0)
-    return buckets
+    excludes = data.get("exclude", [])
+    return buckets, excludes
+
+
+def is_excluded(excludes, failure_type="", bug_location=""):
+    """Check if a candidate should be excluded based on exclude rules."""
+    for rule in excludes:
+        if "failure_type" in rule and rule["failure_type"] == failure_type:
+            return True
+        if "bug_location" in rule and rule["bug_location"] == bug_location:
+            return True
+    return False
 
 
 def _bucket_matches(bucket, language, failure_type, bug_location):
@@ -624,9 +638,10 @@ def main():
         sys.exit(1)
 
     # Load wanted list
+    excludes = []
     if os.path.exists(args.wanted):
-        wanted = load_wanted(args.wanted)
-        print(f"Loaded {len(wanted)} buckets from {args.wanted}")
+        wanted, excludes = load_wanted(args.wanted)
+        print(f"Loaded {len(wanted)} buckets, {len(excludes)} exclude rules from {args.wanted}")
     else:
         wanted = []
         print(f"No wanted file at {args.wanted}, accepting all categories")
@@ -733,6 +748,10 @@ def main():
                 failure_type = classify_failure_type(fail_commit.get("message", "") + " " + fix_commit.get("message", ""))
             classification["failure_type"] = failure_type
             difficulty = estimate_difficulty(diff_files, total_lines)
+
+            if is_excluded(excludes, failure_type=failure_type, bug_location=classification["bug_location"]):
+                print(f"    Excluded: {failure_type}/{classification['bug_location']}")
+                continue
 
             if not check_bucket(wanted, lang, failure_type, classification["bug_location"]):
                 print(f"    Bucket full: {lang}/{failure_type}/{classification['bug_location']}")

@@ -1,52 +1,61 @@
 # Coverage matrix for ground truth mining.
-# Each bucket defines a target count for a specific combination.
-# The script stops adding candidates to a bucket when target is reached.
+# Adjusted after first batch: network over-represented, test/infra under-represented.
+
+# Exclude over-represented and low-quality categories
+exclude:
+  - failure_type: network
+  - failure_type: unknown
+  - bug_location: unknown
 
 buckets:
-  # TypeScript — primary focus (Playwright, Jest)
-  - language: typescript
-    failure_type: assertion
-    bug_location: production
-    target: 5
+  # --- FILLING THE 'TEST' BUG GAP ---
   - language: typescript
     failure_type: assertion
     bug_location: test
-    target: 3
-  - language: typescript
-    failure_type: timeout
+    target: 4
+  - language: python
+    failure_type: assertion
+    bug_location: test
+    target: 4
+  - language: go
+    failure_type: assertion
+    bug_location: test
     target: 3
 
-  # Python — pytest, Django, FastAPI
+  # --- FILLING THE 'INFRA' FAILURE TYPE GAP ---
+  - language: typescript
+    failure_type: infra
+    target: 3
+  - language: python
+    failure_type: infra
+    target: 3
+  - language: go
+    failure_type: infra
+    target: 3
+
+  # --- BALANCING PRODUCTION ASSERTIONS ---
+  - language: typescript
+    failure_type: assertion
+    bug_location: production
+    target: 2
   - language: python
     failure_type: assertion
     bug_location: production
-    target: 5
+    target: 2
+  - language: go
+    failure_type: assertion
+    bug_location: production
+    target: 2
+
+  # --- TIMEOUTS (still need more) ---
+  - language: typescript
+    failure_type: timeout
+    target: 3
   - language: python
     failure_type: timeout
     target: 3
-
-  # Go — go test
   - language: go
-    failure_type: assertion
-    target: 3
-  - language: go
-    failure_type: infra
-    target: 3
+    failure_type: timeout
+    target: 2
 
-  # Java — JUnit, Gradle
-  - language: java
-    failure_type: assertion
-    target: 3
-
-  # Infrastructure across languages
-  - language: "*"
-    failure_type: infra
-    target: 5
-  - language: "*"
-    failure_type: network
-    target: 3
-
-  # Catch-all for unexpected categories
-  - language: "*"
-    failure_type: "*"
-    target: 5
+  # No catch-all bucket — only accept what we explicitly want
