@@ -676,6 +676,118 @@ class TestRecheck:
         assert len(results) == 0  # skipped — already has llm_correlation
 
 
+class TestJudgeDiagnosis:
+    """Claude-as-judge for ground truth correction."""
+
+    def test_build_judge_prompt(self):
+        from mine_ground_truth import build_judge_prompt
+        prompt = build_judge_prompt(
+            log_excerpt="AssertionError: expected 42 got 0",
+            auto_label={"failure_type": "assertion", "bug_location": "production"},
+            heisenberg_label={"failure_type": "assertion", "bug_location": "test",
+                              "title": "Test bug", "root_cause": "Wrong expected value"},
+        )
+        assert "Option A" in prompt
+        assert "Option B" in prompt
+        assert "production" in prompt
+        assert "test" in prompt
+        assert "Wrong expected value" in prompt
+
+    def test_parse_judge_response_winner_B(self):
+        from mine_ground_truth import parse_judge_response
+        result = parse_judge_response('{"winner": "B", "correct_failure_type": "assertion", "correct_bug_location": "test", "reasoning": "Fix only changes test file."}')
+        assert result["winner"] == "B"
+        assert result["correct_bug_location"] == "test"
+
+    def test_parse_judge_response_winner_A(self):
+        from mine_ground_truth import parse_judge_response
+        result = parse_judge_response('{"winner": "A", "correct_failure_type": "timeout", "correct_bug_location": "production", "reasoning": "Log shows production timeout."}')
+        assert result["winner"] == "A"
+
+    def test_parse_judge_response_tie(self):
+        from mine_ground_truth import parse_judge_response
+        result = parse_judge_response('{"winner": "Tie", "correct_failure_type": "assertion", "correct_bug_location": "production", "reasoning": "Both valid."}')
+        assert result["winner"] == "Tie"
+
+    def test_parse_judge_response_invalid_json(self):
+        from mine_ground_truth import parse_judge_response
+        result = parse_judge_response("This is not JSON at all")
+        assert result["winner"] == "error"
+
+    @responses.activate
+    def test_judge_calls_claude_api(self):
+        from mine_ground_truth import judge_diagnosis
+        responses.add(
+            responses.POST,
+            "https://api.anthropic.com/v1/messages",
+            json={
+                "content": [{"type": "text", "text": '{"winner": "B", "correct_failure_type": "assertion", "correct_bug_location": "test", "reasoning": "Test file fix."}'}],
+            },
+        )
+        result = judge_diagnosis(
+            log_excerpt="AssertionError",
+            auto_label={"failure_type": "assertion", "bug_location": "production"},
+            heisenberg_label={"failure_type": "assertion", "bug_location": "test",
+                              "title": "Test bug", "root_cause": "Wrong value"},
+            api_key="test-key",
+        )
+        assert result["winner"] == "B"
+        # Verify correct API call
+        assert responses.calls[0].request.headers["x-api-key"] == "test-key"
+        assert "anthropic-version" in responses.calls[0].request.headers
+
+    @responses.activate
+    def test_judge_handles_api_error(self):
+        from mine_ground_truth import judge_diagnosis
+        responses.add(
+            responses.POST,
+            "https://api.anthropic.com/v1/messages",
+            status=500,
+        )
+        result = judge_diagnosis(
+            log_excerpt="error", auto_label={}, heisenberg_label={},
+            api_key="test-key",
+        )
+        assert result["winner"] == "error"
+
+
+class TestApplyJudgment:
+    def test_updates_winner_B(self, tmp_path):
+        from mine_ground_truth import apply_judgment
+        gt_file = tmp_path / "test.json"
+        gt_file.write_text(json.dumps({
+            "expected_output": {"analyses": [{"failure_type": "timeout", "bug_location": "production"}]},
+            "metadata": {"notes": ""},
+        }))
+        apply_judgment(str(gt_file), {
+            "winner": "B",
+            "correct_failure_type": "assertion",
+            "correct_bug_location": "test",
+            "reasoning": "Fix only changes test file.",
+        })
+        updated = json.loads(gt_file.read_text())
+        assert updated["expected_output"]["analyses"][0]["failure_type"] == "assertion"
+        assert updated["expected_output"]["analyses"][0]["bug_location"] == "test"
+        assert "judge_reasoning" in updated["metadata"]
+
+    def test_keeps_winner_A(self, tmp_path):
+        from mine_ground_truth import apply_judgment
+        gt_file = tmp_path / "test.json"
+        gt_file.write_text(json.dumps({
+            "expected_output": {"analyses": [{"failure_type": "timeout", "bug_location": "production"}]},
+            "metadata": {"notes": ""},
+        }))
+        apply_judgment(str(gt_file), {
+            "winner": "A",
+            "correct_failure_type": "timeout",
+            "correct_bug_location": "production",
+            "reasoning": "Auto-classifier was correct.",
+        })
+        updated = json.loads(gt_file.read_text())
+        assert updated["expected_output"]["analyses"][0]["failure_type"] == "timeout"
+        assert updated["expected_output"]["analyses"][0]["bug_location"] == "production"
+
+
 class TestCandidateExists:
     def test_detects_existing(self, tmp_path):
         from mine_ground_truth import candidate_exists, save_candidate

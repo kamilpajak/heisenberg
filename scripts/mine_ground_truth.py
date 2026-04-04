@@ -322,6 +322,126 @@ def check_correlation(log_excerpt, fix_diff, pr_title, api_key):
         return {"correlated": True, "reason": f"API error, assuming correlated: {e}"}
 
 
+# --- LLM-as-Judge (Claude) ---
+
+CLAUDE_API = "https://api.anthropic.com/v1/messages"
+CLAUDE_MODEL = "claude-sonnet-4-20250514"
+
+
+def build_judge_prompt(log_excerpt, auto_label, heisenberg_label):
+    """Build prompt for Claude to adjudicate between two diagnoses."""
+    return f"""You are an impartial CI test failure expert.
+
+Task: Adjudicate between two root cause analyses for this CI failure.
+
+## CI Failure Log
+```
+{log_excerpt[:3000]}
+```
+
+## Option A (Auto-classifier based on file paths)
+failure_type: {auto_label.get('failure_type', 'unknown')}
+bug_location: {auto_label.get('bug_location', 'unknown')}
+
+## Option B (AI analysis tool)
+failure_type: {heisenberg_label.get('failure_type', 'unknown')}
+bug_location: {heisenberg_label.get('bug_location', 'unknown')}
+title: {heisenberg_label.get('title', '')}
+root_cause: {heisenberg_label.get('root_cause', '')}
+
+## Instructions
+1. Read the CI log and understand the actual failure.
+2. Compare Option A and Option B on accuracy, completeness, evidence alignment.
+3. Pick the winner or declare Tie if both are equally valid.
+
+Output ONLY a JSON object. Keep reasoning under 50 words:
+{{"winner": "A" or "B" or "Tie", "correct_failure_type": "...", "correct_bug_location": "...", "reasoning": "brief"}}"""
+
+
+def parse_judge_response(text):
+    """Parse judge response into structured result. Handles markdown code blocks."""
+    try:
+        # Strip markdown code blocks if present
+        cleaned = text.strip()
+        if "```json" in cleaned:
+            cleaned = cleaned.split("```json")[-1]
+        if "```" in cleaned:
+            cleaned = cleaned.split("```")[0]
+        cleaned = cleaned.strip()
+
+        # Find JSON object
+        start = cleaned.index("{")
+        end = cleaned.rindex("}") + 1
+        return json.loads(cleaned[start:end])
+    except (ValueError, json.JSONDecodeError):
+        return {"winner": "error", "reasoning": f"Failed to parse: {text[:100]}"}
+
+
+def judge_diagnosis(log_excerpt, auto_label, heisenberg_label, api_key, provider="claude"):
+    """Call LLM to adjudicate between auto-classifier and Heisenberg diagnoses.
+
+    provider: "claude" (Anthropic API) or "gemini" (Google API).
+    """
+    prompt = build_judge_prompt(log_excerpt, auto_label, heisenberg_label)
+
+    try:
+        if provider == "gemini":
+            resp = requests.post(
+                f"{GEMINI_API}/models/gemini-2.0-flash:generateContent?key={api_key}",
+                json={
+                    "contents": [{"parts": [{"text": prompt}]}],
+                    "generationConfig": {"temperature": 0, "maxOutputTokens": 500},
+                },
+                timeout=60,
+            )
+            resp.raise_for_status()
+            parts = resp.json()["candidates"][0]["content"]["parts"]
+            # Gemini may return multiple parts (thinking + response)
+            text = parts[-1]["text"]
+        else:
+            resp = requests.post(
+                CLAUDE_API,
+                headers={
+                    "x-api-key": api_key,
+                    "anthropic-version": "2023-06-01",
+                    "content-type": "application/json",
+                },
+                json={
+                    "model": CLAUDE_MODEL,
+                    "max_tokens": 300,
+                    "messages": [{"role": "user", "content": prompt}],
+                },
+                timeout=30,
+            )
+            resp.raise_for_status()
+            text = resp.json()["content"][0]["text"]
+        return parse_judge_response(text)
+    except Exception as e:
+        return {"winner": "error", "reasoning": f"API error: {e}"}
+
+
+def apply_judgment(ground_truth_path, judgment):
+    """Update ground truth file with judge's corrected labels."""
+    with open(ground_truth_path) as f:
+        gt = json.load(f)
+
+    gt.setdefault("metadata", {})
+    gt["metadata"]["judge_reasoning"] = judgment.get("reasoning", "")[:200]
+    gt["metadata"]["judge_model"] = judgment.get("_model", CLAUDE_MODEL)
+    gt["metadata"]["judge_winner"] = judgment.get("winner", "")
+
+    if judgment.get("winner") == "B":
+        analyses = gt.get("expected_output", {}).get("analyses", [])
+        if analyses:
+            if judgment.get("correct_failure_type"):
+                analyses[0]["failure_type"] = judgment["correct_failure_type"]
+            if judgment.get("correct_bug_location"):
+                analyses[0]["bug_location"] = judgment["correct_bug_location"]
+
+    with open(ground_truth_path, "w") as f:
+        json.dump(gt, f, indent=2)
+
+
 # --- Classification ---
 
 TEST_PATTERNS = re.compile(
@@ -577,6 +697,123 @@ def run_recheck(candidates_dir, api_key):
 
 
 
+def run_judge(candidates_dir, provider="gemini"):
+    """Run LLM-as-judge on eval mismatches to correct ground truth."""
+    import subprocess
+
+    if provider == "claude":
+        api_key = subprocess.run(
+            ["security", "find-generic-password", "-s", "anthropic-api-key", "-w"],
+            capture_output=True, text=True,
+        ).stdout.strip()
+        if not api_key:
+            print("Error: anthropic-api-key not found in macOS Keychain", file=sys.stderr)
+            sys.exit(1)
+        judge_model = CLAUDE_MODEL
+    else:
+        api_key = os.environ.get("GOOGLE_API_KEY", "")
+        if not api_key:
+            print("Error: GOOGLE_API_KEY required for Gemini judge", file=sys.stderr)
+            sys.exit(1)
+        judge_model = "gemini-2.5-flash"
+
+    gt_dir = Path("testdata/e2e/ground-truth")
+    eval_log = Path("testdata/e2e/eval.jsonl")
+
+    if not eval_log.exists():
+        print("Error: eval.jsonl not found. Run TestEval_Suite first.", file=sys.stderr)
+        sys.exit(1)
+
+    # Load eval results
+    eval_entries = {}
+    for line in eval_log.read_text().strip().split("\n"):
+        if not line:
+            continue
+        entry = json.loads(line)
+        key = f"{entry['repo']}_{entry['run_id']}"
+        eval_entries[key] = entry
+
+    # Find mismatches (score would be 0 — no ground truth match)
+    mismatches = []
+    for gt_file in sorted(gt_dir.glob("*.json")):
+        gt = json.loads(gt_file.read_text())
+        repo = gt.get("repo", "")
+        run_id = gt.get("run_id", 0)
+        key = f"{repo}_{run_id}"
+
+        # Skip if already judged
+        if gt.get("metadata", {}).get("judge_winner"):
+            continue
+
+        entry = eval_entries.get(key)
+        if not entry:
+            continue
+
+        # Check if any RCA matched
+        exp = gt.get("expected_output", {}).get("analyses", [{}])[0]
+        rcas = entry.get("rca_details", [])
+        matched = False
+        for rca in rcas:
+            if exp.get("failure_type") and rca.get("failure_type") == exp["failure_type"]:
+                matched = True
+            if exp.get("bug_location") and str(rca.get("bug_location", "")) == exp["bug_location"]:
+                matched = True
+        if matched:
+            continue  # At least partial match, skip
+
+        # Get log excerpt from candidate
+        repo_slug = repo.replace("/", "_")
+        candidate_dir = Path(candidates_dir) / f"{repo_slug}_{run_id}"
+        log_text = ""
+        log_file = candidate_dir / "log_excerpt.txt"
+        if log_file.exists():
+            log_text = log_file.read_text()[:3000]
+
+        mismatches.append({
+            "gt_file": str(gt_file),
+            "repo": repo,
+            "run_id": run_id,
+            "auto_label": exp,
+            "heisenberg_label": rcas[0] if rcas else {},
+            "log_excerpt": log_text,
+        })
+
+    if not mismatches:
+        print("No mismatches to judge.")
+        return
+
+    print(f"\n{'=' * 60}")
+    print(f"  Judging {len(mismatches)} mismatches with Claude")
+    print(f"{'=' * 60}")
+
+    winners = {"A": 0, "B": 0, "Tie": 0, "error": 0}
+    for i, m in enumerate(mismatches, 1):
+        print(f"\n--- [{i}/{len(mismatches)}] {m['repo']} ---")
+        print(f"  Auto:       {m['auto_label'].get('failure_type','?')}/{m['auto_label'].get('bug_location','?')}")
+        h = m["heisenberg_label"]
+        print(f"  Heisenberg: {h.get('failure_type','?')}/{h.get('bug_location','?')} — {h.get('title','')[:50]}")
+
+        judgment = judge_diagnosis(
+            log_excerpt=m["log_excerpt"],
+            auto_label=m["auto_label"],
+            heisenberg_label=m["heisenberg_label"],
+            api_key=api_key,
+            provider=provider,
+        )
+
+        winner = judgment.get("winner", "error")
+        winners[winner] = winners.get(winner, 0) + 1
+        icon = {"A": "←", "B": "→", "Tie": "=", "error": "⚠"}.get(winner, "?")
+        print(f"  Judge: {icon} Winner={winner} — {judgment.get('reasoning', '')[:80]}")
+
+        apply_judgment(m["gt_file"], judgment)
+
+    print(f"\n{'=' * 60}")
+    print(f"  Results: A={winners['A']} B={winners['B']} Tie={winners['Tie']} Error={winners['error']}")
+    print(f"  Ground truth updated for {winners['B']} cases (Heisenberg was correct)")
+    print(f"{'=' * 60}")
+
+
 def run_spot_check(candidates_dir, count):
     """Sample N random candidates and print Docker reproduction commands."""
     import random
@@ -635,6 +872,7 @@ def main():
     parser.add_argument("--llm-check", action="store_true", help="Use LLM to verify fix correlates with failure")
     parser.add_argument("--spot-check", type=int, metavar="N", help="Sample N candidates and print reproduction commands")
     parser.add_argument("--recheck", action="store_true", help="Run LLM correlation check on existing candidates")
+    parser.add_argument("--judge", action="store_true", help="Use Claude to adjudicate ground truth mismatches from eval.jsonl")
     parser.add_argument("--dry-run", action="store_true", help="Validate config without API calls")
     args = parser.parse_args()
 
@@ -658,6 +896,10 @@ def main():
 
     if args.spot_check:
         run_spot_check(args.output, args.spot_check)
+        return
+
+    if args.judge:
+        run_judge(args.output)
         return
 
     if args.recheck:

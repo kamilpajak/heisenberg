@@ -30,8 +30,8 @@
     "confidence_max": 0,
     "analyses": [
       {
-        "failure_type": "network",
-        "bug_location": "test"
+        "failure_type": "infra",
+        "bug_location": "infrastructure"
       }
     ],
     "allow_partial_match": true
