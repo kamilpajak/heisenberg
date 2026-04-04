@@ -556,6 +556,7 @@ def run_recheck(candidates_dir, api_key):
     return results
 
 
+
 def run_spot_check(candidates_dir, count):
     """Sample N random candidates and print Docker reproduction commands."""
     import random
