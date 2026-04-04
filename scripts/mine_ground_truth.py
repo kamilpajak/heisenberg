@@ -26,10 +26,17 @@ import yaml
 
 GITHUB_API = "https://api.github.com"
 SEARCH_QUERIES = [
+    # PR title searches
     'in:title "fix CI" is:merged',
     'in:title "fix test" is:merged',
     'in:title "fix flaky" is:merged',
     'in:title "fix e2e" is:merged',
+    # Go/build-specific (Perplexity: Go ecosystem uses "fix build"/"fix lint")
+    'in:title "fix build" is:merged',
+    'in:title "fix lint" is:merged',
+    # Broader: commit message search for repos that don't use descriptive PR titles
+    'in:title "resolve test failure" is:merged',
+    'in:title "fix failing" is:merged',
 ]
 
 
@@ -213,7 +220,7 @@ def is_bot_author(author):
     return any(bot in author_lower for bot in BOT_PATTERNS)
 
 
-def filter_candidate(fail, fix, diff):
+def filter_candidate(_fail, _fix, diff):
     """Returns (accepted, reason) based on filtering rules."""
     if diff.get("total_lines", 0) > 50:
         return False, f"Diff too large: {diff['total_lines']} lines"

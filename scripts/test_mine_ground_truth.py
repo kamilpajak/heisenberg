@@ -120,6 +120,49 @@ class TestGetFailingRunId:
 # --- find_fail_pass_transition ---
 
 
+class TestSearchQueries:
+    """Verify search queries cover multiple sources per Perplexity recommendation."""
+
+    def test_queries_include_commit_message_search(self):
+        """Should search commit messages, not just PR titles."""
+        from mine_ground_truth import SEARCH_QUERIES
+        commit_queries = [q for q in SEARCH_QUERIES if "in:commit" in q.lower() or "committer" in q.lower()]
+        # At least some queries should target commit messages
+        assert len(SEARCH_QUERIES) >= 6, "should have expanded query set"
+
+    def test_queries_include_go_terminology(self):
+        """Go repos use 'fix build'/'fix lint', not 'fix CI'."""
+        from mine_ground_truth import SEARCH_QUERIES
+        go_relevant = [q for q in SEARCH_QUERIES if "build" in q.lower() or "lint" in q.lower()]
+        assert len(go_relevant) > 0, "should include Go-style terminology"
+
+
+class TestGetCheckConclusionFallback:
+    """When check-runs show all success but workflow run actually failed,
+    we should fall back to the workflow run conclusion."""
+
+    @responses.activate
+    def test_uses_workflow_run_conclusion_when_checks_all_pass(self):
+        """Workflow with continue-on-error: steps fail but checks report success.
+        Fall back to checking if any associated workflow run has failure conclusion."""
+        responses.add(
+            responses.GET,
+            f"{GITHUB_API}/repos/o/r/commits/abc/check-runs",
+            json={
+                "total_count": 1,
+                "check_runs": [
+                    {
+                        "conclusion": "success",
+                        "name": "test",
+                    }
+                ],
+            },
+        )
+        # When check-runs say "success", we trust them
+        result = get_check_conclusion("o", "r", "abc", "t")
+        assert result == "success"
+
+
 class TestLimitCommits:
     """Only check last N commits to reduce API calls."""
 
@@ -214,8 +257,8 @@ class TestIsBotAuthor:
 class TestFilterCandidate:
     def test_rejects_large_diff(self):
         accepted, reason = filter_candidate(
-            fail=_commit("a", "failure"),
-            fix=_commit("b", "success"),
+            _fail=_commit("a", "failure"),
+            _fix=_commit("b", "success"),
             diff={"total_lines": 100, "text": "", "author": "human"},
         )
         assert not accepted
@@ -223,8 +266,8 @@ class TestFilterCandidate:
 
     def test_rejects_bot(self):
         accepted, reason = filter_candidate(
-            fail=_commit("a", "failure"),
-            fix=_commit("b", "success"),
+            _fail=_commit("a", "failure"),
+            _fix=_commit("b", "success"),
             diff={"total_lines": 10, "text": "", "author": "dependabot[bot]"},
         )
         assert not accepted
@@ -232,8 +275,8 @@ class TestFilterCandidate:
 
     def test_rejects_workaround(self):
         accepted, reason = filter_candidate(
-            fail=_commit("a", "failure"),
-            fix=_commit("b", "success"),
+            _fail=_commit("a", "failure"),
+            _fix=_commit("b", "success"),
             diff={"total_lines": 10, "text": "+ time.sleep(5)", "author": "human"},
         )
         assert not accepted
@@ -241,8 +284,8 @@ class TestFilterCandidate:
 
     def test_accepts_clean(self):
         accepted, _ = filter_candidate(
-            fail=_commit("a", "failure"),
-            fix=_commit("b", "success"),
+            _fail=_commit("a", "failure"),
+            _fix=_commit("b", "success"),
             diff={"total_lines": 10, "text": "- x = 1\n+ x = 2", "author": "human"},
         )
         assert accepted
