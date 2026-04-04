@@ -45,6 +45,12 @@ testdata/e2e/eval.jsonl
 # Private/corporate ground truth (not for public repo)
 testdata/e2e/ground-truth/azure_*
 
+# Mining script output (candidates for review, not final ground truth)
+candidates/
+scripts/.venv/
+scripts/__pycache__/
+scripts/.pytest_cache/
+
 # Web frontend (SvelteKit)
 web/node_modules/
 web/.svelte-kit/
