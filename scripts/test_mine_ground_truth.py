@@ -475,6 +475,70 @@ class TestBucketControl:
 # --- Output generation ---
 
 
+class TestLLMCorrelationCheck:
+    """LLM checks if fix diff logically addresses the test failure."""
+
+    def test_build_correlation_prompt(self):
+        from mine_ground_truth import build_correlation_prompt
+        prompt = build_correlation_prompt(
+            log_excerpt="AssertionError: expected 42 got 0",
+            fix_diff="- return 0\n+ return 42",
+            pr_title="fix: return correct value",
+        )
+        assert "AssertionError" in prompt
+        assert "return 42" in prompt
+        assert "YES" in prompt and "NO" in prompt
+
+    def test_parse_correlation_response_yes(self):
+        from mine_ground_truth import parse_correlation_response
+        result = parse_correlation_response("YES\nThe diff changes the return value to match the expected assertion.")
+        assert result["correlated"] is True
+
+    def test_parse_correlation_response_no(self):
+        from mine_ground_truth import parse_correlation_response
+        result = parse_correlation_response("NO\nThe diff modifies CSS styles unrelated to the timeout error.")
+        assert result["correlated"] is False
+
+    def test_parse_correlation_response_ambiguous(self):
+        from mine_ground_truth import parse_correlation_response
+        result = parse_correlation_response("Maybe it helps but unclear.")
+        assert result["correlated"] is False  # default to reject on ambiguity
+
+    @responses.activate
+    def test_check_correlation_calls_api(self):
+        from mine_ground_truth import check_correlation
+        responses.add(
+            responses.POST,
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
+            json={
+                "candidates": [{"content": {"parts": [{"text": "YES\nThe fix addresses the failure."}]}}]
+            },
+        )
+        result = check_correlation(
+            log_excerpt="TimeoutError",
+            fix_diff="+ await page.waitForSelector('.btn')",
+            pr_title="fix: wait for button",
+            api_key="test-key",
+        )
+        assert result["correlated"] is True
+
+    @responses.activate
+    def test_check_correlation_handles_api_error(self):
+        from mine_ground_truth import check_correlation
+        responses.add(
+            responses.POST,
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
+            status=500,
+        )
+        result = check_correlation(
+            log_excerpt="error", fix_diff="fix", pr_title="fix",
+            api_key="test-key",
+        )
+        # On API error, assume correlated (don't reject due to API issues)
+        assert result["correlated"] is True
+        assert "error" in result.get("reason", "").lower()
+
+
 class TestSaveCandidateSkipsExisting:
     def test_skips_existing_directory(self, tmp_path):
         from mine_ground_truth import save_candidate
@@ -505,6 +569,108 @@ class TestSaveCandidateSkipsExisting:
         result = save_candidate(str(tmp_path), candidate)
         assert result is not None
         assert "owner_repo_456" in result
+
+
+class TestRecheck:
+    """--recheck mode: run LLM correlation on existing candidates."""
+
+    def _make_candidate(self, tmp_path, name="owner_repo_123", log="AssertionError: expected 1 got 2",
+                        diff="- return 2\n+ return 1"):
+        from mine_ground_truth import save_candidate
+        candidate = {
+            "case_id": name,
+            "repo": "owner/repo",
+            "run_id": 123,
+            "transition": {
+                "failing_commit": "aaa", "fix_commit": "bbb",
+                "pr_url": "", "pr_title": "fix test",
+                "files_changed": ["src/foo.ts"], "fix_size_lines": 5,
+            },
+            "expected_output": {"analyses": [{"bug_location": "production", "failure_type": "assertion"}]},
+            "ground_truth": {"actual_cause": "fix test", "observable_by_tool": True, "review_status": "pending"},
+            "metadata": {"heuristic_difficulty": "easy", "notes": ""},
+        }
+        save_candidate(str(tmp_path), candidate, diff_patch=diff, log_excerpt=log)
+        return tmp_path / "owner_repo_123"
+
+    @responses.activate
+    def test_marks_correlated(self, tmp_path):
+        from mine_ground_truth import run_recheck
+        self._make_candidate(tmp_path)
+        responses.add(
+            responses.POST,
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
+            json={"candidates": [{"content": {"parts": [{"text": "YES\nFix matches failure."}]}}]},
+        )
+        results = run_recheck(str(tmp_path), api_key="test")
+        assert len(results) == 1
+        assert results[0]["correlated"] is True
+        # Check candidate.json was updated with llm_correlation
+        with open(tmp_path / "owner_repo_123" / "candidate.json") as f:
+            c = json.load(f)
+        assert "llm_correlation" in c["metadata"]
+
+    @responses.activate
+    def test_marks_uncorrelated(self, tmp_path):
+        from mine_ground_truth import run_recheck
+        self._make_candidate(tmp_path)
+        responses.add(
+            responses.POST,
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
+            json={"candidates": [{"content": {"parts": [{"text": "NO\nDiff is CSS, failure is timeout."}]}}]},
+        )
+        results = run_recheck(str(tmp_path), api_key="test")
+        assert results[0]["correlated"] is False
+        with open(tmp_path / "owner_repo_123" / "candidate.json") as f:
+            c = json.load(f)
+        assert c["ground_truth"]["review_status"] == "llm_rejected"
+
+    def test_skips_already_checked(self, tmp_path):
+        from mine_ground_truth import run_recheck, save_candidate
+        candidate = {
+            "case_id": "test", "repo": "owner/repo", "run_id": 123,
+            "transition": {"failing_commit": "a", "fix_commit": "b", "pr_url": "", "pr_title": "fix",
+                           "files_changed": [], "fix_size_lines": 1},
+            "expected_output": {"analyses": [{}]},
+            "ground_truth": {"actual_cause": "fix", "observable_by_tool": True, "review_status": "pending"},
+            "metadata": {"heuristic_difficulty": "easy", "notes": "", "llm_correlation": "already checked"},
+        }
+        save_candidate(str(tmp_path), candidate)
+        results = run_recheck(str(tmp_path), api_key="test")
+        assert len(results) == 0  # skipped — already has llm_correlation
+
+
+class TestSpotCheck:
+    def test_prints_reproduction_commands(self, tmp_path, capsys):
+        from mine_ground_truth import run_spot_check, save_candidate
+
+        candidate = {
+            "case_id": "test",
+            "repo": "owner/repo",
+            "run_id": 123,
+            "transition": {
+                "failing_commit": "aaa",
+                "fix_commit": "bbb",
+                "pr_url": "https://github.com/owner/repo/pull/1",
+                "pr_title": "fix test",
+                "files_changed": ["src/foo.ts"],
+                "fix_size_lines": 5,
+            },
+            "expected_output": {"analyses": [{"bug_location": "production", "failure_type": "assertion"}]},
+        }
+        save_candidate(str(tmp_path), candidate)
+
+        run_spot_check(str(tmp_path), 1)
+        out = capsys.readouterr().out
+        assert "git clone" in out
+        assert "git checkout aaa" in out
+        assert "owner/repo" in out
+
+    def test_handles_empty_dir(self, tmp_path, capsys):
+        from mine_ground_truth import run_spot_check
+        run_spot_check(str(tmp_path), 5)
+        out = capsys.readouterr().out
+        assert "No candidates" in out
 
 
 class TestGenerateCandidate:

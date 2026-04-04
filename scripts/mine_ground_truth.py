@@ -257,6 +257,71 @@ def filter_candidate(_fail, _fix, diff):
     return True, "accepted"
 
 
+# --- LLM Correlation Check ---
+
+GEMINI_API = "https://generativelanguage.googleapis.com/v1beta"
+GEMINI_MODEL = "gemini-2.0-flash"
+
+
+def build_correlation_prompt(log_excerpt, fix_diff, pr_title):
+    """Build prompt asking LLM if the fix addresses the failure."""
+    return f"""You are evaluating whether a code change (fix) directly addresses a CI test failure.
+
+## Test Failure Log
+```
+{log_excerpt[:2000]}
+```
+
+## Fix Diff
+```
+{fix_diff[:2000]}
+```
+
+## PR Title
+{pr_title}
+
+## Question
+Does this code change directly address the test failure shown in the log?
+Answer YES or NO on the first line, then briefly explain why.
+
+Rules:
+- YES if the diff modifies code/tests that logically relate to the failure
+- NO if the diff is unrelated (e.g., CSS change for a timeout error)
+- NO if the failure looks like infrastructure/flaky (network timeout, OOM) and the fix just retries or skips
+"""
+
+
+def parse_correlation_response(text):
+    """Parse LLM response into structured result."""
+    first_line = text.strip().split("\n")[0].strip().upper()
+    correlated = first_line.startswith("YES")
+    return {"correlated": correlated, "reason": text.strip()[:200]}
+
+
+def check_correlation(log_excerpt, fix_diff, pr_title, api_key):
+    """Call Gemini to check if fix correlates with failure.
+
+    Returns {"correlated": bool, "reason": str}.
+    On API error, assumes correlated (don't reject due to API issues).
+    """
+    prompt = build_correlation_prompt(log_excerpt, fix_diff, pr_title)
+
+    try:
+        resp = requests.post(
+            f"{GEMINI_API}/models/{GEMINI_MODEL}:generateContent?key={api_key}",
+            json={
+                "contents": [{"parts": [{"text": prompt}]}],
+                "generationConfig": {"temperature": 0, "maxOutputTokens": 200},
+            },
+            timeout=30,
+        )
+        resp.raise_for_status()
+        text = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
+        return parse_correlation_response(text)
+    except Exception as e:
+        return {"correlated": True, "reason": f"API error, assuming correlated: {e}"}
+
+
 # --- Classification ---
 
 TEST_PATTERNS = re.compile(
@@ -439,6 +504,106 @@ def save_candidate(output_dir, candidate, diff_patch="", run_metadata=None, log_
 # --- CLI ---
 
 
+def run_recheck(candidates_dir, api_key):
+    """Run LLM correlation check on existing candidates.
+
+    Reads each candidate.json + log_excerpt.txt + fix_diff.patch.
+    Skips candidates that already have llm_correlation in metadata.
+    Updates candidate.json with result. Marks uncorrelated as llm_rejected.
+
+    Returns list of results for reporting.
+    """
+    candidates_path = Path(candidates_dir)
+    results = []
+
+    for case_dir in sorted(candidates_path.iterdir()):
+        candidate_file = case_dir / "candidate.json"
+        if not case_dir.is_dir() or not candidate_file.exists():
+            continue
+
+        with open(candidate_file) as f:
+            candidate = json.load(f)
+
+        # Skip already checked
+        if candidate.get("metadata", {}).get("llm_correlation"):
+            continue
+
+        # Read log and diff
+        log_file = case_dir / "log_excerpt.txt"
+        diff_file = case_dir / "fix_diff.patch"
+        log_text = log_file.read_text() if log_file.exists() else ""
+        diff_text = diff_file.read_text() if diff_file.exists() else ""
+
+        pr_title = candidate.get("transition", {}).get("pr_title", "")
+
+        correlation = check_correlation(
+            log_excerpt=log_text or candidate.get("ground_truth", {}).get("actual_cause", ""),
+            fix_diff=diff_text,
+            pr_title=pr_title,
+            api_key=api_key,
+        )
+
+        # Update candidate
+        candidate.setdefault("metadata", {})["llm_correlation"] = correlation["reason"][:200]
+        if not correlation["correlated"]:
+            candidate.setdefault("ground_truth", {})["review_status"] = "llm_rejected"
+
+        with open(candidate_file, "w") as f:
+            json.dump(candidate, f, indent=2)
+
+        results.append({"case_id": candidate.get("case_id", case_dir.name), **correlation})
+
+    return results
+
+
+def run_spot_check(candidates_dir, count):
+    """Sample N random candidates and print Docker reproduction commands."""
+    import random
+
+    candidates_path = Path(candidates_dir)
+    if not candidates_path.exists():
+        print(f"No candidates directory at {candidates_dir}")
+        return
+
+    case_dirs = [d for d in candidates_path.iterdir() if d.is_dir() and (d / "candidate.json").exists()]
+    if not case_dirs:
+        print("No candidates found.")
+        return
+
+    sample = random.sample(case_dirs, min(count, len(case_dirs)))
+
+    print(f"\n{'=' * 60}")
+    print(f"  Spot-check: {len(sample)} of {len(case_dirs)} candidates")
+    print(f"{'=' * 60}")
+
+    for i, case_dir in enumerate(sample, 1):
+        with open(case_dir / "candidate.json") as f:
+            c = json.load(f)
+
+        t = c.get("transition", {})
+        a = c.get("expected_output", {}).get("analyses", [{}])[0]
+
+        print(f"\n--- [{i}/{len(sample)}] {c['repo']} ---")
+        print(f"  PR: {t.get('pr_title', '')[:60]}")
+        print(f"  Bug: {a.get('bug_location', '?')} | {a.get('failure_type', '?')}")
+        print(f"  Fix: {t.get('fix_size_lines', '?')} lines in {', '.join(t.get('files_changed', [])[:3])}")
+        print(f"  PR URL: {t.get('pr_url', '')}")
+        print()
+        print(f"  # Reproduce locally:")
+        print(f"  git clone https://github.com/{c['repo']}.git /tmp/spot-check-{i}")
+        print(f"  cd /tmp/spot-check-{i}")
+        print(f"  git checkout {t.get('failing_commit', '?')}")
+        print(f"  # Run tests (check CI workflow for command)")
+        print(f"  # Then apply fix:")
+        print(f"  git checkout {t.get('fix_commit', '?')}")
+        print(f"  # Run tests again — should pass")
+
+    print(f"\n{'=' * 60}")
+    print(f"If 0/{len(sample)} false positives → ~95% confidence in full corpus.")
+    print(f"If 1-2/{len(sample)} false positives → ~85-90% confidence, tighten filters.")
+    print(f"{'=' * 60}")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Mine GitHub for ground truth candidates")
     parser.add_argument("--wanted", default="scripts/wanted.yaml", help="Coverage matrix YAML")
@@ -446,6 +611,9 @@ def main():
     parser.add_argument("--languages", nargs="+", default=["typescript", "python", "go"])
     parser.add_argument("--days", type=int, default=30, help="Search window in days")
     parser.add_argument("--max-candidates", type=int, default=50)
+    parser.add_argument("--llm-check", action="store_true", help="Use LLM to verify fix correlates with failure")
+    parser.add_argument("--spot-check", type=int, metavar="N", help="Sample N candidates and print reproduction commands")
+    parser.add_argument("--recheck", action="store_true", help="Run LLM correlation check on existing candidates")
     parser.add_argument("--dry-run", action="store_true", help="Validate config without API calls")
     args = parser.parse_args()
 
@@ -464,6 +632,24 @@ def main():
 
     if args.dry_run:
         print("Dry run — config validated, no API calls.")
+        return
+
+    if args.spot_check:
+        run_spot_check(args.output, args.spot_check)
+        return
+
+    if args.recheck:
+        google_key = os.environ.get("GOOGLE_API_KEY", "")
+        if not google_key:
+            print("Error: GOOGLE_API_KEY required for --recheck", file=sys.stderr)
+            sys.exit(1)
+        results = run_recheck(args.output, google_key)
+        correlated = sum(1 for r in results if r["correlated"])
+        rejected = len(results) - correlated
+        print(f"\nRecheck complete: {correlated} correlated, {rejected} rejected, {len(results)} total checked")
+        for r in results:
+            status = "✓" if r["correlated"] else "✗"
+            print(f"  {status} {r['case_id']}: {r.get('reason', '')[:60]}")
         return
 
     date_from = (datetime.now(timezone.utc) - timedelta(days=args.days)).strftime("%Y-%m-%d")
@@ -551,6 +737,22 @@ def main():
                 print(f"    Bucket full: {lang}/{failure_type}/{classification['bug_location']}")
                 continue
 
+            # LLM correlation check (optional, requires GOOGLE_API_KEY)
+            correlation = None
+            if args.llm_check:
+                google_key = os.environ.get("GOOGLE_API_KEY", "")
+                if google_key:
+                    correlation = check_correlation(
+                        log_excerpt=log_text or fail_commit.get("message", ""),
+                        fix_diff=diff_text,
+                        pr_title=pr["title"],
+                        api_key=google_key,
+                    )
+                    if not correlation["correlated"]:
+                        print(f"    LLM rejected: {correlation['reason'][:80]}")
+                        continue
+                    print(f"    LLM: correlated ✓")
+
             candidate = generate_candidate(
                 repo=f"{owner}/{repo}",
                 run_id=failing_run_id,
@@ -565,6 +767,9 @@ def main():
                 classification=classification,
                 difficulty=difficulty,
             )
+
+            if correlation:
+                candidate["metadata"]["llm_correlation"] = correlation["reason"][:200]
 
             case_dir = save_candidate(args.output, candidate, diff_text, log_excerpt=log_text)
             if case_dir is None:
