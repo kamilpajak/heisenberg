@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-04-04
+
+### Added
+
+- **Dynamic pattern recognition (Phase 2)** — vector similarity search for historical failure patterns using pgvector in the SaaS tier (`ee/`)
+  - Gemini embedding client generates 768-dim vectors from RCA text
+  - `rca_embeddings` table with HNSW cosine index for fast nearest-neighbor search
+  - `DynamicMatcher` and `CompositeMatcher` combining static + dynamic patterns
+  - Auto-embedding on analysis creation (async, non-blocking)
+  - `GET /analyses/{id}/similar` — find historically similar failures
+  - `GET /patterns/search?q=...` — free-text semantic search
+- **Confidence calibration** — post-LLM pipeline reduces false positives when root cause is external
+  - Rule 1: production bug claimed but no diff-fault intersection → cap 39
+  - Rule 2: >50% blast radius + code blame → cap 39
+  - Rule 3: uniform network errors blamed on code → cap 49
+  - Rule 4: LLM uncertain about bug location → cap 49
+  - Rule 5: evidence mentions HTTP/API errors but classified as code → cap 49
+  - `original_confidence` and `calibration_reason` in JSON output
+  - System prompt now requires considering external root causes
+- **Run status validation** — prevents analyzing in-progress CI runs that produce misleading diagnoses
+  - Hybrid approach: allows in-progress runs with completed failed jobs (Azure manual approval, GitHub matrix)
+  - Normalized `ci.Status*` and `ci.Conclusion*` constants for CI-agnostic design
+  - GitHub `timed_out` conclusion mapped to failure
+- **Eval framework improvements**
+  - Multi-provider eval support (GitHub + Azure)
+  - Redesigned ground truth model: separates actual cause from expected output, confidence ranges, partial matching
+  - Ground truth mining script (`scripts/mine_ground_truth.py`) — mines GitHub for fail→pass transitions with LLM verification
+
+### Changed
+
+- Docker images switched to `pgvector/pgvector:pg16` (docker-compose, CI, testutil)
+- `CalibrationSignals` exported with JSON tags for future data-driven calibration
+- Blast radius warning injected into cluster context when >25% of jobs share same error
+
+### Fixed
+
+- Similar RCAs sorted by similarity before truncation
+- `bgTasks.Wait()` in server shutdown for graceful embedding completion
+- Silent error swallowing in `DynamicMatcher` and `collectSimilar` — now logged
+- JSON `null` vs `[]` inconsistency in similar analyses response
+- `TestDeleteOldAnalyses` handles shared CI database
+
 ## [0.5.0] - 2026-04-02
 
 ### Added
