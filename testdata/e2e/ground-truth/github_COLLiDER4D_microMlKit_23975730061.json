@@ -1,0 +1,46 @@
+{
+  "case_id": "gh-COLLiDER4D-microMlKit-23975730061",
+  "repo": "COLLiDER4D/microMlKit",
+  "run_id": 23975730061,
+  "tags": [],
+  "transition": {
+    "failing_commit": "fbb62828df6f9d25a338813882a852ee12109622",
+    "fix_commit": "bd5c7af3898c496de8d12888d048041ed657ca1f",
+    "pr_url": "https://github.com/COLLiDER4D/microMlKit/pull/2",
+    "pr_title": "Refactor project structure and fix tests",
+    "files_changed": [
+      "tests/test_base.py",
+      "tests/test_linear_regression.py",
+      "tests/test_metrics.py"
+    ],
+    "fix_size_lines": 24
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "Refactor project structure and fix tests",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "test"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "",
+    "llm_correlation": "YES. The diff modifies the `sys.path` to ensure that the package can be imported correctly when running tests from the repository root. This suggests that the tests were failing due to import errors, "
+  }
+}

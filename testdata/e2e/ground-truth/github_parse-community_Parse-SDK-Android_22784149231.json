@@ -1,0 +1,45 @@
+{
+  "case_id": "gh-parse-community-Parse-SDK-Android-22784149231",
+  "repo": "parse-community/Parse-SDK-Android",
+  "run_id": 22784149231,
+  "tags": [],
+  "transition": {
+    "failing_commit": "f80fb5daab25f3b3e1a3020b9ea5b32ceecfa7ae",
+    "fix_commit": "47ecc6791f01a24c52808d0eddbbb89c938aedd3",
+    "pr_url": "https://github.com/parse-community/Parse-SDK-Android/pull/1228",
+    "pr_title": "ci: Resolve Gradle wrapper validation and unit test failures",
+    "files_changed": [
+      "parse/src/test/java/com/parse/ParseCorePluginsTest.java",
+      "parse/src/test/java/com/parse/ParseFileControllerTest.java"
+    ],
+    "fix_size_lines": 30
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "ci: Resolve Gradle wrapper validation and unit test failures",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "assertion",
+        "bug_location": "production"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "",
+    "llm_correlation": "YES\n\nThe test failure log shows the CI process setting up Java 11. The diff includes changes to `ParseFileControllerTest` and `ParseCorePluginsTest`, which are unit tests. The changes in the diff invo"
+  }
+}

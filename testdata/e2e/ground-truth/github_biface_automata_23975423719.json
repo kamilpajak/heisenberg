@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-biface-automata-23975423719",
+  "repo": "biface/automata",
+  "run_id": 23975423719,
+  "tags": [],
+  "transition": {
+    "failing_commit": "fe5c2b84e4f4a00323b3165372c6bdd79a9c89c2",
+    "fix_commit": "79677a102b5dc3c1fd35667726b1a765c76a2fae",
+    "pr_url": "https://github.com/biface/automata/pull/52",
+    "pr_title": "Fix/ci workflows",
+    "files_changed": [
+      "tox.ini"
+    ],
+    "fix_size_lines": 6
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "Fix/ci workflows",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "infrastructure"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "Vague PR title \u2014 actual_cause needs human review",
+    "llm_correlation": "YES\nThe diff comments out mypy and type-check requirements, suggesting a problem with type checking is causing the CI failure. The PR title \"Fix/ci workflows\" also indicates that the change is intende"
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "case_id": "gh-Connexity-AI-connexity-evals-23897777701",
+  "repo": "Connexity-AI/connexity-evals",
+  "run_id": 23897777701,
+  "tags": [],
+  "transition": {
+    "failing_commit": "53ab98ac9dbf5b54e79178892ba522524e411a87",
+    "fix_commit": "b7695cb30a28f94b722b98843b5881a575b2ae4c",
+    "pr_url": "https://github.com/Connexity-AI/connexity-evals/pull/28",
+    "pr_title": "feat(ci): add CI workflow, switch mypy to pyright, fix failing tests \u2026",
+    "files_changed": [
+      ".github/workflows/ci.yml",
+      "CLAUDE.md"
+    ],
+    "fix_size_lines": 8
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "feat(ci): add CI workflow, switch mypy to pyright, fix failing tests \u2026",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "infrastructure"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "",
+    "llm_correlation": "YES. The diff changes `pnpm turbo typecheck` to `pnpm turbo check-types` in multiple places. This suggests that the original command was incorrect and causing the typecheck to fail, and the change dir"
+  }
+}

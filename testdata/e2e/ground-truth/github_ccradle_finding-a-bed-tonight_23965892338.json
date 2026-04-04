@@ -1,0 +1,45 @@
+{
+  "case_id": "gh-ccradle-finding-a-bed-tonight-23965892338",
+  "repo": "ccradle/finding-a-bed-tonight",
+  "run_id": 23965892338,
+  "tags": [],
+  "transition": {
+    "failing_commit": "eaf5091ecd73d6a52df0f151f665bc053ad1d2f1",
+    "fix_commit": "4ded0fd34617d60459f85a5ff5de2993ca81dd9f",
+    "pr_url": "https://github.com/ccradle/finding-a-bed-tonight/pull/47",
+    "pr_title": "Fix #34 + #44: Availability validation + shelter-edit test cleanup",
+    "files_changed": [
+      "e2e/karate/src/test/java/features/reservations/reservation-concurrency.feature",
+      "e2e/karate/src/test/java/features/reservations/reservation-lifecycle.feature"
+    ],
+    "fix_size_lines": 9
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "Fix #34 + #44: Availability validation + shelter-edit test cleanup",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "timeout",
+        "bug_location": "production"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "",
+    "llm_correlation": "YES\nThe diff modifies the test case related to reservation concurrency and full lifecycle, specifically changing the population type and shelter ID in the requests. This suggests the original test fai"
+  }
+}

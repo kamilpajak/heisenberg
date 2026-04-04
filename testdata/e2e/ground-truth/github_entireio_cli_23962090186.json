@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-entireio-cli-23962090186",
+  "repo": "entireio/cli",
+  "run_id": 23962090186,
+  "tags": [],
+  "transition": {
+    "failing_commit": "37b0c4f957abb03e013d2f6f9c808717f599967e",
+    "fix_commit": "a1e07b620dfbca3a691d022e12ddb0d35797db35",
+    "pr_url": "https://github.com/entireio/cli/pull/835",
+    "pr_title": "fix: Windows E2E failures \u2014 MSYS path normalization and test fixes",
+    "files_changed": [
+      "cmd/entire/cli/strategy/manual_commit_hooks.go"
+    ],
+    "fix_size_lines": 2
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix: Windows E2E failures \u2014 MSYS path normalization and test fixes",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "assertion",
+        "bug_location": "production"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES. The PR title mentions \"Windows E2E failures\" and \"MSYS path normalization\". The code change modifies how file paths are normalized, specifically addressing relative paths and absolute paths, whic"
+  }
+}

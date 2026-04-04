@@ -1,0 +1,45 @@
+{
+  "case_id": "gh-kagura-ai-memory-cloud-23894743861",
+  "repo": "kagura-ai/memory-cloud",
+  "run_id": 23894743861,
+  "tags": [],
+  "transition": {
+    "failing_commit": "bd82f1d8a4748150f784a08e2452434cee4e515d",
+    "fix_commit": "9df40d93131e1b1729ee7148196d4c8066d72c1f",
+    "pr_url": "https://github.com/kagura-ai/memory-cloud/pull/110",
+    "pr_title": "fix(test): fix all failing tests on main \u2014 45 failures + 70 errors \u2192 0 (#108)",
+    "files_changed": [
+      "backend/tests/conftest.py",
+      "backend/tests/test_mcp_tools.py"
+    ],
+    "fix_size_lines": 7
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix(test): fix all failing tests on main \u2014 45 failures + 70 errors \u2192 0 (#108)",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "test"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "",
+    "llm_correlation": "YES.\n\nThe PR title indicates that this change fixes all failing tests. The diff shows changes to test files, including removing an unused import (`asyncio`) and reordering imports to comply with `E402"
+  }
+}

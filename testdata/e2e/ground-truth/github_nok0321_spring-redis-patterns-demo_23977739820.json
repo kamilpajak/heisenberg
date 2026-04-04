@@ -1,0 +1,45 @@
+{
+  "case_id": "gh-nok0321-spring-redis-patterns-demo-23977739820",
+  "repo": "nok0321/spring-redis-patterns-demo",
+  "run_id": 23977739820,
+  "tags": [],
+  "transition": {
+    "failing_commit": "3c308df45063ccdfefeba073cb6ecae788a58caa",
+    "fix_commit": "e5a7f5ab2e5524ff3cd6491b4c93faa727dce251",
+    "pr_url": "https://github.com/nok0321/spring-redis-patterns-demo/pull/44",
+    "pr_title": "fix: Infra Mid \u2014 \u30bb\u30ad\u30e5\u30ea\u30c6\u30a3\u5f37\u5316 + CI\u6700\u9069\u5316 (#41)",
+    "files_changed": [
+      ".github/workflows/ci.yml",
+      "e2e/tests/smoke/infrastructure.spec.ts"
+    ],
+    "fix_size_lines": 13
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix: Infra Mid \u2014 \u30bb\u30ad\u30e5\u30ea\u30c6\u30a3\u5f37\u5316 + CI\u6700\u9069\u5316 (#41)",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "assertion",
+        "bug_location": "infrastructure"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "",
+    "llm_correlation": "YES\nThe test failure log shows package installation and dependency resolution, which is not directly related to the provided code changes. However, the code changes introduce a `GRAFANA_ADMIN_PASSWORD"
+  }
+}

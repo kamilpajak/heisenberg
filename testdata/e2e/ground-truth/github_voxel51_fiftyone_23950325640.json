@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-voxel51-fiftyone-23950325640",
+  "repo": "voxel51/fiftyone",
+  "run_id": 23950325640,
+  "tags": [],
+  "transition": {
+    "failing_commit": "83421e51c940dcd9a5cb52ead973934f3c482a0c",
+    "fix_commit": "53dd4d12f6bc16d0203752435dbca10f9fe90c2c",
+    "pr_url": "https://github.com/voxel51/fiftyone/pull/7304",
+    "pr_title": "fix: replace flaky subprocess session test with unit tests",
+    "files_changed": [
+      "tests/session_tests.py"
+    ],
+    "fix_size_lines": 20
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix: replace flaky subprocess session test with unit tests",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "assertion",
+        "bug_location": "test"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "",
+    "llm_correlation": "YES.\n\nThe PR title indicates the change replaces a flaky subprocess session test. The diff modifies the session tests, specifically addressing the `__del__` logic of the `Session` object, which is lik"
+  }
+}

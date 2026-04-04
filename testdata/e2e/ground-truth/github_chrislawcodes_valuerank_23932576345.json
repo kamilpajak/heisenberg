@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-chrislawcodes-valuerank-23932576345",
+  "repo": "chrislawcodes/valuerank",
+  "run_id": 23932576345,
+  "tags": [],
+  "transition": {
+    "failing_commit": "d3a298fcac091bbea843c4e988dcce9c6fa18bb9",
+    "fix_commit": "fa31558833aa89d841e8d7ffcaa7c945c96fcaf7",
+    "pr_url": "https://github.com/chrislawcodes/valuerank/pull/523",
+    "pr_title": "fix: domain analysis failing for default-temp signature (vnewtd/v1td)",
+    "files_changed": [
+      "cloud/apps/api/tests/graphql/queries/domain-analysis.test.ts"
+    ],
+    "fix_size_lines": 12
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix: domain analysis failing for default-temp signature (vnewtd/v1td)",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "assertion",
+        "bug_location": "production"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES. The test failure log shows warnings related to \"Admin export denied: invalid token\" and \"Admin export denied: IP not allowlisted\". While the provided diff doesn't directly address these warnings,"
+  }
+}

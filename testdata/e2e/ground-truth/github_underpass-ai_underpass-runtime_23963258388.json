@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-underpass-ai-underpass-runtime-23963258388",
+  "repo": "underpass-ai/underpass-runtime",
+  "run_id": 23963258388,
+  "tags": [],
+  "transition": {
+    "failing_commit": "49da6350b6de2bee69dbdbaeeb739be5cd6b037f",
+    "fix_commit": "e7897a6e4d874bdcba6383a3474c366c0da347ff",
+    "pr_url": "https://github.com/underpass-ai/underpass-runtime/pull/105",
+    "pr_title": "fix: log feedback errors in remediation agent + regen e2e proto",
+    "files_changed": [
+      "internal/remediation/agent_test.go"
+    ],
+    "fix_size_lines": 39
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix: log feedback errors in remediation agent + regen e2e proto",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "production"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "",
+    "llm_correlation": "YES\nThe diff adds error handling for `AcceptRecommendation` and `RejectRecommendation` in the `fakeRuntimeClient` used in tests. It also adds new tests `TestAgent_HandleAlert_AcceptFeedbackError` and "
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "case_id": "gh-DaveMBush-dms-workspace-23936729924",
+  "repo": "DaveMBush/dms-workspace",
+  "run_id": 23936729924,
+  "tags": [],
+  "transition": {
+    "failing_commit": "ae1b84ecd269e779ffb52e8cfff9f67a47cbdf29",
+    "fix_commit": "6470682b289ce3f6825b1cc13574bf2559632918",
+    "pr_url": "https://github.com/DaveMBush/dms-workspace/pull/894",
+    "pr_title": "fix: resolve failing Chromium e2e tests",
+    "files_changed": [
+      "apps/dms-material/src/app/shared/components/base-table/base-table.component.html",
+      "apps/dms-material/src/app/shared/components/summary-display/summary-display.html"
+    ],
+    "fix_size_lines": 13
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix: resolve failing Chromium e2e tests",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "production"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "",
+    "llm_correlation": "YES. The PR title indicates the fix addresses failing Chromium e2e tests. The diff includes changes to HTML elements with `data-testid` attributes, which are commonly used in e2e tests to locate and i"
+  }
+}
