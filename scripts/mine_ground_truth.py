@@ -25,6 +25,45 @@ import yaml
 # --- GitHub API ---
 
 GITHUB_API = "https://api.github.com"
+MAX_RETRIES = 5
+
+
+def github_get(url, token, params=None):
+    """Rate-limit-aware GET request for GitHub API.
+
+    Handles:
+    - 429 + Retry-After header (secondary rate limits)
+    - 403 + X-RateLimit-Remaining=0 (primary rate limits)
+    - Proactive 2.1s sleep for /search/ endpoints (30 req/min limit)
+    - Raises HTTPError for non-rate-limit errors
+    """
+    headers = {"Authorization": f"token {token}", "Accept": "application/vnd.github.v3+json"}
+
+    if "/search/" in url:
+        time.sleep(2.1)
+
+    for _ in range(MAX_RETRIES):
+        resp = requests.get(url, headers=headers, params=params)
+
+        if resp.status_code == 429:
+            wait = int(resp.headers.get("Retry-After", 60)) + 1
+            print(f"  ⏳ 429 rate limited, waiting {wait}s...")
+            time.sleep(wait)
+            continue
+
+        if resp.status_code == 403 and resp.headers.get("X-RateLimit-Remaining") == "0":
+            reset_epoch = int(resp.headers.get("X-RateLimit-Reset", time.time() + 60))
+            wait = max(0, reset_epoch - int(time.time())) + 1
+            print(f"  ⏳ Primary rate limit exhausted, waiting {wait}s...")
+            time.sleep(wait)
+            continue
+
+        resp.raise_for_status()
+        return resp
+
+    # Exhausted retries
+    resp.raise_for_status()
+    return resp
 SEARCH_QUERIES = [
     # PR title searches
     'in:title "fix CI" is:merged',
@@ -42,16 +81,14 @@ SEARCH_QUERIES = [
 
 def search_fix_prs(language, date_from, token):
     """Search GitHub for merged PRs with fix-related titles."""
-    headers = {"Authorization": f"token {token}", "Accept": "application/vnd.github.v3+json"}
     results = []
     for query_base in SEARCH_QUERIES:
         q = f"{query_base} language:{language} created:>{date_from}"
-        resp = requests.get(
+        resp = github_get(
             f"{GITHUB_API}/search/issues",
-            headers=headers,
+            token=token,
             params={"q": q, "per_page": 30, "sort": "created", "order": "desc"},
         )
-        resp.raise_for_status()
         for item in resp.json().get("items", []):
             if item.get("pull_request"):
                 results.append(item)
@@ -64,13 +101,11 @@ def get_check_conclusion(owner, repo, sha, token):
     Returns 'failure' if ANY check-run failed, 'success' if all passed,
     'pending' if any are still running, 'unknown' if no checks exist.
     """
-    headers = {"Authorization": f"token {token}", "Accept": "application/vnd.github.v3+json"}
-    resp = requests.get(
+    resp = github_get(
         f"{GITHUB_API}/repos/{owner}/{repo}/commits/{sha}/check-runs",
-        headers=headers,
+        token=token,
         params={"per_page": 100},
     )
-    resp.raise_for_status()
     check_runs = resp.json().get("check_runs", [])
 
     if not check_runs:
@@ -92,13 +127,11 @@ def get_failing_run_id(owner, repo, sha, token):
 
     Returns 0 if no failing check-run or URL can't be parsed.
     """
-    headers = {"Authorization": f"token {token}", "Accept": "application/vnd.github.v3+json"}
-    resp = requests.get(
+    resp = github_get(
         f"{GITHUB_API}/repos/{owner}/{repo}/commits/{sha}/check-runs",
-        headers=headers,
+        token=token,
         params={"per_page": 100},
     )
-    resp.raise_for_status()
 
     for cr in resp.json().get("check_runs", []):
         if cr.get("conclusion") == "failure":
@@ -117,22 +150,18 @@ def fetch_failing_log(owner, repo, run_id, token, max_bytes=50000):
     """
     if not run_id:
         return ""
-    headers = {"Authorization": f"token {token}", "Accept": "application/vnd.github.v3+json"}
     try:
-        # Get jobs for this run
-        resp = requests.get(
+        resp = github_get(
             f"{GITHUB_API}/repos/{owner}/{repo}/actions/runs/{run_id}/jobs",
-            headers=headers,
+            token=token,
         )
-        resp.raise_for_status()
         jobs = resp.json().get("jobs", [])
 
-        # Find first failed job
         for job in jobs:
             if job.get("conclusion") == "failure":
-                log_resp = requests.get(
+                log_resp = github_get(
                     f"{GITHUB_API}/repos/{owner}/{repo}/actions/jobs/{job['id']}/logs",
-                    headers=headers,
+                    token=token,
                 )
                 if log_resp.status_code == 200:
                     text = log_resp.text
@@ -151,14 +180,11 @@ def get_pr_commits_with_status(owner, repo, pr_number, token):
     Limits to MAX_COMMITS_PER_PR most recent commits to reduce API calls.
     Most fix transitions happen in the last few commits.
     """
-    headers = {"Authorization": f"token {token}", "Accept": "application/vnd.github.v3+json"}
-
-    resp = requests.get(
+    resp = github_get(
         f"{GITHUB_API}/repos/{owner}/{repo}/pulls/{pr_number}/commits",
-        headers=headers,
+        token=token,
         params={"per_page": 100},
     )
-    resp.raise_for_status()
     commits = resp.json()
 
     # Only check last N commits — fixes are typically near the end
@@ -470,19 +496,6 @@ def main():
                 continue
             owner, repo = parts
 
-            # Rate limit check every 10 PRs
-            if len(seen_prs) % 10 == 0:
-                rl_resp = requests.get(
-                    f"{GITHUB_API}/rate_limit",
-                    headers={"Authorization": f"token {token}"},
-                )
-                remaining = rl_resp.json().get("resources", {}).get("core", {}).get("remaining", 5000)
-                if remaining < 200:
-                    reset = rl_resp.json()["resources"]["core"]["reset"]
-                    wait = max(0, reset - time.time()) + 5
-                    print(f"  ⏳ Rate limit low ({remaining}), waiting {wait:.0f}s...")
-                    time.sleep(wait)
-
             print(f"  Checking {owner}/{repo} PR#{pr['number']}: {pr['title'][:60]}...")
 
             try:
@@ -501,11 +514,10 @@ def main():
 
             # Get diff
             try:
-                diff_resp = requests.get(
+                diff_resp = github_get(
                     f"{GITHUB_API}/repos/{owner}/{repo}/compare/{fail_commit['sha']}...{fix_commit['sha']}",
-                    headers={"Authorization": f"token {token}", "Accept": "application/vnd.github.v3+json"},
+                    token=token,
                 )
-                diff_resp.raise_for_status()
                 diff_data = diff_resp.json()
             except requests.HTTPError:
                 print(f"    Skipped: diff API error")

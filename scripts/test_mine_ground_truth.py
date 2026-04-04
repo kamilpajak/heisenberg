@@ -3,6 +3,7 @@
 import json
 
 import pytest
+import requests
 import responses
 
 from mine_ground_truth import (
@@ -118,6 +119,62 @@ class TestGetFailingRunId:
 
 
 # --- find_fail_pass_transition ---
+
+
+class TestGithubRequest:
+    """Rate-limited request wrapper."""
+
+    @responses.activate
+    def test_normal_request(self):
+        from mine_ground_truth import github_get
+        responses.add(responses.GET, f"{GITHUB_API}/test", json={"ok": True})
+        resp = github_get(f"{GITHUB_API}/test", token="t")
+        assert resp.json() == {"ok": True}
+
+    @responses.activate
+    def test_retries_on_429_with_retry_after(self):
+        from mine_ground_truth import github_get
+        responses.add(
+            responses.GET, f"{GITHUB_API}/test",
+            status=429, headers={"Retry-After": "0"},
+        )
+        responses.add(responses.GET, f"{GITHUB_API}/test", json={"ok": True})
+        resp = github_get(f"{GITHUB_API}/test", token="t")
+        assert resp.json() == {"ok": True}
+        assert len(responses.calls) == 2
+
+    @responses.activate
+    def test_retries_on_403_rate_limit_exhausted(self):
+        from mine_ground_truth import github_get
+        import time
+        responses.add(
+            responses.GET, f"{GITHUB_API}/test",
+            status=403,
+            headers={
+                "X-RateLimit-Remaining": "0",
+                "X-RateLimit-Reset": str(int(time.time())),
+            },
+        )
+        responses.add(responses.GET, f"{GITHUB_API}/test", json={"ok": True})
+        resp = github_get(f"{GITHUB_API}/test", token="t")
+        assert resp.json() == {"ok": True}
+
+    @responses.activate
+    def test_raises_on_non_rate_limit_403(self):
+        from mine_ground_truth import github_get
+        responses.add(
+            responses.GET, f"{GITHUB_API}/test",
+            status=403, json={"message": "forbidden"},
+        )
+        with pytest.raises(requests.HTTPError):
+            github_get(f"{GITHUB_API}/test", token="t")
+
+    @responses.activate
+    def test_raises_on_500(self):
+        from mine_ground_truth import github_get
+        responses.add(responses.GET, f"{GITHUB_API}/test", status=500)
+        with pytest.raises(requests.HTTPError):
+            github_get(f"{GITHUB_API}/test", token="t")
 
 
 class TestSearchQueries:
