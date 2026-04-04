@@ -676,6 +676,23 @@ class TestRecheck:
         assert len(results) == 0  # skipped — already has llm_correlation
 
 
+class TestCandidateExists:
+    def test_detects_existing(self, tmp_path):
+        from mine_ground_truth import candidate_exists, save_candidate
+        candidate = {"case_id": "t", "repo": "owner/repo", "run_id": 123,
+                     "transition": {"failing_commit": "a", "fix_commit": "b",
+                                    "pr_url": "", "pr_title": "fix", "files_changed": [], "fix_size_lines": 1},
+                     "expected_output": {"analyses": [{}]},
+                     "ground_truth": {"actual_cause": "", "observable_by_tool": True, "review_status": "pending"},
+                     "metadata": {"heuristic_difficulty": "easy", "notes": ""}}
+        save_candidate(str(tmp_path), candidate)
+        assert candidate_exists(str(tmp_path), "owner/repo", 123)
+
+    def test_not_exists(self, tmp_path):
+        from mine_ground_truth import candidate_exists
+        assert not candidate_exists(str(tmp_path), "owner/repo", 999)
+
+
 class TestSpotCheck:
     def test_prints_reproduction_commands(self, tmp_path, capsys):
         from mine_ground_truth import run_spot_check, save_candidate

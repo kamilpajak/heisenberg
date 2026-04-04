@@ -492,6 +492,12 @@ def generate_candidate(repo, run_id, transition, classification, difficulty):
     }
 
 
+def candidate_exists(output_dir, repo, run_id):
+    """Check if a candidate directory already exists."""
+    case_dir = Path(output_dir) / f"{repo.replace('/', '_')}_{run_id}"
+    return case_dir.exists()
+
+
 def save_candidate(output_dir, candidate, diff_patch="", run_metadata=None, log_excerpt=""):
     """Write candidate directory with all files. Returns None if already exists."""
     case_dir = Path(output_dir) / f"{candidate['repo'].replace('/', '_')}_{candidate['run_id']}"
@@ -755,6 +761,11 @@ def main():
 
             if not check_bucket(wanted, lang, failure_type, classification["bug_location"]):
                 print(f"    Bucket full: {lang}/{failure_type}/{classification['bug_location']}")
+                continue
+
+            # Early existence check — before expensive LLM call
+            if candidate_exists(args.output, f"{owner}/{repo}", failing_run_id):
+                print(f"    ⏭ Already exists, skipping")
                 continue
 
             # LLM correlation check (optional, requires GOOGLE_API_KEY)
