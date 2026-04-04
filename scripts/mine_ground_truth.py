@@ -17,6 +17,8 @@ import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+import time
+
 import requests
 import yaml
 
@@ -49,11 +51,101 @@ def search_fix_prs(language, date_from, token):
     return results
 
 
+def get_check_conclusion(owner, repo, sha, token):
+    """Get the overall conclusion from check-runs API (not combined status).
+
+    Returns 'failure' if ANY check-run failed, 'success' if all passed,
+    'pending' if any are still running, 'unknown' if no checks exist.
+    """
+    headers = {"Authorization": f"token {token}", "Accept": "application/vnd.github.v3+json"}
+    resp = requests.get(
+        f"{GITHUB_API}/repos/{owner}/{repo}/commits/{sha}/check-runs",
+        headers=headers,
+        params={"per_page": 100},
+    )
+    resp.raise_for_status()
+    check_runs = resp.json().get("check_runs", [])
+
+    if not check_runs:
+        return "unknown"
+
+    for cr in check_runs:
+        if cr.get("conclusion") == "failure":
+            return "failure"
+
+    for cr in check_runs:
+        if cr.get("conclusion") is None:
+            return "pending"
+
+    return "success"
+
+
+def get_failing_run_id(owner, repo, sha, token):
+    """Extract the workflow run ID from the first failed check-run's details_url.
+
+    Returns 0 if no failing check-run or URL can't be parsed.
+    """
+    headers = {"Authorization": f"token {token}", "Accept": "application/vnd.github.v3+json"}
+    resp = requests.get(
+        f"{GITHUB_API}/repos/{owner}/{repo}/commits/{sha}/check-runs",
+        headers=headers,
+        params={"per_page": 100},
+    )
+    resp.raise_for_status()
+
+    for cr in resp.json().get("check_runs", []):
+        if cr.get("conclusion") == "failure":
+            url = cr.get("details_url", "")
+            # Parse run ID from: https://github.com/owner/repo/actions/runs/12345/jobs/67890
+            match = re.search(r"/actions/runs/(\d+)", url)
+            if match:
+                return int(match.group(1))
+    return 0
+
+
+def fetch_failing_log(owner, repo, run_id, token, max_bytes=50000):
+    """Fetch log excerpt from the first failed job in a workflow run.
+
+    Returns log text (last max_bytes) or empty string on failure.
+    """
+    if not run_id:
+        return ""
+    headers = {"Authorization": f"token {token}", "Accept": "application/vnd.github.v3+json"}
+    try:
+        # Get jobs for this run
+        resp = requests.get(
+            f"{GITHUB_API}/repos/{owner}/{repo}/actions/runs/{run_id}/jobs",
+            headers=headers,
+        )
+        resp.raise_for_status()
+        jobs = resp.json().get("jobs", [])
+
+        # Find first failed job
+        for job in jobs:
+            if job.get("conclusion") == "failure":
+                log_resp = requests.get(
+                    f"{GITHUB_API}/repos/{owner}/{repo}/actions/jobs/{job['id']}/logs",
+                    headers=headers,
+                )
+                if log_resp.status_code == 200:
+                    text = log_resp.text
+                    return text[-max_bytes:] if len(text) > max_bytes else text
+        return ""
+    except (requests.HTTPError, requests.ConnectionError):
+        return ""
+
+
+MAX_COMMITS_PER_PR = 6  # Only check last N commits to limit API calls
+
+
 def get_pr_commits_with_status(owner, repo, pr_number, token):
-    """Get PR commits with their CI check conclusions."""
+    """Get last N PR commits with their CI check conclusions.
+
+    Limits to MAX_COMMITS_PER_PR most recent commits to reduce API calls.
+    Most fix transitions happen in the last few commits.
+    """
     headers = {"Authorization": f"token {token}", "Accept": "application/vnd.github.v3+json"}
 
-    # Get commits
     resp = requests.get(
         f"{GITHUB_API}/repos/{owner}/{repo}/pulls/{pr_number}/commits",
         headers=headers,
@@ -62,16 +154,13 @@ def get_pr_commits_with_status(owner, repo, pr_number, token):
     resp.raise_for_status()
     commits = resp.json()
 
-    # Get check-run conclusion for each commit
+    # Only check last N commits — fixes are typically near the end
+    commits = commits[-MAX_COMMITS_PER_PR:]
+
     enriched = []
     for c in commits:
         sha = c["sha"]
-        status_resp = requests.get(
-            f"{GITHUB_API}/repos/{owner}/{repo}/commits/{sha}/status",
-            headers=headers,
-        )
-        status_resp.raise_for_status()
-        conclusion = status_resp.json().get("state", "unknown")
+        conclusion = get_check_conclusion(owner, repo, sha, token)
         enriched.append({"sha": sha, "conclusion": conclusion, "message": c["commit"]["message"]})
 
     return enriched
@@ -151,7 +240,7 @@ FAILURE_TYPE_PATTERNS = [
     (re.compile(r"(TimeoutError|timed?\s*out|timeout\s+\d)", re.IGNORECASE), "timeout"),
     (re.compile(r"(Assertion|assert|expect\(|toBe|toEqual|assertEqual)", re.IGNORECASE), "assertion"),
     (re.compile(r"(ECONNREFUSED|connection refused|HTTP\s*[45]\d\d|502|503|504)", re.IGNORECASE), "network"),
-    (re.compile(r"(exit code 137|OOM|OutOfMemory|killed|ENOMEM)", re.IGNORECASE), "infra"),
+    (re.compile(r"(exit code 137|OOM|OutOfMemory|killed|ENOMEM|ERESOLVE|ModuleNotFoundError|ImportError|npm ERR)", re.IGNORECASE), "infra"),
 ]
 
 
@@ -191,12 +280,11 @@ def classify_failure_type(log_text):
 def estimate_difficulty(diff_files, diff_lines):
     """Heuristic difficulty: easy/medium/hard."""
     n_files = len(diff_files)
-    has_config = any(INFRA_PATTERNS.search(f.get("path", "")) for f in diff_files)
-    all_test = all(TEST_PATTERNS.search(f.get("path", "")) for f in diff_files) and n_files > 0
 
-    if all_test and n_files == 1 and diff_lines < 15:
+    # Small, single-file fixes are easy regardless of file type
+    if n_files <= 1 and diff_lines < 15:
         return "easy"
-    if n_files > 3 or has_config or diff_lines > 30:
+    if n_files > 3 or diff_lines > 40:
         return "hard"
     return "medium"
 
@@ -345,6 +433,7 @@ def main():
 
     date_from = (datetime.now(timezone.utc) - timedelta(days=args.days)).strftime("%Y-%m-%d")
     total_candidates = 0
+    seen_prs = set()  # deduplicate across search queries
 
     for lang in args.languages:
         if total_candidates >= args.max_candidates:
@@ -364,11 +453,28 @@ def main():
                 break
 
             pr_url = pr.get("pull_request", {}).get("html_url", "")
+            if pr_url in seen_prs:
+                continue
+            seen_prs.add(pr_url)
+
             repo_url = pr.get("repository_url", "")
             parts = repo_url.replace(f"{GITHUB_API}/repos/", "").split("/")
             if len(parts) != 2:
                 continue
             owner, repo = parts
+
+            # Rate limit check every 10 PRs
+            if len(seen_prs) % 10 == 0:
+                rl_resp = requests.get(
+                    f"{GITHUB_API}/rate_limit",
+                    headers={"Authorization": f"token {token}"},
+                )
+                remaining = rl_resp.json().get("resources", {}).get("core", {}).get("remaining", 5000)
+                if remaining < 200:
+                    reset = rl_resp.json()["resources"]["core"]["reset"]
+                    wait = max(0, reset - time.time()) + 5
+                    print(f"  ⏳ Rate limit low ({remaining}), waiting {wait:.0f}s...")
+                    time.sleep(wait)
 
             print(f"  Checking {owner}/{repo} PR#{pr['number']}: {pr['title'][:60]}...")
 
@@ -410,7 +516,13 @@ def main():
                 continue
 
             classification = classify_fix(diff_files)
-            failure_type = classify_failure_type(fix_commit.get("message", ""))
+
+            # Get failing run ID and fetch log for failure type classification
+            failing_run_id = get_failing_run_id(owner, repo, fail_commit["sha"], token)
+            log_text = fetch_failing_log(owner, repo, failing_run_id, token)
+            failure_type = classify_failure_type(log_text) if log_text else "unknown"
+            if failure_type == "unknown":
+                failure_type = classify_failure_type(fail_commit.get("message", "") + " " + fix_commit.get("message", ""))
             classification["failure_type"] = failure_type
             difficulty = estimate_difficulty(diff_files, total_lines)
 
@@ -420,7 +532,7 @@ def main():
 
             candidate = generate_candidate(
                 repo=f"{owner}/{repo}",
-                run_id=0,  # TODO: get actual failing run ID
+                run_id=failing_run_id,
                 transition={
                     "failing_commit": fail_commit["sha"],
                     "fix_commit": fix_commit["sha"],
@@ -433,7 +545,7 @@ def main():
                 difficulty=difficulty,
             )
 
-            case_dir = save_candidate(args.output, candidate, diff_text)
+            case_dir = save_candidate(args.output, candidate, diff_text, log_excerpt=log_text)
             update_bucket(wanted, lang, failure_type, classification["bug_location"])
             total_candidates += 1
             print(f"    ✓ Saved: {case_dir}")

@@ -1,9 +1,15 @@
 """Tests for ground truth mining script."""
 
+import json
+
 import pytest
+import responses
 
 from mine_ground_truth import (
+    GITHUB_API,
     find_fail_pass_transition,
+    get_check_conclusion,
+    get_failing_run_id,
     filter_candidate,
     is_workaround,
     is_bot_author,
@@ -21,6 +27,110 @@ from mine_ground_truth import (
 
 def _commit(sha, conclusion):
     return {"sha": sha, "conclusion": conclusion}
+
+
+# --- get_check_conclusion (uses check-runs API, not status API) ---
+
+
+class TestGetCheckConclusion:
+    @responses.activate
+    def test_returns_failure_when_any_check_fails(self):
+        responses.add(
+            responses.GET,
+            f"{GITHUB_API}/repos/owner/repo/commits/abc123/check-runs",
+            json={
+                "total_count": 2,
+                "check_runs": [
+                    {"conclusion": "success", "name": "lint"},
+                    {"conclusion": "failure", "name": "test"},
+                ],
+            },
+        )
+        assert get_check_conclusion("owner", "repo", "abc123", "token") == "failure"
+
+    @responses.activate
+    def test_returns_success_when_all_pass(self):
+        responses.add(
+            responses.GET,
+            f"{GITHUB_API}/repos/owner/repo/commits/xyz789/check-runs",
+            json={
+                "total_count": 2,
+                "check_runs": [
+                    {"conclusion": "success", "name": "lint"},
+                    {"conclusion": "success", "name": "test"},
+                ],
+            },
+        )
+        assert get_check_conclusion("owner", "repo", "xyz789", "token") == "success"
+
+    @responses.activate
+    def test_returns_pending_when_no_conclusion(self):
+        responses.add(
+            responses.GET,
+            f"{GITHUB_API}/repos/owner/repo/commits/ppp/check-runs",
+            json={
+                "total_count": 1,
+                "check_runs": [{"conclusion": None, "name": "test"}],
+            },
+        )
+        assert get_check_conclusion("owner", "repo", "ppp", "token") == "pending"
+
+    @responses.activate
+    def test_returns_unknown_when_no_checks(self):
+        responses.add(
+            responses.GET,
+            f"{GITHUB_API}/repos/owner/repo/commits/nnn/check-runs",
+            json={"total_count": 0, "check_runs": []},
+        )
+        assert get_check_conclusion("owner", "repo", "nnn", "token") == "unknown"
+
+
+# --- get_failing_run_id ---
+
+
+class TestGetFailingRunId:
+    @responses.activate
+    def test_returns_run_id_from_failed_check(self):
+        responses.add(
+            responses.GET,
+            f"{GITHUB_API}/repos/owner/repo/commits/abc123/check-runs",
+            json={
+                "total_count": 2,
+                "check_runs": [
+                    {"conclusion": "success", "name": "lint", "details_url": "https://github.com/owner/repo/actions/runs/111/jobs/1"},
+                    {"conclusion": "failure", "name": "test", "details_url": "https://github.com/owner/repo/actions/runs/222/jobs/2"},
+                ],
+            },
+        )
+        assert get_failing_run_id("owner", "repo", "abc123", "token") == 222
+
+    @responses.activate
+    def test_returns_zero_when_no_failure(self):
+        responses.add(
+            responses.GET,
+            f"{GITHUB_API}/repos/owner/repo/commits/ok/check-runs",
+            json={
+                "total_count": 1,
+                "check_runs": [{"conclusion": "success", "name": "test", "details_url": ""}],
+            },
+        )
+        assert get_failing_run_id("owner", "repo", "ok", "token") == 0
+
+
+# --- find_fail_pass_transition ---
+
+
+class TestLimitCommits:
+    """Only check last N commits to reduce API calls."""
+
+    def test_limits_to_last_n(self):
+        commits = [_commit(str(i), "success") for i in range(20)]
+        commits[-2] = _commit("fail", "failure")
+        commits[-1] = _commit("fix", "success")
+        # With full list, should find transition at end
+        result = find_fail_pass_transition(commits[-5:])
+        assert result is not None
+        assert result[0]["sha"] == "fail"
 
 
 class TestFindFailPassTransition:
@@ -180,16 +290,49 @@ class TestClassifyFailureType:
         assert classify_failure_type("something went wrong") == "unknown"
 
 
+class TestClassifyFailureTypeFromLog:
+    """classify_failure_type should detect patterns in actual CI logs, not just commit messages."""
+
+    def test_playwright_timeout(self):
+        log = "Error: locator.click: Timeout 30000ms exceeded.\nWaiting for locator('button')"
+        assert classify_failure_type(log) == "timeout"
+
+    def test_jest_assertion(self):
+        log = "FAIL src/utils.test.ts\n● expect(received).toBe(expected)\nExpected: 42\nReceived: 0"
+        assert classify_failure_type(log) == "assertion"
+
+    def test_connection_refused(self):
+        log = "Error: connect ECONNREFUSED 127.0.0.1:5432\nat TCPConnectWrap"
+        assert classify_failure_type(log) == "network"
+
+    def test_oom_killed(self):
+        log = "Process exited with exit code 137\nThe runner has received a shutdown signal"
+        assert classify_failure_type(log) == "infra"
+
+    def test_npm_ci_failure(self):
+        log = "npm ERR! code ERESOLVE\nnpm ERR! ERESOLVE unable to resolve dependency tree"
+        assert classify_failure_type(log) == "infra"
+
+    def test_python_import_error(self):
+        log = "ModuleNotFoundError: No module named 'pandas'"
+        assert classify_failure_type(log) == "infra"
+
+
 class TestEstimateDifficulty:
-    def test_easy(self):
+    def test_easy_single_test_file(self):
         files = [{"path": "tests/test_foo.py"}]
         assert estimate_difficulty(files, 10) == "easy"
+
+    def test_easy_single_config_small_diff(self):
+        """A 3-line CI yml fix is easy, not hard."""
+        files = [{"path": ".github/workflows/ci.yml"}]
+        assert estimate_difficulty(files, 3) == "easy"
 
     def test_medium(self):
         files = [{"path": "src/foo.ts"}, {"path": "tests/foo.test.ts"}]
         assert estimate_difficulty(files, 20) == "medium"
 
-    def test_hard(self):
+    def test_hard_many_files(self):
         files = [
             {"path": "src/a.ts"},
             {"path": "src/b.ts"},
@@ -197,6 +340,10 @@ class TestEstimateDifficulty:
             {"path": ".github/workflows/ci.yml"},
         ]
         assert estimate_difficulty(files, 50) == "hard"
+
+    def test_hard_large_diff(self):
+        files = [{"path": "src/big.ts"}]
+        assert estimate_difficulty(files, 45) == "hard"
 
 
 # --- Diversity control ---
