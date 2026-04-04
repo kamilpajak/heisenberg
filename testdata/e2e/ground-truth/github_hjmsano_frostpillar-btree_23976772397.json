@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-hjmsano-frostpillar-btree-23976772397",
+  "repo": "hjmsano/frostpillar-btree",
+  "run_id": 23976772397,
+  "tags": [],
+  "transition": {
+    "failing_commit": "f84bf1635ae24c81dafc58f49a4db6a255bb5b05",
+    "fix_commit": "267a49a1ab47b9f6f19165f7b54d6390c295284a",
+    "pr_url": "https://github.com/hjmsano/frostpillar-btree/pull/4",
+    "pr_title": "fix: switch CI exclude condition and deleted unnecessary test",
+    "files_changed": [
+      "tests/githubActionsWorkflows.test.ts"
+    ],
+    "fix_size_lines": 12
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix: switch CI exclude condition and deleted unnecessary test",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "assertion",
+        "bug_location": "test"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES\nThe test failure \"CI workflow must not exclude main branch pushes\" is directly addressed by the removal of the explicit test for this condition and the modification of the `ci-release.yml` workflo"
+  }
+}

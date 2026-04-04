@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-besu-eth-besu-23875424642",
+  "repo": "besu-eth/besu",
+  "run_id": 23875424642,
+  "tags": [],
+  "transition": {
+    "failing_commit": "b0c4d67df6249a80e411dc6289dcf4599d5a1460",
+    "fix_commit": "532dab71abd5b26d2d2ad76a395d840ad4ff56d8",
+    "pr_url": "https://github.com/besu-eth/besu/pull/10158",
+    "pr_title": "Fix flaky EngineForkchoiceUpdatedV2",
+    "files_changed": [
+      "ethereum/eth/src/test/java/org/hyperledger/besu/ethereum/eth/sync/backwardsync/BackwardSyncContextTest.java"
+    ],
+    "fix_size_lines": 2
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "Fix flaky EngineForkchoiceUpdatedV2",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "infra",
+        "bug_location": "infrastructure"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES.\n\nThe PR title indicates the fix addresses a flaky test named `EngineForkchoiceUpdatedV2`. The provided code diff modifies a test method named `shouldSyncUntilHash`. While the exact name doesn't m"
+  }
+}

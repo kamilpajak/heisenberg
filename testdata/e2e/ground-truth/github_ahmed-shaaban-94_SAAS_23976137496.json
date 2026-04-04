@@ -1,0 +1,45 @@
+{
+  "case_id": "gh-ahmed-shaaban-94-SAAS-23976137496",
+  "repo": "ahmed-shaaban-94/SAAS",
+  "run_id": 23976137496,
+  "tags": [],
+  "transition": {
+    "failing_commit": "8514bdd9e0788a86098b489e7ff9978ed586a54f",
+    "fix_commit": "b5690b3d45a817623456731bf961e51c2f0d10aa",
+    "pr_url": "https://github.com/ahmed-shaaban-94/SAAS/pull/117",
+    "pr_title": "ci: fix coverage threshold in CI command",
+    "files_changed": [
+      "frontend/vitest.config.ts",
+      "pyproject.toml"
+    ],
+    "fix_size_lines": 4
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "ci: fix coverage threshold in CI command",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "infrastructure"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "",
+    "llm_correlation": "YES\nThe test failure log shows a package installation process, which is likely part of a CI environment setup. The provided diff modifies coverage thresholds in both the Javascript/Typescript and Pyth"
+  }
+}

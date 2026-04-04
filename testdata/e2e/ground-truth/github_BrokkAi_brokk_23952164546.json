@@ -1,0 +1,47 @@
+{
+  "case_id": "gh-BrokkAi-brokk-23952164546",
+  "repo": "BrokkAi/brokk",
+  "run_id": 23952164546,
+  "tags": [],
+  "transition": {
+    "failing_commit": "19bbafd4db6749b7eeac1266aa5fc4d88e675bb5",
+    "fix_commit": "47db1738011304f3763ede09b379bf0c9e62202d",
+    "pr_url": "https://github.com/BrokkAi/brokk/pull/3257",
+    "pr_title": "Fix flaky macOS tests: AnalyzerWrapperPersistence and ContextRoutingIntegration",
+    "files_changed": [
+      "app/src/test/java/ai/brokk/executor/ContextRoutingIntegrationTest.java"
+    ],
+    "fix_size_lines": 28
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "Fix flaky macOS tests: AnalyzerWrapperPersistence and ContextRoutingIntegration",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "timeout",
+        "bug_location": "production"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "",
+    "llm_correlation": "YES\nThe PR title indicates that the change is intended to fix flaky tests, and the diff modifies the `ContextRoutingIntegration` test, which is likely related to the `ContextRoutingIntegration` mentio",
+    "judge_reasoning": "The log shows tests passing, not failing. Option B's analysis of a race condition is not supported by the log. Option A is more likely given the lack of failures.",
+    "judge_model": "claude-sonnet-4-20250514",
+    "judge_winner": "A"
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "case_id": "gh-0xmariowu-Autosearch-23976602947",
+  "repo": "0xmariowu/Autosearch",
+  "run_id": 23976602947,
+  "tags": [],
+  "transition": {
+    "failing_commit": "a3f90ab77266270a3d11ecd7e378451490def6d5",
+    "fix_commit": "102a49d12fd63964e64a72833583fb4a3c493be4",
+    "pr_url": "https://github.com/0xmariowu/Autosearch/pull/38",
+    "pr_title": "fix: Block 4 hang prevention + test coverage",
+    "files_changed": [
+      "lib/templates/report.html",
+      "lib/templates/slides.html",
+      "tests/test_stress_limits.py"
+    ],
+    "fix_size_lines": 12
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix: Block 4 hang prevention + test coverage",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "assertion",
+        "bug_location": "production"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "",
+    "llm_correlation": "YES\n\nThe test failure log doesn't show the actual failure, but the PR title \"fix: Block 4 hang prevention + test coverage\" and the diff showing a test function `test_large_file_compact_extraction` str",
+    "judge_reasoning": "The log abruptly ends during the git version check, indicating a problem with the checked-out code or the checkout process itself, not a linting issue. Option A is more accurate.",
+    "judge_model": "claude-sonnet-4-20250514",
+    "judge_winner": "A"
+  }
+}

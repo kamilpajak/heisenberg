@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-plures-praxis-23841867253",
+  "repo": "plures/praxis",
+  "run_id": 23841867253,
+  "tags": [],
+  "transition": {
+    "failing_commit": "24bab1950f478f979e25180a9bddbf177955801d",
+    "fix_commit": "0584364bd92156aa96f70b92821c40d5f66515e9",
+    "pr_url": "https://github.com/plures/praxis/pull/327",
+    "pr_title": "fix: resolve cli-validate test failures caused by TypeScript bundling in sample registry import",
+    "files_changed": [
+      "examples/sample-registry.js"
+    ],
+    "fix_size_lines": 2
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix: resolve cli-validate test failures caused by TypeScript bundling in sample registry import",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "infra",
+        "bug_location": "infrastructure"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES\nThe test failure log shows errors related to missing contracts (\"Contract gap for...\"). The provided code diff changes the import path for `defineContract` from `'../dist/node/index.js'` to `'../d"
+  }
+}

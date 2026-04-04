@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-agentscope-ai-agentscope-java-23735828659",
+  "repo": "agentscope-ai/agentscope-java",
+  "run_id": 23735828659,
+  "tags": [],
+  "transition": {
+    "failing_commit": "ca0214a74f41bd8ce9e3bf3e5a2cc64306cf9b9d",
+    "fix_commit": "5049de4d7818cadca1345981c2f3e3da3b87628e",
+    "pr_url": "https://github.com/agentscope-ai/agentscope-java/pull/1078",
+    "pr_title": "fix(test): update e2e tests for hook builder API and video resolution",
+    "files_changed": [
+      "agentscope-core/src/test/java/io/agentscope/core/e2e/HookE2ETest.java"
+    ],
+    "fix_size_lines": 13
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix(test): update e2e tests for hook builder API and video resolution",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "timeout",
+        "bug_location": "production"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES. The PR title mentions \"hook builder API\" and the diff modifies code related to hooks in the `ReActAgent` builder, which is likely related to the test failure. The log shows the build process for "
+  }
+}

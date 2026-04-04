@@ -1,0 +1,47 @@
+{
+  "case_id": "gh-alex-mextner-ExpenseSyncBot-23944489246",
+  "repo": "alex-mextner/ExpenseSyncBot",
+  "run_id": 23944489246,
+  "tags": [],
+  "transition": {
+    "failing_commit": "fee46459fb2863e2ca8ebcb6f288924e4b8bbc41",
+    "fix_commit": "b09e3f7cc0b74f9d350299e07810c8722c63f717",
+    "pr_url": "https://github.com/alex-mextner/ExpenseSyncBot/pull/49",
+    "pr_title": "Improve monthly budget notification + fix flaky CI tests",
+    "files_changed": [
+      "src/database/schema.test.ts"
+    ],
+    "fix_size_lines": 12
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "Improve monthly budget notification + fix flaky CI tests",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "timeout",
+        "bug_location": "production"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES\nThe diff modifies the tests for database schema initialization, specifically addressing PRAGMA settings. The original tests were setting the `DATABASE_PATH` environment variable directly within ea",
+    "judge_reasoning": "The provided log is incomplete. There is no error message or stack trace to confirm the SQLite database lock. The log abruptly ends during the checkout action, suggesting a timeout or infrastructure i",
+    "judge_model": "claude-sonnet-4-20250514",
+    "judge_winner": "A"
+  }
+}

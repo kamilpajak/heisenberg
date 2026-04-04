@@ -1,0 +1,48 @@
+{
+  "case_id": "gh-pdylanross-barnacle-23959477179",
+  "repo": "pdylanross/barnacle",
+  "run_id": 23959477179,
+  "tags": [],
+  "transition": {
+    "failing_commit": "b20c21027cde6e33d291b92de0bfcd3dda6c634b",
+    "fix_commit": "878aa83313efa906af7a624a5c7ea7ff1528b85c",
+    "pr_url": "https://github.com/pdylanross/barnacle/pull/3",
+    "pr_title": "fix: resolve all golangci-lint issues across e2e test suite",
+    "files_changed": [
+      ".golangci.yml",
+      "internal/registry/cache/coordinator/coordinator.go",
+      "internal/registry/cache/coordinator/rebalance/capacity.go",
+      "internal/registry/cache/coordinator/rebalance/planner.go",
+      "internal/registry/upstream/caching.go"
+    ],
+    "fix_size_lines": 24
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix: resolve all golangci-lint issues across e2e test suite",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "production"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "",
+    "original_model": "",
+    "heuristic_difficulty": "hard",
+    "notes": "",
+    "llm_correlation": "YES\n\nThe diff includes changes to `.golangci.yml` to add the `godot` linter, and code changes to address `gochecknoglobals` and other linting issues. The PR title also indicates that the changes are i"
+  }
+}

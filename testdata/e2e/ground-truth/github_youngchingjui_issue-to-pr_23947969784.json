@@ -1,0 +1,46 @@
+{
+  "case_id": "gh-youngchingjui-issue-to-pr-23947969784",
+  "repo": "youngchingjui/issue-to-pr",
+  "run_id": 23947969784,
+  "tags": [],
+  "transition": {
+    "failing_commit": "e5f463ef89b6418fb7dd668d1d0e81c67c5f1f9a",
+    "fix_commit": "50aa868da3e82e8c506a31640da729849727b06d",
+    "pr_url": "https://github.com/youngchingjui/issue-to-pr/pull/1536",
+    "pr_title": "Fix Claude SDK runner failing as root in agent containers",
+    "files_changed": [
+      "__tests__/lib/agents/claude/runClaudeAgentInContainer.test.ts",
+      "docker/agent-base/Dockerfile",
+      "shared/src/lib/agents/claude/runClaudeAgentInContainer.ts"
+    ],
+    "fix_size_lines": 30
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "Fix Claude SDK runner failing as root in agent containers",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "assertion",
+        "bug_location": "production"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "",
+    "llm_correlation": "YES. The log shows the commit message \"Fix Claude SDK runner failing as root in agent containers\", which matches the PR title. The diff itself modifies the Dockerfile to create an `agent` user with a "
+  }
+}

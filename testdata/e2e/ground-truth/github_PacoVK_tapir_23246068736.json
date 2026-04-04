@@ -1,0 +1,48 @@
+{
+  "case_id": "gh-PacoVK-tapir-23246068736",
+  "repo": "PacoVK/tapir",
+  "run_id": 23246068736,
+  "tags": [],
+  "transition": {
+    "failing_commit": "a288aef99f24a5d771252f60b1f55a40e46d499a",
+    "fix_commit": "ccb65e1b090d2d8da5d60e83f035ba83d2b7ef68",
+    "pr_url": "https://github.com/PacoVK/tapir/pull/520",
+    "pr_title": "fix(ci): resolve frontend and backend test failures",
+    "files_changed": [
+      ".github/workflows/build.yml",
+      "src/test/java/core/storage/azure/BlobStorageRepositoryTest.java"
+    ],
+    "fix_size_lines": 7
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix(ci): resolve frontend and backend test failures",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "infra",
+        "bug_location": "infrastructure"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "",
+    "llm_correlation": "YES\nThe test log shows that the tests are interacting with DynamoDB and Azure Blob Storage. The diff includes changes to the `DynamodbDeployKeyRepositoryTest` setup, specifically adding code to create",
+    "judge_reasoning": "Option B's analysis of a race condition causing the failure is more accurate and aligns better with the log snippets showing DynamoDB table creation issues. Option A's timeout classification is less s",
+    "judge_model": "claude-sonnet-4-20250514",
+    "judge_winner": "B"
+  }
+}

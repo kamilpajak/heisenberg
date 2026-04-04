@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-google-gemini-gemini-cli-23950242674",
+  "repo": "google-gemini/gemini-cli",
+  "run_id": 23950242674,
+  "tags": [],
+  "transition": {
+    "failing_commit": "11f25cabe9bcb056b586a83049c93e539b6f318e",
+    "fix_commit": "e5b27d8d53eb683b227a68490fefa802f468ba2e",
+    "pr_url": "https://github.com/google-gemini/gemini-cli/pull/24476",
+    "pr_title": "test: fix Windows CI execution and resolve exposed platform failures",
+    "files_changed": [
+      "packages/core/src/agents/auth-provider/value-resolver.test.ts"
+    ],
+    "fix_size_lines": 38
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "test: fix Windows CI execution and resolve exposed platform failures",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "timeout",
+        "bug_location": "test"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "Corrected: fix only changes test file (value-resolver.test.ts), not production code. Heisenberg correctly identified as test bug.",
+    "llm_correlation": "YES\n\nThe test failure log doesn't show a specific failure, but the PR title \"test: fix Windows CI execution and resolve exposed platform failures\" and the diff, which includes mocking `shellUtils.spaw"
+  }
+}

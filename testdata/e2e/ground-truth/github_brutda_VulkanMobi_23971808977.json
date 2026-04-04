@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-brutda-VulkanMobi-23971808977",
+  "repo": "brutda/VulkanMobi",
+  "run_id": 23971808977,
+  "tags": [],
+  "transition": {
+    "failing_commit": "22511e0635f5d10bc2965b50e3b267e25efa25ce",
+    "fix_commit": "695e8c0b52b3f1eddc6c15540ca6275618e2da61",
+    "pr_url": "https://github.com/brutda/VulkanMobi/pull/2",
+    "pr_title": "Fix GitHub Action build failure by updating gradle wrapper validation action",
+    "files_changed": [
+      ".github/workflows/build.yml"
+    ],
+    "fix_size_lines": 2
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "Fix GitHub Action build failure by updating gradle wrapper validation action",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "timeout",
+        "bug_location": "infrastructure"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES. The diff updates the gradle wrapper validation action from v3 to v4. While the provided log doesn't explicitly state the cause of the failure, the PR title indicates that the build failure was re"
+  }
+}

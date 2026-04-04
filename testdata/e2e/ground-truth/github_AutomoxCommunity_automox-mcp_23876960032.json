@@ -1,0 +1,45 @@
+{
+  "case_id": "gh-AutomoxCommunity-automox-mcp-23876960032",
+  "repo": "AutomoxCommunity/automox-mcp",
+  "run_id": 23876960032,
+  "tags": [],
+  "transition": {
+    "failing_commit": "1f4ca490122a2cd750aac86bff1ee825c44f1817",
+    "fix_commit": "7ccc6cdae946adb0d896815fe66d358fae0415a2",
+    "pr_url": "https://github.com/AutomoxCommunity/automox-mcp/pull/13",
+    "pr_title": "Fix flaky CI: rate-limit tests, mcp-scanner, zizmor",
+    "files_changed": [
+      ".github/workflows/security.yml",
+      "CHANGELOG.md"
+    ],
+    "fix_size_lines": 11
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "Fix flaky CI: rate-limit tests, mcp-scanner, zizmor",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "infrastructure"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "",
+    "llm_correlation": "YES\nThe fix diff includes a change to the regex used to parse the MCP scanner output, specifically to match \"Unsafe items:\" in addition to \"Unsafe tools:\". The PR title and description also explicitly"
+  }
+}

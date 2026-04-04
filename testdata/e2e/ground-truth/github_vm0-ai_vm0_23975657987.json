@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-vm0-ai-vm0-23975657987",
+  "repo": "vm0-ai/vm0",
+  "run_id": 23975657987,
+  "tags": [],
+  "transition": {
+    "failing_commit": "768cd42647edf1a6250b08faa9bd157b7ab1bf63",
+    "fix_commit": "c25abcb0c0b65c1b0f8c7cc87909e1f2cf84b566",
+    "pr_url": "https://github.com/vm0-ai/vm0/pull/8150",
+    "pr_title": "fix: stabilize flaky chat tagline test (CHAT-D-002)",
+    "files_changed": [
+      "turbo/apps/platform/src/views/zero-page/zero-chat-page.tsx"
+    ],
+    "fix_size_lines": 6
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix: stabilize flaky chat tagline test (CHAT-D-002)",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "production"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES\nThe PR title indicates that the change is meant to stabilize a flaky test related to the chat tagline. The diff modifies the `ZeroChatPage` component, specifically the `h2` element that displays t"
+  }
+}

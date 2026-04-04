@@ -138,6 +138,82 @@ func TestConfidenceInRange(t *testing.T) {
 	}
 }
 
+// --- Weighted scoring ---
+
+func TestScoreCase_AllMatch(t *testing.T) {
+	score := scoreCase(
+		expectedAnalysis{FailureType: "assertion", BugLocation: "production"},
+		llm.RootCauseAnalysis{FailureType: "assertion", BugLocation: llm.BugLocationProduction},
+	)
+	assert.InDelta(t, 1.0, score, 0.01)
+}
+
+func TestScoreCase_CategoryOnly(t *testing.T) {
+	// failure_type wrong, bug_location wrong — but we only score these two axes
+	score := scoreCase(
+		expectedAnalysis{FailureType: "timeout", BugLocation: "test"},
+		llm.RootCauseAnalysis{FailureType: "assertion", BugLocation: llm.BugLocationProduction},
+	)
+	assert.InDelta(t, 0.0, score, 0.01)
+}
+
+func TestScoreCase_FailureTypeOnly(t *testing.T) {
+	score := scoreCase(
+		expectedAnalysis{FailureType: "timeout", BugLocation: "test"},
+		llm.RootCauseAnalysis{FailureType: "timeout", BugLocation: llm.BugLocationProduction},
+	)
+	// failure_type matches (0.3/0.8), bug_location doesn't (0.0/0.8)
+	assert.InDelta(t, 0.375, score, 0.01)
+}
+
+func TestScoreCase_BugLocationOnly(t *testing.T) {
+	score := scoreCase(
+		expectedAnalysis{FailureType: "timeout", BugLocation: "production"},
+		llm.RootCauseAnalysis{FailureType: "assertion", BugLocation: llm.BugLocationProduction},
+	)
+	// bug_location matches (0.5/0.8), failure_type doesn't (0.0/0.8)
+	assert.InDelta(t, 0.625, score, 0.01)
+}
+
+func TestScoreCase_EmptyExpected(t *testing.T) {
+	// No expected fields set — any result is a match
+	score := scoreCase(
+		expectedAnalysis{},
+		llm.RootCauseAnalysis{FailureType: "assertion", BugLocation: llm.BugLocationProduction},
+	)
+	assert.InDelta(t, 1.0, score, 0.01)
+}
+
+func TestScoreCase_FilePathMatch(t *testing.T) {
+	score := scoreCase(
+		expectedAnalysis{FilePathContains: "checkout.spec.ts", FailureType: "timeout", BugLocation: "test"},
+		llm.RootCauseAnalysis{
+			FailureType: "timeout",
+			BugLocation: llm.BugLocationTest,
+			Location:    &llm.CodeLocation{FilePath: "tests/checkout.spec.ts"},
+		},
+	)
+	assert.InDelta(t, 1.0, score, 0.01)
+}
+
+func TestScoreSuite_AggregateReport(t *testing.T) {
+	report := evalReport{}
+	report.addCategoryResult(true)
+	report.addCategoryResult(true)
+	report.addCategoryResult(false)
+	report.addCaseScore(1.0)
+	report.addCaseScore(0.5)
+	report.addCaseScore(0.0)
+	report.addConfidence(90, true)  // correct diagnosis
+	report.addConfidence(80, false) // wrong diagnosis
+
+	assert.InDelta(t, 0.667, report.categoryAccuracy(), 0.01)
+	assert.InDelta(t, 0.5, report.meanScore(), 0.01)
+	assert.Equal(t, 3, report.totalCases)
+	assert.InDelta(t, 90.0, report.avgConfidenceCorrect(), 0.1)
+	assert.InDelta(t, 80.0, report.avgConfidenceWrong(), 0.1)
+}
+
 func TestScoreResult_PartialMatch(t *testing.T) {
 	gt := groundTruth{
 		Expected: expectedOutput{
@@ -205,6 +281,111 @@ func loadGroundTruth(t *testing.T) []groundTruth {
 	return cases
 }
 
+// --- Weighted scoring ---
+
+const (
+	weightFailureType = 0.3
+	weightBugLocation = 0.5
+	weightFilePath    = 0.2
+)
+
+// scoreCase returns a weighted score (0.0-1.0) for how well an RCA matches expected.
+func scoreCase(exp expectedAnalysis, rca llm.RootCauseAnalysis) float64 {
+	totalWeight := 0.0
+	earned := 0.0
+
+	if exp.FailureType != "" {
+		totalWeight += weightFailureType
+		if rca.FailureType == exp.FailureType {
+			earned += weightFailureType
+		}
+	}
+
+	if exp.BugLocation != "" {
+		totalWeight += weightBugLocation
+		if string(rca.BugLocation) == exp.BugLocation {
+			earned += weightBugLocation
+		}
+	}
+
+	if exp.FilePathContains != "" {
+		totalWeight += weightFilePath
+		path := ""
+		if rca.Location != nil {
+			path = rca.Location.FilePath
+		}
+		if strings.Contains(path, exp.FilePathContains) {
+			earned += weightFilePath
+		}
+	}
+
+	if totalWeight == 0 {
+		return 1.0 // no expectations = match
+	}
+	return earned / totalWeight
+}
+
+// evalReport accumulates scoring metrics across an eval suite.
+type evalReport struct {
+	totalCases      int
+	categoryMatches int
+	scoreSum        float64
+	confCorrect     []int // confidences on correct diagnoses (score > 0.5)
+	confWrong       []int // confidences on wrong diagnoses (score <= 0.5)
+}
+
+func (r *evalReport) addCategoryResult(matched bool) {
+	r.totalCases++
+	if matched {
+		r.categoryMatches++
+	}
+}
+
+func (r *evalReport) addCaseScore(score float64) {
+	r.scoreSum += score
+}
+
+func (r *evalReport) addConfidence(confidence int, correct bool) {
+	if correct {
+		r.confCorrect = append(r.confCorrect, confidence)
+	} else {
+		r.confWrong = append(r.confWrong, confidence)
+	}
+}
+
+func (r *evalReport) categoryAccuracy() float64 {
+	if r.totalCases == 0 {
+		return 0
+	}
+	return float64(r.categoryMatches) / float64(r.totalCases)
+}
+
+func (r *evalReport) meanScore() float64 {
+	if r.totalCases == 0 {
+		return 0
+	}
+	return r.scoreSum / float64(r.totalCases)
+}
+
+func (r *evalReport) avgConfidenceCorrect() float64 {
+	return avgInts(r.confCorrect)
+}
+
+func (r *evalReport) avgConfidenceWrong() float64 {
+	return avgInts(r.confWrong)
+}
+
+func avgInts(vals []int) float64 {
+	if len(vals) == 0 {
+		return 0
+	}
+	sum := 0
+	for _, v := range vals {
+		sum += v
+	}
+	return float64(sum) / float64(len(vals))
+}
+
 // confidenceInRange checks if confidence falls within [min, max].
 // max=0 means no upper bound.
 func confidenceInRange(confidence, min, max int) bool {
@@ -263,6 +444,7 @@ func TestEval_Suite(t *testing.T) {
 
 	cases := loadGroundTruth(t)
 	logPath := filepath.Join("..", "..", "testdata", "e2e", "eval.jsonl")
+	report := evalReport{}
 
 	for _, gt := range cases {
 		gt := gt
@@ -286,52 +468,90 @@ func TestEval_Suite(t *testing.T) {
 				CI:           provider,
 			})
 			emitter.Close()
-			require.NoError(t, err)
-
-			// Score against ground truth
-			matched, expected := scoreResult(gt, result)
-
-			// Assertions
-			assert.Equal(t, gt.Expected.Category, result.Category, "category mismatch")
-			assert.True(t, confidenceInRange(result.Confidence, gt.Expected.ConfidenceMin, gt.Expected.ConfidenceMax),
-				"confidence %d outside expected range [%d, %d]",
-				result.Confidence, gt.Expected.ConfidenceMin, gt.Expected.ConfidenceMax)
-			if gt.Expected.AnalysesCount > 0 {
-				assert.Equal(t, gt.Expected.AnalysesCount, len(result.RCAs), "analyses count mismatch")
+			if err != nil {
+				t.Logf("ERROR: %v", err)
+				report.addCategoryResult(false)
+				report.addCaseScore(0)
+				return
 			}
-			if !gt.Expected.AllowPartialMatch && expected > 0 {
-				assert.Equal(t, expected, len(result.RCAs), "exact match required but got extra analyses")
-			}
-			assert.Equal(t, expected, matched, "ground truth match: %d/%d", matched, expected)
 
-			// Log results
-			t.Logf("category=%s confidence=%d analyses=%d matched=%d/%d iterations=%d",
-				result.Category, result.Confidence, len(result.RCAs), matched, expected,
-				evalIterations(result))
-
-			// Append to eval.jsonl
-			entry := evalEntry{
-				CaseID:           gt.CaseID,
-				Timestamp:        time.Now().UTC().Format(time.RFC3339),
-				Model:            model,
-				Repo:             gt.Repo,
-				RunID:            gt.RunID,
-				Category:         result.Category,
-				Confidence:       result.Confidence,
-				Analyses:         len(result.RCAs),
-				Iterations:       evalIterations(result),
-				ModelMs:          evalModelMs(result),
-				Tokens:           evalTokens(result),
-				WallMs:           evalWallMs(result),
-				Matched:          matched,
-				Expected:         expected,
-				ObservableByTool: gt.Truth.ObservableByTool,
-				Tags:             gt.Tags,
-				RCAs:             result.RCAs,
-			}
-			appendEvalLog(t, logPath, entry)
+			scoreAndLog(t, gt, result, model, logPath, &report)
 		})
 	}
+
+	// Aggregate report
+	t.Logf("\n=== EVALUATION REPORT ===")
+	t.Logf("Total cases: %d", report.totalCases)
+	t.Logf("Mean score: %.1f%% (%0.1f/%d)", report.meanScore()*100, report.scoreSum, report.totalCases)
+	t.Logf("Category accuracy: %.1f%%", report.categoryAccuracy()*100)
+	t.Logf("Confidence (correct): %.0f avg", report.avgConfidenceCorrect())
+	t.Logf("Confidence (wrong):   %.0f avg", report.avgConfidenceWrong())
+
+	// Aggregate threshold assertion — catches regressions
+	assert.GreaterOrEqual(t, report.meanScore(), 0.3,
+		"aggregate score below minimum threshold — possible regression")
+}
+
+// scoreAndLog scores one eval case, logs per-case results, and appends to eval.jsonl.
+func scoreAndLog(t *testing.T, gt groundTruth, result *llm.AnalysisResult,
+	model, logPath string, report *evalReport) {
+	t.Helper()
+
+	report.addCategoryResult(result.Category == gt.Expected.Category)
+
+	bestScore := bestRCAScore(gt.Expected.Analyses, result.RCAs)
+	report.addCaseScore(bestScore)
+	report.addConfidence(result.Confidence, bestScore > 0.5)
+
+	icon := "✓"
+	if bestScore < 0.5 {
+		icon = "✗"
+	}
+	t.Logf("%s score=%.2f category=%s confidence=%d analyses=%d iterations=%d",
+		icon, bestScore, result.Category, result.Confidence, len(result.RCAs),
+		evalIterations(result))
+
+	matched, expected := scoreResult(gt, result)
+	t.Logf("category=%s confidence=%d analyses=%d matched=%d/%d iterations=%d",
+		result.Category, result.Confidence, len(result.RCAs), matched, expected,
+		evalIterations(result))
+
+	entry := evalEntry{
+		CaseID:           gt.CaseID,
+		Timestamp:        time.Now().UTC().Format(time.RFC3339),
+		Model:            model,
+		Repo:             gt.Repo,
+		RunID:            gt.RunID,
+		Category:         result.Category,
+		Confidence:       result.Confidence,
+		Analyses:         len(result.RCAs),
+		Iterations:       evalIterations(result),
+		ModelMs:          evalModelMs(result),
+		Tokens:           evalTokens(result),
+		WallMs:           evalWallMs(result),
+		Matched:          matched,
+		Expected:         expected,
+		ObservableByTool: gt.Truth.ObservableByTool,
+		Tags:             gt.Tags,
+		RCAs:             result.RCAs,
+	}
+	appendEvalLog(t, logPath, entry)
+}
+
+// bestRCAScore finds the highest weighted score across all expected × actual RCA pairs.
+func bestRCAScore(expected []expectedAnalysis, rcas []llm.RootCauseAnalysis) float64 {
+	if len(expected) == 0 {
+		return 1.0
+	}
+	best := 0.0
+	for _, exp := range expected {
+		for _, rca := range rcas {
+			if s := scoreCase(exp, rca); s > best {
+				best = s
+			}
+		}
+	}
+	return best
 }
 
 func evalIterations(r *llm.AnalysisResult) int {

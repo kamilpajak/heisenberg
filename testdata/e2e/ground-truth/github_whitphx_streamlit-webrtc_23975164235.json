@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-whitphx-streamlit-webrtc-23975164235",
+  "repo": "whitphx/streamlit-webrtc",
+  "run_id": 23975164235,
+  "tags": [],
+  "transition": {
+    "failing_commit": "a5b70de0878fe6c52d9ce17ccf2eb0578e1ef26a",
+    "fix_commit": "b2949bfa0fb315b35ce85f97554a45e467063e1c",
+    "pr_url": "https://github.com/whitphx/streamlit-webrtc/pull/2334",
+    "pr_title": "Fix CI failure for old Streamlit versions by installing setuptools se\u2026",
+    "files_changed": [
+      ".github/workflows/test-build.yml"
+    ],
+    "fix_size_lines": 9
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "Fix CI failure for old Streamlit versions by installing setuptools se\u2026",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "timeout",
+        "bug_location": "infrastructure"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES\nThe diff modifies the CI configuration to explicitly install an older version of `setuptools` that includes `pkg_resources`. The comment in the diff explains that older Streamlit versions rely on "
+  }
+}

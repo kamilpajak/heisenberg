@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-lpasquali-rune-ui-23976091537",
+  "repo": "lpasquali/rune-ui",
+  "run_id": 23976091537,
+  "tags": [],
+  "transition": {
+    "failing_commit": "723a0e57ece79f413f7b1dfcfde5c214683a588d",
+    "fix_commit": "9929ec385559ddb9606f72aea71cac06cd62f257",
+    "pr_url": "https://github.com/lpasquali/rune-ui/pull/4",
+    "pr_title": "fix(ci): gitleaks range scan falls back to full scan when base SHA is unreachable",
+    "files_changed": [
+      ".github/workflows/quality-gates.yml"
+    ],
+    "fix_size_lines": 9
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix(ci): gitleaks range scan falls back to full scan when base SHA is unreachable",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "infrastructure"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES\n\nThe diff modifies the `SCAN_ARGS` for gitleaks, specifically how the range of commits to scan is specified. The PR title indicates that the base SHA might be unreachable, causing a fallback to a "
+  }
+}
