@@ -38,6 +38,7 @@ type CalibrationSignals struct {
 	BugLocConfLow          bool    `json:"bug_loc_conf_low"`
 	HasHiddenInfraEvidence bool    `json:"has_hidden_infra_evidence"`
 	DiffTouchesErrorPaths  bool    `json:"diff_touches_error_paths"`
+	LowIterations          bool    `json:"low_iterations"`
 }
 
 // calibrateResult adjusts confidence based on heuristic signals that the LLM
@@ -119,6 +120,11 @@ func evaluateRules(s CalibrationSignals) []capRule {
 		rules = append(rules, capRule{capAmbiguous, "low_bug_location_confidence"})
 	}
 
+	// Rule 6: Model used very few iterations — likely guessed without thorough investigation.
+	if s.LowIterations {
+		rules = append(rules, capRule{capAmbiguous, "low_iteration_count"})
+	}
+
 	return rules
 }
 
@@ -133,6 +139,12 @@ func computeSignals(ctx context.Context, result *llm.AnalysisResult,
 
 	s.BlastRadius = computeBlastRadius(jobs)
 	extractRCASignals(&s, result.RCAs)
+
+	// Low iteration count suggests model guessed without thorough investigation.
+	const lowIterThreshold = 3
+	if result.Eval != nil && result.Eval.Iterations <= lowIterThreshold {
+		s.LowIterations = true
+	}
 
 	if s.BugLocationIsCode && !s.HasNetworkErrors {
 		s.HasHiddenInfraEvidence = anyRCAContainsInfraEvidence(result.RCAs)
