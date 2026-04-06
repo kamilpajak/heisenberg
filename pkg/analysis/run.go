@@ -10,6 +10,7 @@ import (
 	"github.com/kamilpajak/heisenberg/pkg/ci"
 	"github.com/kamilpajak/heisenberg/pkg/cluster"
 	"github.com/kamilpajak/heisenberg/pkg/llm"
+	"github.com/kamilpajak/heisenberg/pkg/logclean"
 	"github.com/kamilpajak/heisenberg/pkg/patterns"
 )
 
@@ -251,11 +252,7 @@ func fetchFailureLogs(ctx context.Context, p Params, failedJobs []ci.Job) []clus
 
 			sig := cluster.ExtractSignature(logText)
 
-			// Keep last 10KB for LLM context
-			logTail := logText
-			if len(logTail) > 10000 {
-				logTail = logTail[len(logTail)-10000:]
-			}
+			logTail, _ := logclean.Extract(logText, 30000)
 
 			// Each goroutine writes to its own pre-allocated index — no mutex needed
 			failures[idx] = cluster.FailureInfo{

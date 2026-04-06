@@ -1,0 +1,635 @@
+st() PASSED
+2026-04-03T15:50:39.2290820Z 
+2026-04-03T15:50:39.2291150Z TestOutputParserTest > maven_summary_with_time_elapsed_and_error_maps_to_error() PASSED
+2026-04-03T15:50:39.2291510Z 
+2026-04-03T15:50:39.2291840Z TestOutputParserTest > maven_summary_without_in_uses_last_running_class() PASSED
+2026-04-03T15:50:39.2292170Z 
+2026-04-03T15:50:39.2292410Z TestOutputParserTest > gradle_simple_pass() PASSED
+2026-04-03T15:50:39.3325690Z 
+2026-04-03T15:50:39.3332530Z FileDropHandlerFactoryDecisionTest > cancelledDecision_preventsAdditions_andShowsCancellationNotification() PASSED
+2026-04-03T15:50:39.3334250Z 
+2026-04-03T15:50:39.3335710Z FileDropHandlerFactoryDecisionTest > blockedDecision_preventsAdditions_andDoesNotProduceExtraNotifications() PASSED
+2026-04-03T15:50:39.3337000Z 
+2026-04-03T15:50:39.3338000Z JDeploySettingsUtilTest > createsConfigFileWhenItDoesNotExist() PASSED
+2026-04-03T15:50:39.3338890Z 
+2026-04-03T15:50:39.3339830Z JDeploySettingsUtilTest > multipleXmxArgsAreAllRemoved() PASSED
+2026-04-03T15:50:39.3340670Z 
+2026-04-03T15:50:39.3341650Z JDeploySettingsUtilTest > manualModeWithNegativeMbDoesNotAddXmx() PASSED
+2026-04-03T15:50:39.3342550Z 
+2026-04-03T15:50:39.3343510Z JDeploySettingsUtilTest > replacesExistingXmxArg() PASSED
+2026-04-03T15:50:39.3398040Z 
+2026-04-03T15:50:39.3398590Z JDeploySettingsUtilTest > preservesNonXmxArgs() PASSED
+2026-04-03T15:50:39.3399010Z 
+2026-04-03T15:50:39.3399420Z JDeploySettingsUtilTest > manualModeWithZeroMbDoesNotAddXmx() PASSED
+2026-04-03T15:50:39.3399790Z 
+2026-04-03T15:50:39.3400250Z JDeploySettingsUtilTest > handlesCorruptedJsonGracefully() PASSED
+2026-04-03T15:50:39.3400550Z 
+2026-04-03T15:50:39.3400910Z JDeploySettingsUtilTest > automaticModeRemovesXmxArgs() PASSED
+2026-04-03T15:50:39.3401190Z 
+2026-04-03T15:50:39.3401540Z JDeploySettingsUtilTest > handlesNonArrayArgsField() PASSED
+2026-04-03T15:50:39.3401860Z 
+2026-04-03T15:50:39.3402520Z JDeploySettingsUtilTest > preservesOtherConfigFields() PASSED
+2026-04-03T15:50:39.3403060Z 
+2026-04-03T15:50:39.3403430Z OnboardingOrchestratorTest > testFullyConfigured_NoSteps() PASSED
+2026-04-03T15:50:39.3851560Z 
+2026-04-03T15:50:39.3857570Z OnboardingOrchestratorTest > testPostGitStyleRegeneration_NotIncluded() PASSED
+2026-04-03T15:50:39.3859330Z 
+2026-04-03T15:50:39.3859890Z OnboardingOrchestratorTest > testStepDependencies_CorrectOrder() PASSED
+2026-04-03T15:50:39.5077140Z 
+2026-04-03T15:50:39.5080670Z OnboardingOrchestratorTest > testPostGitStyleRegeneration_Included() PASSED
+2026-04-03T15:50:39.5610190Z 
+2026-04-03T15:50:39.5612090Z OnboardingOrchestratorTest > testBuildDetailsPersistence_AfterOnboardingSettingsApplied() PASSED
+2026-04-03T15:50:39.5616720Z 
+2026-04-03T15:50:39.5617310Z OnboardingOrchestratorTest > testGitConfigured_OnlyBuildSettings() PASSED
+2026-04-03T15:50:39.7421050Z 
+2026-04-03T15:50:39.7426700Z OnboardingOrchestratorTest > testFreshProject_AllStepsExceptMigration() PASSED
+2026-04-03T15:50:39.7427240Z 
+2026-04-03T15:50:39.7427740Z OnboardingOrchestratorTest > testLegacyProject_NeedsMigration() PASSED
+2026-04-03T15:50:39.7428200Z 
+2026-04-03T15:50:39.7428670Z OnboardingOrchestratorTest > testBuildProjectState_Helper() PASSED
+2026-04-03T15:50:39.7429060Z 
+2026-04-03T15:50:39.7429460Z OnboardingOrchestratorTest > testEmptyLegacyFile_NoMigration() PASSED
+2026-04-03T15:50:39.7430350Z 
+2026-04-03T15:50:39.7430850Z OnboardingOrchestratorTest > testBothFilesExist_NoMigration() PASSED
+2026-04-03T15:50:39.7431260Z 
+2026-04-03T15:50:39.7431640Z OnboardingOrchestratorTest > testBuildDetails_InitiallyEmpty() PASSED
+2026-04-03T15:50:39.8270670Z 
+2026-04-03T15:50:39.8271390Z OnboardingOrchestratorTest > testGitConfigDeclined_NotApplicable() PASSED
+2026-04-03T15:50:40.6315840Z 
+2026-04-03T15:50:40.6317880Z JiraIssueServiceTest > testListIssuesCassandraProject() PASSED
+2026-04-03T15:50:41.2331550Z 
+2026-04-03T15:50:41.2335300Z JiraIssueServiceTest > testListIssuesWithStatusFilter() PASSED
+2026-04-03T15:50:42.1785670Z 
+2026-04-03T15:50:42.1787530Z JiraIssueServiceTest > testLoadDetailsCassandraIssue() PASSED
+2026-04-03T15:51:02.6264020Z 
+2026-04-03T15:51:02.6269960Z McpUtilsAsyncTest > callToolAsync_stdio_failure_wraps_ioe_with_expected_message() PASSED
+2026-04-03T15:51:02.6270950Z 
+2026-04-03T15:51:02.6271480Z McpUtilsAsyncTest > callToolAsync_unsupported_server_type_throws_meaningful_error() PASSED
+2026-04-03T15:51:02.6271970Z 
+2026-04-03T15:51:02.6272330Z McpUtilsAsyncTest > stdio_json_newline_escaping_regression() PASSED
+2026-04-03T15:51:02.6272690Z 
+2026-04-03T15:51:02.6273170Z McpUtilsAsyncTest > callToolAsync_http_failure_wraps_ioe_with_expected_message() PASSED
+2026-04-03T15:51:02.6273590Z 
+2026-04-03T15:51:02.6274170Z BrokkExternalMcpServerProjectRootTest > resolveProjectRoot_returnsResolvedPathWhenNoGitMarkerExists() PASSED
+2026-04-03T15:51:02.6274680Z 
+2026-04-03T15:51:02.6275430Z BrokkExternalMcpServerProjectRootTest > resolveProjectRoot_returnsNearestGitAncestorForNestedFile() PASSED
+2026-04-03T15:51:02.6275950Z 
+2026-04-03T15:51:02.6276790Z BrokkExternalMcpServerProjectRootTest > resolveProjectRoot_returnsNearestGitAncestorForNestedDirectory() PASSED
+2026-04-03T15:51:02.7156230Z 
+2026-04-03T15:51:02.7157520Z McpServerCommandTest > toolSpecifications_containsSearchTools() PASSED
+2026-04-03T15:51:02.7158410Z 
+2026-04-03T15:51:02.7159800Z IProject.Dependency.files() symlink loop handling > files() does not throw when dependency contains symlink cycle PASSED
+2026-04-03T15:51:02.7160940Z 
+2026-04-03T15:51:02.7162240Z IProject.Dependency.files() symlink loop handling > files() returns files normally when no symlink cycle exists PASSED
+2026-04-03T15:51:02.9495540Z 
+2026-04-03T15:51:02.9496120Z FileFilteringServiceTest > testWorktreeIncludesSharedInfoExclude() PASSED
+2026-04-03T15:51:02.9497480Z 
+2026-04-03T15:51:02.9497790Z FileFilteringServiceTest > testWorktreeGitignoreIsHonored() PASSED
+2026-04-03T15:51:02.9569120Z 
+2026-04-03T15:51:02.9577500Z FileFilteringServiceTest > testWorktreeFilterFilesUsesWorktreeGitignore() PASSED
+2026-04-03T15:51:03.1932680Z 
+2026-04-03T15:51:03.1954060Z FileFilteringServiceTest > testWorktreeGitignorePrecedenceOverMainRepo() PASSED
+2026-04-03T15:51:03.3064050Z 
+2026-04-03T15:51:03.3066020Z FileFilteringServiceTest > testGetFixedGitignoreFilesIncludesWorktreeRoot() PASSED
+2026-04-03T15:51:03.3067170Z 
+2026-04-03T15:51:03.3068370Z FileFilteringServiceTest > testIsGitIgnoredWithExplicitFlagForFilePatterns() PASSED
+2026-04-03T15:51:03.3069610Z 
+2026-04-03T15:51:03.3070730Z FileFilteringServiceTest > testIsGitIgnoredWithExplicitDirectoryFlag() PASSED
+2026-04-03T15:51:03.3071850Z 
+2026-04-03T15:51:03.3073030Z MainProjectBuildModulesPersistenceTest > testModulePathRoundTripStability(Path) PASSED
+2026-04-03T15:51:03.3074180Z 
+2026-04-03T15:51:03.3075550Z MainProjectBuildModulesPersistenceTest > testModulePersistenceAndNormalization(Path) PASSED
+2026-04-03T15:51:03.3076760Z 
+2026-04-03T15:51:03.3077660Z ProjectEmptinessTest > isEmptyProject_onlyConfigFiles(Path) PASSED
+2026-04-03T15:51:03.3078610Z 
+2026-04-03T15:51:03.3079520Z ProjectEmptinessTest > isEmptyProject_nestedSourceFile(Path) PASSED
+2026-04-03T15:51:03.3080390Z 
+2026-04-03T15:51:03.3081260Z ProjectEmptinessTest > isEmptyProject_withPythonFile(Path) PASSED
+2026-04-03T15:51:03.3082110Z 
+2026-04-03T15:51:03.3083190Z ProjectEmptinessTest > isEmptyProject_trulyEmptyDirectory(Path) PASSED
+2026-04-03T15:51:03.3084180Z 
+2026-04-03T15:51:03.3085170Z ProjectEmptinessTest > isEmptyProject_onlyTextAndMarkdownFiles(Path) PASSED
+2026-04-03T15:51:03.3086120Z 
+2026-04-03T15:51:03.3087110Z ProjectEmptinessTest > isEmptyProject_withJavaScriptFile(Path) PASSED
+2026-04-03T15:51:03.3088080Z 
+2026-04-03T15:51:03.3089050Z ProjectEmptinessTest > isEmptyProject_configFilesAndSourceFile(Path) PASSED
+2026-04-03T15:51:03.3090040Z 
+2026-04-03T15:51:03.3090850Z ProjectEmptinessTest > isEmptyProject_rustFile(Path) PASSED
+2026-04-03T15:51:03.3091780Z 
+2026-04-03T15:51:03.3092810Z ProjectEmptinessTest > isEmptyProject_interfaceDefaultReturnsFalse() PASSED
+2026-04-03T15:51:03.3093760Z 
+2026-04-03T15:51:03.3094700Z ProjectEmptinessTest > isEmptyProject_withTypeScriptFile(Path) PASSED
+2026-04-03T15:51:03.3095710Z 
+2026-04-03T15:51:03.3096490Z ProjectEmptinessTest > isEmptyProject_goFile(Path) PASSED
+2026-04-03T15:51:03.3097300Z 
+2026-04-03T15:51:03.3098060Z ProjectEmptinessTest > isEmptyProject_withJavaFile(Path) PASSED
+2026-04-03T15:51:03.3098910Z 
+2026-04-03T15:51:03.3099690Z ProjectEmptinessTest > isEmptyProject_cppFile(Path) PASSED
+2026-04-03T15:51:03.3100500Z 
+2026-04-03T15:51:03.3110380Z CodePromptsTest > shouldRedactTrue_preservesOriginalAiMessageTextBeforeToolList() PASSED
+2026-04-03T15:51:03.3111950Z 
+2026-04-03T15:51:03.3112900Z CodePromptsTest > handlesMessageWithOnlyMultipleBlocks() PASSED
+2026-04-03T15:51:03.3113830Z 
+2026-04-03T15:51:03.3114950Z CodePromptsTest > shouldRedactFalse_preservesToolRequestAndResultMessages() PASSED
+2026-04-03T15:51:03.3116010Z 
+2026-04-03T15:51:03.3117220Z CodePromptsTest > shouldRedactFalse_stillAppliesSRBlockRedactionToAiMessages() PASSED
+2026-04-03T15:51:03.3118400Z 
+2026-04-03T15:51:03.3119240Z CodePromptsTest > removesBlockOnlyMessages() PASSED
+2026-04-03T15:51:03.3120060Z 
+2026-04-03T15:51:03.3120970Z CodePromptsTest > silentModeWithOnlyBlocksReturnsEmpty() PASSED
+2026-04-03T15:51:03.3121970Z 
+2026-04-03T15:51:03.3122860Z CodePromptsTest > preservesOtherMessageTypes() PASSED
+2026-04-03T15:51:03.3123730Z 
+2026-04-03T15:51:03.3124910Z CodePromptsTest > getHistoryMessages_sameModel_preservesToolExecutionRequests() PASSED
+2026-04-03T15:51:03.3126070Z 
+2026-04-03T15:51:03.3126920Z CodePromptsTest > handlesBlankMessage() PASSED
+2026-04-03T15:51:03.3127720Z 
+2026-04-03T15:51:03.3128710Z CodePromptsTest > insertsPlaceholderIntoMixedMessage() PASSED
+2026-04-03T15:51:03.3130720Z 
+2026-04-03T15:51:03.3153410Z CodePromptsTest > handlesEmptyMessage() PASSED
+2026-04-03T15:51:03.3169730Z 
+2026-04-03T15:51:03.3217650Z CodePromptsTest > silentModeWithMultipleBlocksPreservesIntermediateText() PASSED
+2026-04-03T15:51:03.3226710Z 
+2026-04-03T15:51:03.3267390Z CodePromptsTest > handlesMessageEndingWithBlock() PASSED
+2026-04-03T15:51:03.3277270Z 
+2026-04-03T15:51:03.3379150Z CodePromptsTest > handlesMessageStartingWithBlock() PASSED
+2026-04-03T15:51:03.3405170Z 
+2026-04-03T15:51:03.3453880Z CodePromptsTest > getHistoryMessages_differentModel_dropsToolExecutionResults_andRedactsToolRequests() PASSED
+2026-04-03T15:51:03.3454750Z 
+2026-04-03T15:51:03.3455140Z CodePromptsTest > handlesEmptyMessageList() PASSED
+2026-04-03T15:51:03.3455570Z 
+2026-04-03T15:51:03.3456140Z CodePromptsTest > shouldRedactTrue_rewritesToolRequestAiMessageIntoPassiveText() PASSED
+2026-04-03T15:51:03.3456730Z 
+2026-04-03T15:51:03.3457190Z CodePromptsTest > shouldRedactTrue_dropsToolExecutionResultMessage() PASSED
+2026-04-03T15:51:03.3457620Z 
+2026-04-03T15:51:03.3458000Z CodePromptsTest > silentModeRemovesBlocksEntirely() PASSED
+2026-04-03T15:51:03.3458450Z 
+2026-04-03T15:51:03.3458760Z CodePromptsTest > leavesPlainMessageUntouched() PASSED
+2026-04-03T15:51:03.3459140Z 
+2026-04-03T15:51:03.3459520Z CodePromptsTest > handlesMultipleBlocksAndTextSegments() PASSED
+2026-04-03T15:51:03.3459920Z 
+2026-04-03T15:51:03.3460470Z CodePromptsTest > shouldRedactTrue_aiMessageWithoutToolRequests_appliesSRBlockRedaction() PASSED
+2026-04-03T15:51:03.3461020Z 
+2026-04-03T15:51:03.3461460Z CodePromptsTest > shouldRedactTrue_handlesMultipleToolRequests() PASSED
+2026-04-03T15:51:03.3461870Z 
+2026-04-03T15:51:03.3462370Z SearchPromptsIssueDiagnosisTest > issueDiagnosisTerminals_isIssueJsonOnly() PASSED
+2026-04-03T15:51:03.4432820Z 
+2026-04-03T15:51:03.4434020Z TaskListTest > createOrReplaceTaskList_setsCorrectAction() PASSED
+2026-04-03T15:51:03.4434970Z 
+2026-04-03T15:51:03.4435890Z TaskListTest > formatChecklist_producesExpectedMarkdown() PASSED
+2026-04-03T15:51:03.5101280Z 
+2026-04-03T15:51:03.5102890Z TaskListTest > createOrReplaceTaskList_emptyTasksClears() PASSED
+2026-04-03T15:51:03.6798410Z 
+2026-04-03T15:51:03.6799300Z TaskListTest > taskTitlesExplicitlySet() PASSED
+2026-04-03T15:51:03.7967890Z 
+2026-04-03T15:51:03.7968730Z TaskListTest > createOrReplaceTaskList_replaceEmptyWithNew() PASSED
+2026-04-03T15:51:03.7969150Z 
+2026-04-03T15:51:03.7969460Z TaskListTest > formatChecklist_handlesEmptyList() PASSED
+2026-04-03T15:51:03.7969730Z 
+2026-04-03T15:51:03.7970140Z TaskListTest > createOrReplaceTaskList_replaceExistingDropsCompleted() PASSED
+2026-04-03T15:51:03.7970490Z 
+2026-04-03T15:51:03.7970960Z SupportsTemperatureTest > supportsTemperature_returnsFalse_whenTemperatureMissingFromParams() PASSED
+2026-04-03T15:51:03.7971380Z 
+2026-04-03T15:51:03.7971790Z SupportsTemperatureTest > supportsTemperature_returnsTrue_whenTemperatureInParams() PASSED
+2026-04-03T15:51:03.7972170Z 
+2026-04-03T15:51:03.7972550Z SupportsTemperatureTest > supportsTemperature_returnsFalse_whenModelUnknown() PASSED
+2026-04-03T15:51:03.7972920Z 
+2026-04-03T15:51:03.7973290Z DependencyToolsTest > importDependency_NpmPackage_RoutesToNode() PASSED
+2026-04-03T15:51:03.7973720Z 
+2026-04-03T15:51:03.7976750Z DependencyToolsTest > importDependency_EmptySpec_ReturnsError() PASSED
+2026-04-03T15:51:08.9891200Z 
+2026-04-03T15:51:08.9894100Z DependencyToolsTest > importDependency_Java_VersionResolutionFails_ReturnsErrorMessage() PASSED
+2026-04-03T15:51:09.1922510Z 
+2026-04-03T15:51:09.1925070Z DependencyToolsTest > importDependency_Java_ThreeParts_SkipsVersionResolution() PASSED
+2026-04-03T15:51:09.1925630Z 
+2026-04-03T15:51:09.1926000Z DependencyToolsTest > importDependency_Rust_NoCargo_ReturnsErrorMessage() PASSED
+2026-04-03T15:51:09.1926350Z 
+2026-04-03T15:51:09.1926670Z DependencyToolsTest > importDependency_Python_PackageNotFound() PASSED
+2026-04-03T15:51:09.1926990Z 
+2026-04-03T15:51:09.1927330Z DependencyToolsTest > importDependency_JavaWithoutColons_GivesHint() PASSED
+2026-04-03T15:51:09.1927670Z 
+2026-04-03T15:51:09.1928000Z DependencyToolsTest > importDependency_MavenCoords_RoutesToJava() PASSED
+2026-04-03T15:51:09.1928340Z 
+2026-04-03T15:51:09.1929540Z DependencyToolsTest > importDependency_Python_NoVenv_ReturnsErrorMessage() PASSED
+2026-04-03T15:51:09.1929910Z 
+2026-04-03T15:51:09.1930760Z DependencyToolsTest > isSupported_RustProject_ReturnsTrue() PASSED
+2026-04-03T15:51:09.1931070Z 
+2026-04-03T15:51:09.1931370Z DependencyToolsTest > isSupported_GoProject_ReturnsFalse() PASSED
+2026-04-03T15:51:09.1931650Z 
+2026-04-03T15:51:09.1932060Z DependencyToolsTest > importDependency_Java_RealLibrary_DownloadsAndDecompiles() SKIPPED
+2026-04-03T15:51:09.1932410Z 
+2026-04-03T15:51:09.1932740Z DependencyToolsTest > isSupported_PythonProject_ReturnsTrue() PASSED
+2026-04-03T15:51:09.1933030Z 
+2026-04-03T15:51:09.1933380Z DependencyToolsTest > isSupported_TypeScriptProject_ReturnsTrue() PASSED
+2026-04-03T15:51:09.1933700Z 
+2026-04-03T15:51:09.1934020Z DependencyToolsTest > isSupported_JavaProject_ReturnsTrue() PASSED
+2026-04-03T15:51:09.1934310Z 
+2026-04-03T15:51:09.1934650Z DependencyToolsTest > isSupported_JavaScriptProject_ReturnsTrue() PASSED
+2026-04-03T15:51:09.2800850Z 
+2026-04-03T15:51:09.2803650Z DependencyToolsTest > importDependency_Node_PackageNotFound() PASSED
+2026-04-03T15:51:09.2804530Z 
+2026-04-03T15:51:09.2805480Z DependencyToolsTest > importDependency_PythonPackage_RoutesToPython() PASSED
+2026-04-03T15:51:09.2806360Z 
+2026-04-03T15:51:09.2807150Z DependencyToolsTest > importDependency_Java_LocalCacheHasPriority() PASSED
+2026-04-03T15:51:09.2807980Z 
+2026-04-03T15:51:09.2809060Z DependencyToolsTest > importDependency_Java_InvalidCoordinates_ReturnsErrorMessage() PASSED
+2026-04-03T15:51:09.4404790Z 
+2026-04-03T15:51:09.4407480Z DependencyToolsTest > importDependency_RustCrate_RoutesToRust() PASSED
+2026-04-03T15:51:09.4408580Z 
+2026-04-03T15:51:09.4409840Z DependencyToolsTest > importDependency_Node_NoNodeModules_ReturnsErrorMessage() PASSED
+2026-04-03T15:51:09.4411100Z 
+2026-04-03T15:51:09.4412360Z DependencyToolsTest > importDependency_Java_TwoParts_TriggersVersionResolution() PASSED
+2026-04-03T15:51:09.4413550Z 
+2026-04-03T15:51:09.4420710Z JobDiagnosticsLoaderTest > testLoadJobsAndPhases(Path) PASSED
+2026-04-03T15:51:09.4584940Z 
+2026-04-03T15:51:09.4586890Z SearchToolsTest > testGetGitLog_fileWithNoHistory() PASSED
+2026-04-03T15:51:09.6807490Z 
+2026-04-03T15:51:09.6809260Z SearchToolsTest > testSearchFileContents_LiteralSubpathGlob() PASSED
+2026-04-03T15:51:09.6812570Z 
+2026-04-03T15:51:09.6813640Z SearchToolsTest > testSearchSymbols_IncludesLoc() PASSED
+2026-04-03T15:51:09.6814720Z 
+2026-04-03T15:51:09.6815710Z SearchToolsTest > testSkimFiles_dependenciesNotGitignored() PASSED
+2026-04-03T15:51:09.9062330Z 
+2026-04-03T15:51:09.9163800Z SearchToolsTest > testSearchFileContents_TruncatesLongLines() PASSED
+2026-04-03T15:51:09.9264990Z 
+2026-04-03T15:51:09.9367680Z SearchToolsTest > testJq_ProductBudgetClampsMatchesPerFile() PASSED
+2026-04-03T15:51:09.9468980Z 
+2026-04-03T15:51:09.9570300Z SearchToolsTest > testSearchFileContents_ContextAndClamping() PASSED
+2026-04-03T15:51:10.0434780Z 
+2026-04-03T15:51:10.0440620Z SearchToolsTest > testSkimFiles() PASSED
+2026-04-03T15:51:10.0441000Z 
+2026-04-03T15:51:10.0441400Z SearchToolsTest > testSearchFileContents_GlobRecursiveJava() PASSED
+2026-04-03T15:51:10.0441820Z 
+2026-04-03T15:51:10.0442140Z SearchToolsTest > testGetGitLog_RenameTracking() PASSED
+2026-04-03T15:51:10.0442450Z 
+2026-04-03T15:51:10.0442790Z SearchToolsTest > testSearchFileContents_PathRetry() PASSED
+2026-04-03T15:51:10.0443120Z 
+2026-04-03T15:51:10.0443560Z SearchToolsTest > testSearchFileContents_FixedPerPatternLimitIsHitCount() PASSED
+2026-04-03T15:51:10.1922380Z 
+2026-04-03T15:51:10.1925700Z SearchToolsTest > testfindFilenames_limitEnforced() PASSED
+2026-04-03T15:51:10.1926090Z 
+2026-04-03T15:51:10.1926600Z SearchToolsTest > testSearchFileContents_NoSpuriousTrailingEmptyLine() PASSED
+2026-04-03T15:51:10.1927020Z 
+2026-04-03T15:51:10.1927270Z SearchToolsTest > testJq() PASSED
+2026-04-03T15:51:10.2915000Z 
+2026-04-03T15:51:10.2915620Z SearchToolsTest > testSearchFileContents_invalidRegexThrows() PASSED
+2026-04-03T15:51:10.3532640Z 
+2026-04-03T15:51:10.3533710Z SearchToolsTest > testXmlSelect_XmlFallsBackToSkimWhenTooLarge() PASSED
+2026-04-03T15:51:10.3534300Z 
+2026-04-03T15:51:10.3536200Z SearchToolsTest > testXmlSelect_NamespaceAgnostic_RewritesLocalNames() PASSED
+2026-04-03T15:51:10.5144800Z 
+2026-04-03T15:51:10.5156800Z SearchToolsTest > testfindFilenames_invalidRegexThrows() PASSED
+2026-04-03T15:51:10.5157220Z 
+2026-04-03T15:51:10.5157540Z SearchToolsTest > testListFiles_IncludesLoc() PASSED
+2026-04-03T15:51:10.5157850Z 
+2026-04-03T15:51:10.5158230Z SearchToolsTest > testSearchFileContents_MultilineFlag_Anchors() PASSED
+2026-04-03T15:51:10.5158610Z 
+2026-04-03T15:51:10.5159070Z SearchToolsTest > testSearchFileContents_NoSpuriousTruncationOnExactMatchLimit() PASSED
+2026-04-03T15:51:10.5159500Z 
+2026-04-03T15:51:10.5159840Z SearchToolsTest > testGetGitLog_limitCappedAt100() PASSED
+2026-04-03T15:51:10.6926510Z 
+2026-04-03T15:51:10.6927930Z SearchToolsTest > testFindFilenames_IncludesLoc() PASSED
+2026-04-03T15:51:10.6928750Z 
+2026-04-03T15:51:10.6929520Z SearchToolsTest > testSearchFileContents_GlobBackslashInput() PASSED
+2026-04-03T15:51:10.6930290Z 
+2026-04-03T15:51:10.6930940Z SearchToolsTest > testJq_InvalidJsonAndFilter() PASSED
+2026-04-03T15:51:10.6931560Z 
+2026-04-03T15:51:10.6932330Z SearchToolsTest > testJq_BfsSummarizationWhenResultTooLarge() PASSED
+2026-04-03T15:51:10.6933060Z 
+2026-04-03T15:51:10.6933830Z SearchToolsTest > testfindFilesContaining_invalidRegexThrows() PASSED
+2026-04-03T15:51:10.6934560Z 
+2026-04-03T15:51:10.6935320Z SearchToolsTest > testSearchGitCommitMessages_invalidRegexFallback() PASSED
+2026-04-03T15:51:10.6936110Z 
+2026-04-03T15:51:10.6936700Z SearchToolsTest > testGetGitLog_limitEnforced() PASSED
+2026-04-03T15:51:10.6937290Z 
+2026-04-03T15:51:10.6937830Z SearchToolsTest > testGetClassSkeletons() PASSED
+2026-04-03T15:51:10.6938400Z 
+2026-04-03T15:51:10.6938990Z SearchToolsTest > testSearchFileContents() PASSED
+2026-04-03T15:51:10.8789780Z 
+2026-04-03T15:51:10.8790430Z SearchToolsTest > testSearchSymbols_StripsParams() PASSED
+2026-04-03T15:51:10.8790880Z 
+2026-04-03T15:51:10.8791340Z SearchToolsTest > testSearchFileContents_GlobalMatchBudget500IsSoftWithinFile() PASSED
+2026-04-03T15:51:10.8791770Z 
+2026-04-03T15:51:10.8792140Z SearchToolsTest > testGetGitLog_emptyPathReturnsRepoWideLog() PASSED
+2026-04-03T15:51:10.8792400Z 
+2026-04-03T15:51:10.8792780Z SearchToolsTest > testSearchFileContents_MultiplePatternsSameLine_Deduped() PASSED
+2026-04-03T15:51:10.8793140Z 
+2026-04-03T15:51:10.8793440Z SearchToolsTest > testfindFilenames_withSubdirectories() PASSED
+2026-04-03T15:51:10.8793750Z 
+2026-04-03T15:51:10.8793970Z SearchToolsTest > testXmlSkim_Basic() PASSED
+2026-04-03T15:51:10.8794200Z 
+2026-04-03T15:51:10.8794460Z SearchToolsTest > testGetGitLog_specificFile() PASSED
+2026-04-03T15:51:10.8794730Z 
+2026-04-03T15:51:10.8795060Z SearchToolsTest > testSearchFileContents_CaseInsensitiveFlag() PASSED
+2026-04-03T15:51:11.0767390Z 
+2026-04-03T15:51:11.0769090Z SearchToolsTest > testCompilePatterns_ErrorAggregation() PASSED
+2026-04-03T15:51:11.0769730Z 
+2026-04-03T15:51:11.0770790Z SearchToolsTest > testGetGitLog_invalidPathReturnsNoHistory() PASSED
+2026-04-03T15:51:11.0771940Z 
+2026-04-03T15:51:11.0772510Z SearchToolsTest > testGetSymbolLocations_IncludesLoc() PASSED
+2026-04-03T15:51:11.0773030Z 
+2026-04-03T15:51:11.0819490Z SearchToolsTest > testXmlSelect_AttrsJsonl() PASSED
+2026-04-03T15:51:11.5426990Z 
+2026-04-03T15:51:11.5429050Z TreeSitterRepoRunner > setupAndAnalyze_withSparseCheckout_usesMinimalDiskSpace() PASSED
+2026-04-03T15:51:11.5430030Z 
+2026-04-03T15:51:11.5430730Z TreeSitterRepoRunner > sanity_createsRunnerInstance() PASSED
+2026-04-03T15:51:11.5431400Z 
+2026-04-03T15:51:11.5432330Z TreeSitterRepoRunner > fileDiscovery_onTempDir_matchesJavaFilesOnly() PASSED
+2026-04-03T15:51:11.7477410Z 
+2026-04-03T15:51:11.7478380Z TreeSitterRepoRunner > memoryMonitor_recordsNonNegativePeak() PASSED
+2026-04-03T15:51:11.8744930Z 
+2026-04-03T15:51:11.8753780Z TreeSitterRepoRunner > sparseCheckout_onlyChecksOutMatchingPatterns() PASSED
+2026-04-03T15:51:11.8754300Z 
+2026-04-03T15:51:11.8755140Z LlmHistoryParserTest > testParseSingleCall(Path) PASSED
+2026-04-03T15:51:11.8759160Z 
+2026-04-03T15:51:11.8759560Z LlmHistoryParserTest > testMalformedMissingSectionsDontThrow(Path) PASSED
+2026-04-03T15:51:11.8759920Z 
+2026-04-03T15:51:11.8760280Z BrokkSnapshotTgzTest > extractJarFromTgz_selectionConstraintsAndOrder() PASSED
+2026-04-03T15:51:11.8760620Z 
+2026-04-03T15:51:11.8760950Z BrokkSnapshotTgzTest > extractJarFromTgz_findsCorrectEntry() PASSED
+2026-04-03T15:51:11.8761250Z 
+2026-04-03T15:51:11.8762500Z BrokkSnapshotTgzTest > extractJarFromTgz_failsIfNotFound() PASSED
+2026-04-03T15:51:11.8763380Z 
+2026-04-03T15:51:11.8764040Z BuildVerifierTest > testVerifyStartupError() PASSED
+2026-04-03T15:51:11.8764650Z 
+2026-04-03T15:51:11.8765170Z BuildVerifierTest > testOutputBounding() PASSED
+2026-04-03T15:51:11.8766110Z 
+2026-04-03T15:51:11.8766480Z BuildVerifierTest > testBuildEnvironmentRelativeJdkPath() PASSED
+2026-04-03T15:51:11.8766780Z 
+2026-04-03T15:51:11.8767100Z BuildVerifierTest > testBuildEnvironmentJdkSentinel() PASSED
+2026-04-03T15:51:11.8767390Z 
+2026-04-03T15:51:11.8767710Z BuildVerifierTest > testBuildEnvironmentInvalidJdkPath() PASSED
+2026-04-03T15:51:11.8768000Z 
+2026-04-03T15:51:11.8768220Z BuildVerifierTest > testVerifySuccess() PASSED
+2026-04-03T15:51:11.8768450Z 
+2026-04-03T15:51:11.8768750Z BuildVerifierTest > testBuildEnvironmentMacOsBundle() PASSED
+2026-04-03T15:51:11.8769020Z 
+2026-04-03T15:51:11.8769240Z BuildVerifierTest > testExtraEnvVars() PASSED
+2026-04-03T15:51:11.8769460Z 
+2026-04-03T15:51:11.8769700Z BuildVerifierTest > testVerifyFailure() PASSED
+2026-04-03T15:51:11.8769930Z 
+2026-04-03T15:51:11.8770340Z DecompilerTest > decompileJarBlocking_OverwriteFalse_ReturnsExistingResult() PASSED
+2026-04-03T15:51:12.0825620Z 
+2026-04-03T15:51:12.0831730Z DecompilerTest > decompileJarBlocking_OverwriteTrue_ReplacesDirectory() PASSED
+2026-04-03T15:51:12.0833560Z 
+2026-04-03T15:51:12.0834570Z EnvironmentTest > testNegativeTimeoutThrowsException() PASSED
+2026-04-03T15:51:12.0835600Z 
+2026-04-03T15:51:12.0836210Z EnvironmentTest > helloWorld() PASSED
+2026-04-03T15:51:12.0836750Z 
+2026-04-03T15:51:12.0837290Z EnvironmentTest > helloWorldChroot() PASSED
+2026-04-03T15:51:12.0837840Z 
+2026-04-03T15:51:12.0839780Z EnvironmentTest > cannotWriteOutsideSandbox() PASSED
+2026-04-03T15:51:12.0840100Z 
+2026-04-03T15:51:12.0840460Z HistoryIoTest > testCountIncompleteTasks_zipWithMixedTasks() PASSED
+2026-04-03T15:51:12.0840780Z 
+2026-04-03T15:51:12.0841090Z HistoryIoTest > testCountAiResponses_v4ZipWithMixedContexts() PASSED
+2026-04-03T15:51:12.0841360Z 
+2026-04-03T15:51:12.0841680Z HistoryIoTest > testCountIncompleteTasks_zipWithNoTaskList() PASSED
+2026-04-03T15:51:12.0842000Z 
+2026-04-03T15:51:12.0842290Z HistoryIoTest > testCountSessionStats_combinedCounts() PASSED
+2026-04-03T15:51:12.0842580Z 
+2026-04-03T15:51:12.0842950Z HistoryIoTest > testCountIncompleteTasks_emptyNewFormatWithLegacyFallback() PASSED
+2026-04-03T15:51:12.0843330Z 
+2026-04-03T15:51:12.0843680Z HistoryIoTest > testCountIncompleteTasks_legacyTasklistJsonOnly() PASSED
+2026-04-03T15:51:12.0844040Z 
+2026-04-03T15:51:12.0844400Z HistoryIoTest > testCountAiResponses_blankLinesAndMalformedJson() PASSED
+2026-04-03T15:51:12.0844710Z 
+2026-04-03T15:51:12.0845040Z HistoryIoTest > testCountIncompleteTasks_zipWithEmptyTaskList() PASSED
+2026-04-03T15:51:12.0845290Z 
+2026-04-03T15:51:12.0845570Z HistoryIoTest > testCountAiResponses_nonExistentFile() PASSED
+2026-04-03T15:51:12.0845920Z 
+2026-04-03T15:51:12.0846410Z LocalCacheScannerTest > listAllJars, findArtifact, findLatestVersion handle symlink cycles gracefully PASSED
+2026-04-03T15:51:12.0846840Z 
+2026-04-03T15:51:12.0847180Z LocalCacheScannerTest > findArtifact_DoesNotExist_ReturnsEmpty() PASSED
+2026-04-03T15:51:12.0849540Z 
+2026-04-03T15:51:12.0849980Z LocalCacheScannerTest > findLatestVersion_NoVersionsFound_ReturnsEmpty() PASSED
+2026-04-03T15:51:12.0850340Z 
+2026-04-03T15:51:12.0850700Z LocalCacheScannerTest > findArtifact_ExistsInMavenRepo_ReturnsPath() PASSED
+2026-04-03T15:51:12.1941550Z 
+2026-04-03T15:51:12.1944940Z LocalCacheScannerTest > findLatestVersion_MavenRepoStructure_ReturnsHighestVersion() PASSED
+2026-04-03T15:51:12.1946670Z 
+2026-04-03T15:51:12.1947840Z LocalCacheScannerTest > findLatestVersion_SemanticVersionOrdering_HandlesComplexVersions() PASSED
+2026-04-03T15:51:12.1948920Z 
+2026-04-03T15:51:12.1949780Z ProjectGuideResolverTest > resolve_withFallbackToProject(Path) PASSED
+2026-04-03T15:51:12.1950520Z 
+2026-04-03T15:51:12.1951500Z ProjectGuideResolverTest > resolveCompositeGuide_onlyNested(Path) PASSED
+2026-04-03T15:51:12.1952370Z 
+2026-04-03T15:51:12.1953310Z ProjectGuideResolverTest > orderedAgentFiles_noneFound_returnsEmpty(Path) PASSED
+2026-04-03T15:51:12.1954220Z 
+2026-04-03T15:51:12.1955310Z ProjectGuideResolverTest > orderedAgentFiles_nearestFirstAndDedup_multipleInputs(Path) PASSED
+2026-04-03T15:51:12.1956350Z 
+2026-04-03T15:51:12.1957900Z ProjectGuideResolverTest > systemMessageStyleGuide_nearestFirst_viaResolver(Path) PASSED
+2026-04-03T15:51:12.1959250Z 
+2026-04-03T15:51:12.1960240Z ProjectGuideResolverTest > resolveCompositeGuide_onlyRoot(Path) PASSED
+2026-04-03T15:51:12.1961100Z 
+2026-04-03T15:51:12.1961710Z ShellConfigTest > testFromConfigWithBlankArgs() PASSED
+2026-04-03T15:51:12.1962540Z 
+2026-04-03T15:51:12.1963160Z ShellConfigTest > testBuildCommandWithMultipleArgs() PASSED
+2026-04-03T15:51:12.1963850Z 
+2026-04-03T15:51:12.1964400Z ShellConfigTest > testIsValidOnWindows() SKIPPED
+2026-04-03T15:51:12.1964980Z 
+2026-04-03T15:51:12.1965580Z ShellConfigTest > testIsValidWithTempFiles() PASSED
+2026-04-03T15:51:12.1966570Z 
+2026-04-03T15:51:12.1967160Z ShellConfigTest > testIsValidOnMac() PASSED
+2026-04-03T15:51:12.1967790Z 
+2026-04-03T15:51:12.1968470Z ShellConfigTest > testToString() PASSED
+2026-04-03T15:51:12.1969030Z 
+2026-04-03T15:51:12.1969700Z ShellConfigTest > testFromConfigWithCustomArgs() PASSED
+2026-04-03T15:51:12.1970360Z 
+2026-04-03T15:51:12.1971190Z ShellConfigTest > testIsValidWithInvalidPathCharactersWindows() SKIPPED
+2026-04-03T15:51:12.1972000Z 
+2026-04-03T15:51:12.1972580Z ShellConfigTest > testGetDisplayName() PASSED
+2026-04-03T15:51:12.1973160Z 
+2026-04-03T15:51:12.1973830Z ShellConfigTest > testExceptionHandlingInIsValid() PASSED
+2026-04-03T15:51:12.1974470Z 
+2026-04-03T15:51:12.1975020Z ShellConfigTest > testIsValidOnLinux() SKIPPED
+2026-04-03T15:51:12.1975570Z 
+2026-04-03T15:51:12.1976100Z ShellConfigTest > testBuildCommand() PASSED
+2026-04-03T15:51:12.1976730Z 
+2026-04-03T15:51:12.1977520Z ShellConfigTest > testGetCommonExecutorsReturnsValidExecutables() PASSED
+2026-04-03T15:51:12.1978370Z 
+2026-04-03T15:51:12.1979050Z ShellConfigTest > testFromConfigWithValidExecutor() PASSED
+2026-04-03T15:51:12.1979710Z 
+2026-04-03T15:51:12.1980370Z ShellConfigTest > testFromConfigWithBlankExecutor() PASSED
+2026-04-03T15:51:12.1981020Z 
+2026-04-03T15:51:12.1981700Z ShellConfigTest > testFromConfigWithNullExecutor() PASSED
+2026-04-03T15:51:12.1982370Z 
+2026-04-03T15:51:12.1982850Z WhitespaceMatchTest > testFindAll() PASSED
+2026-04-03T15:51:12.1983400Z 
+2026-04-03T15:51:12.1983900Z WhitespaceMatchTest > testNoMatch() PASSED
+2026-04-03T15:51:12.1984480Z 
+2026-04-03T15:51:12.1985190Z FileWatcherHelperTest > testClassifyChanges_OnlyGit() PASSED
+2026-04-03T15:51:12.1985880Z 
+2026-04-03T15:51:12.1986610Z FileWatcherHelperTest > testClassifyChanges_OnlyTracked() PASSED
+2026-04-03T15:51:12.1987310Z 
+2026-04-03T15:51:12.1988070Z FileWatcherHelperTest > testIsSignificantChange_WithFiles() PASSED
+2026-04-03T15:51:12.1988790Z 
+2026-04-03T15:51:12.1989520Z FileWatcherHelperTest > testIsGitMetadataChanged_Worktree() PASSED
+2026-04-03T15:51:12.1990240Z 
+2026-04-03T15:51:12.1990830Z FileWatcherHelperTest > testContainsAnyFile() PASSED
+2026-04-03T15:51:12.1991480Z 
+2026-04-03T15:51:12.1992160Z FileWatcherHelperTest > testGetFilesWithExtensions() PASSED
+2026-04-03T15:51:12.1992740Z 
+2026-04-03T15:51:12.1993490Z FileWatcherHelperTest > testClassifyChanges_GitAndTracked() PASSED
+2026-04-03T15:51:12.1994200Z 
+2026-04-03T15:51:12.1995000Z FileWatcherHelperTest > testIsGitMetadataChanged_WithGitFiles() PASSED
+2026-04-03T15:51:12.1995770Z 
+2026-04-03T15:51:12.1998100Z FileWatcherHelperTest > testIsGitMetadataChanged_WithoutGitFiles() PASSED
+2026-04-03T15:51:12.1999350Z 
+2026-04-03T15:51:12.2000180Z FileWatcherHelperTest > testIsGitMetadataChanged_NotGitignore() PASSED
+2026-04-03T15:51:12.2000940Z 
+2026-04-03T15:51:12.2001710Z FileWatcherHelperTest > testIsSignificantChange_WithOverflow() PASSED
+2026-04-03T15:51:12.2002710Z 
+2026-04-03T15:51:12.2003550Z FileWatcherHelperTest > testFileWatcherHelperWithDifferentBases() PASSED
+2026-04-03T15:51:12.2004350Z 
+2026-04-03T15:51:12.2005110Z FileWatcherHelperTest > testIsGitMetadataChanged_NoGitRepo() PASSED
+2026-04-03T15:51:12.2005840Z 
+2026-04-03T15:51:12.2006560Z FileWatcherHelperTest > testIsSignificantChange_Empty() PASSED
+2026-04-03T15:51:12.2007270Z 
+2026-04-03T15:51:12.2007940Z FileWatcherHelperTest > testGetChangedTrackedFiles() PASSED
+2026-04-03T15:51:12.2008620Z 
+2026-04-03T15:51:12.2009280Z FileWatcherHelperTest > testGetFilesInDirectory() PASSED
+2026-04-03T15:51:14.1983820Z 
+2026-04-03T15:51:14.2020510Z ================================================================================
+2026-04-03T15:51:14.2021220Z FAILED TESTS SUMMARY
+2026-04-03T15:51:14.2026480Z ================================================================================
+2026-04-03T15:51:14.2026940Z 
+2026-04-03T15:51:14.2034170Z â ai.brokk.executor.ContextRoutingIntegrationTest.testListSessionsUsesProjectSessionManagerTitles()
+2026-04-03T15:51:14.2035170Z    Expected session in /v1/sessions response ==> expected: <true> but was: <false>
+2026-04-03T15:51:14.2056920Z       at app//org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:158)
+2026-04-03T15:51:14.2057890Z       at app//org.junit.jupiter.api.AssertionFailureBuilder.buildAndThrow(AssertionFailureBuilder.java:139)
+2026-04-03T15:51:14.2058770Z       at app//org.junit.jupiter.api.AssertTrue.failNotTrue(AssertTrue.java:69)
+2026-04-03T15:51:14.2059840Z       at app//org.junit.jupiter.api.AssertTrue.assertTrue(AssertTrue.java:41)
+2026-04-03T15:51:14.2072540Z       at app//org.junit.jupiter.api.Assertions.assertTrue(Assertions.java:228)
+2026-04-03T15:51:14.2073710Z       at app//ai.brokk.executor.ContextRoutingIntegrationTest.testListSessionsUsesProjectSessionManagerTitles(ContextRoutingIntegrationTest.java:168)
+2026-04-03T15:51:14.2074720Z    Output:
+2026-04-03T15:51:14.2076290Z 15:50:11.140 [Test worker] DEBUG AbstractProject - Project root: /var/folders/tb/y368xp_x10s3ty1b_mtl5mxr0000gn/T/junit-5098082245658811345, Master root for config/sessions: /var/folders/tb/y368xp_x10s3ty1b_mtl5mxr0000gn/T/junit-5098082245658811345
+2026-04-03T15:51:14.2078980Z 15:50:11.141 [Test worker] WARN  AbstractProject - Project build details are already saved; overwriting them with BuildDetails[buildLintCommand=, buildLintEnabled=false, testAllCommand=, testAllEnabled=false, testSomeCommand=, testSomeEnabled=false, exclusionPatterns=[], environmentVariables={}, maxBuildAttempts=null, afterTaskListCommand=, modules=[]]
+2026-04-03T15:51:14.2080710Z 15:50:11.141 [ForkJoinPool.commonPool-worker-1] WARN  Service - Data Retention Policy is UNSET for project junit-5098082245658811345. Defaulting to MINIMAL.
+2026-04-03T15:51:14.2081910Z 15:50:11.141 [ForkJoinPool.commonPool-worker-1] INFO  Service - Initializing models using policy: Essential Use Only and proxy: https://proxy.brokk.ai
+2026-04-03T15:51:14.2083360Z 15:50:11.141 [Test worker] INFO  HeadlessExecutorMain - Initializing HeadlessExecutorMain: execId=bee83d2e-8548-4e49-86da-4c4d9cc3c9b1, listen=127.0.0.1:0, workspace=/var/folders/tb/y368xp_x10s3ty1b_mtl5mxr0000gn/T/junit-5098082245658811345
+2026-04-03T15:51:14.2084650Z 15:50:11.141 [Test worker] INFO  JobStore - JobStore initialized at /var/folders/tb/y368xp_x10s3ty1b_mtl5mxr0000gn/T/junit-5098082245658811345/.brokk
+2026-04-03T15:51:14.2085660Z 15:50:11.143 [ContextManager-Init] DEBUG NoopWatchService - AbstractWatchService constructed: root=., gitRepoRoot=null, gitMetaDir=null
+2026-04-03T15:51:14.2087230Z 15:50:11.143 [Test worker] INFO  SimpleHttpServer - SimpleHttpServer created: 127.0.0.1:0 with 4 worker threads
+2026-04-03T15:51:14.2088210Z 15:50:11.143 [Test worker] DEBUG SimpleHttpServer - Registered unauthenticated context: /health/live
+2026-04-03T15:51:14.2089010Z 15:50:11.143 [Test worker] DEBUG SimpleHttpServer - Registered unauthenticated context: /health/ready
+2026-04-03T15:51:14.2089780Z 15:50:11.143 [Test worker] DEBUG SimpleHttpServer - Registered unauthenticated context: /v1/executor
+2026-04-03T15:51:14.2090540Z 15:50:11.143 [Test worker] DEBUG SimpleHttpServer - Registered authenticated context: /v1/sessions
+2026-04-03T15:51:14.2091280Z 15:50:11.143 [Test worker] DEBUG SimpleHttpServer - Registered authenticated context: /v1/jobs
+2026-04-03T15:51:14.2092270Z 15:50:11.143 [Test worker] DEBUG SimpleHttpServer - Registered authenticated context: /v1/context
+2026-04-03T15:51:14.2093000Z 15:50:11.143 [Test worker] DEBUG SimpleHttpServer - Registered authenticated context: /v1/tasklist
+2026-04-03T15:51:14.2093790Z 15:50:11.143 [Test worker] DEBUG SimpleHttpServer - Registered authenticated context: /v1/session/costs
+2026-04-03T15:51:14.2102250Z 15:50:11.143 [Test worker] DEBUG SimpleHttpServer - Registered authenticated context: /v1/repo
+2026-04-03T15:51:14.2104510Z 15:50:11.143 [Test worker] DEBUG SimpleHttpServer - Registered authenticated context: /v1/models
+2026-04-03T15:51:14.2106420Z 15:50:11.143 [Test worker] DEBUG SimpleHttpServer - Registered authenticated context: /v1/auth
+2026-04-03T15:51:14.2108940Z 15:50:11.143 [Test worker] DEBUG SimpleHttpServer - Registered authenticated context: /v1/model-config
+2026-04-03T15:51:14.2111060Z 15:50:11.143 [Test worker] DEBUG SimpleHttpServer - Registered authenticated context: /v1/activity
+2026-04-03T15:51:14.2113130Z 15:50:11.143 [Test worker] DEBUG SimpleHttpServer - Registered authenticated context: /v1/completions
+2026-04-03T15:51:14.2115810Z 15:50:11.143 [Test worker] DEBUG SimpleHttpServer - Registered authenticated context: /v1/favorites
+2026-04-03T15:51:14.2118930Z 15:50:11.143 [Test worker] DEBUG SimpleHttpServer - Registered authenticated context: /v1/openai/oauth
+2026-04-03T15:51:14.2121160Z 15:50:11.143 [Test worker] DEBUG SimpleHttpServer - Registered authenticated context: /v1/github/oauth
+2026-04-03T15:51:14.2123190Z 15:50:11.143 [Test worker] DEBUG SimpleHttpServer - Registered authenticated context: /v1/review
+2026-04-03T15:51:14.2125240Z 15:50:11.143 [Test worker] DEBUG SimpleHttpServer - Registered authenticated context: /v1/dependencies
+2026-04-03T15:51:14.2127360Z 15:50:11.143 [Test worker] DEBUG SimpleHttpServer - Registered authenticated context: /v1/settings
+2026-04-03T15:51:14.2129410Z 15:50:11.143 [Test worker] INFO  HeadlessExecutorMain - HeadlessExecutorMain initialized successfully
+2026-04-03T15:51:14.2131180Z 15:50:11.144 [Test worker] INFO  SimpleHttpServer - SimpleHttpServer started
+2026-04-03T15:51:14.2133300Z 15:50:11.144 [Test worker] INFO  HeadlessExecutorMain - HeadlessExecutorMain HTTP server started on endpoints: /health/live, /v1/sessions, /v1/jobs, etc.; cmSession=019d5409-a3c5-78c0-836c-81eef5268b69
+2026-04-03T15:51:14.2134430Z 15:50:11.141 [ForkJoinPool.commonPool-worker-1] WARN  Service - Brokk API key is empty, cannot fetch models from Brokk proxy
+2026-04-03T15:51:14.2135150Z 15:50:11.144 [ForkJoinPool.commonPool-worker-1] WARN  Service - No chat models available
+2026-04-03T15:51:14.2136020Z 15:50:11.145 [ForkJoinPool.commonPool-worker-1] WARN  Service - No suitable transcription model found via LiteLLM proxy. STT will be unavailable.
+2026-04-03T15:51:14.2136990Z 15:50:11.145 [ContextManager-Init] DEBUG NoopWatchService - AbstractWatchService constructed: root=., gitRepoRoot=null, gitMetaDir=null
+2026-04-03T15:51:14.2137760Z 15:50:11.145 [ContextManager-Init] DEBUG NoopWatchService - Added listener: AnalyzerWrapper
+2026-04-03T15:51:14.2138860Z 15:50:11.145 [BackgroundTask-2] DEBUG ContextManager - LLM history log directory /var/folders/tb/y368xp_x10s3ty1b_mtl5mxr0000gn/T/junit-5098082245658811345/.brokk/llm-history does not exist, skipping cleanup.
+2026-04-03T15:51:14.2141170Z 15:50:11.146 [brokk-analyzer-exec-junit-5098082245658811345] DEBUG MainProject - No files with recognized (non-NONE) languages found for /var/folders/tb/y368xp_x10s3ty1b_mtl5mxr0000gn/T/junit-5098082245658811345 (repo files and live dependencies checked). Defaulting to Language.NONE.
+2026-04-03T15:51:14.2143550Z 15:50:11.146 [brokk-analyzer-exec-junit-5098082245658811345] INFO  AnalyzerWrapper - No languages configured, using disabled analyzer for: /var/folders/tb/y368xp_x10s3ty1b_mtl5mxr0000gn/T/junit-5098082245658811345
+2026-04-03T15:51:14.2144720Z 15:50:11.146 [brokk-analyzer-exec-junit-5098082245658811345] DEBUG AnalyzerWrapper - Analyzer became ready (Disabled), notifying listeners
+2026-04-03T15:51:14.2145640Z 15:50:11.146 [brokk-analyzer-exec-junit-5098082245658811345] DEBUG AnalyzerWrapper - Processing 0 queued watcher event batches
+2026-04-03T15:51:14.2146620Z 15:50:11.146 [brokk-analyzer-exec-junit-5098082245658811345] DEBUG AnalyzerWrapper - Initial analyzer has 0 declarations across 0 files and took 0 ms
+2026-04-03T15:51:14.2147560Z 15:50:11.146 [ContextManager-Init] INFO  ContextManager - Created and loaded new session: 019d5409-a3ca-70d0-ae90-d11c59a21d7d
+2026-04-03T15:51:14.2148550Z 15:50:11.149 [session-io-4154] INFO  SessionManager - Created new session New Session (019d5409-a3ca-70d0-ae90-d11c59a21d7d) with manifest and empty history.
+2026-04-03T15:51:14.2149530Z 15:50:11.151 [UserActionManager-1] INFO  ContextManager - Created new session: Initial Name (019d5409-a3cf-752b-a61c-21ad87226022)
+2026-04-03T15:51:14.2150630Z 15:50:11.151 [ContextManager-Init] DEBUG ContextManager - Skipping task list migration for session 019d5409-a3cf-752b-a61c-21ad87226022 (modified 1775231411151 >= cutoff 1764460800000)
+2026-04-03T15:51:14.2151690Z 15:50:11.152 [SimpleHttpServer-Worker-1] INFO  SessionsRouter - Created new session: Initial Name (019d5409-a3cf-752b-a61c-21ad87226022)
+2026-04-03T15:51:14.2152700Z 15:50:11.154 [session-io-4158] INFO  SessionManager - Created new session Initial Name (019d5409-a3cf-752b-a61c-21ad87226022) with manifest and empty history.
+2026-04-03T15:51:14.2154000Z 15:50:11.157 [session-io-4158] INFO  SessionManager - Moved session zip 019d5409-a3cf-752b-a61c-21ad87226022.zip to /var/folders/tb/y368xp_x10s3ty1b_mtl5mxr0000gn/T/junit-5098082245658811345/.brokk/sessions/unreadable
+2026-04-03T15:51:14.2154950Z 15:50:11.159 [ContextManager-Init] DEBUG ContextManager - Using existing build details
+2026-04-03T15:51:14.2155660Z 15:50:11.159 [ContextManager-Init] INFO  HeadlessExecutorMain - ContextManager headless initialization complete
+2026-04-03T15:51:14.2156510Z 15:50:11.159 [Test worker] WARN  SessionManager - Session ID 019d5409-a3cf-752b-a61c-21ad87226022 not found in cache, cannot rename.
+2026-04-03T15:51:14.2157340Z 15:50:11.161 [BackgroundTask-3] INFO  ContextManager - Quarantine complete; moved 1 unreadable session zip(s).
+2026-04-03T15:51:14.2158200Z 15:50:11.161 [BackgroundTask-5] ERROR GlobalExceptionHandler - Uncaught exception on thread Thread[#4164,BackgroundTask-5,5,main]
+2026-04-03T15:51:14.2159200Z java.lang.IllegalArgumentException: Key must have format `brk+<userId>+<token>`; found ``
+2026-04-03T15:51:14.2159790Z 	at ai.brokk.AbstractService.parseKey(AbstractService.java:270) ~[main/:?]
+2026-04-03T15:51:14.2160270Z 	at ai.brokk.Service.getBalanceInfo(Service.java:123) ~[main/:?]
+2026-04-03T15:51:14.2160700Z 	at ai.brokk.Service.getUserBalance(Service.java:183) ~[main/:?]
+2026-04-03T15:51:14.2161160Z 	at ai.brokk.Service.getUserBalance(Service.java:110) ~[main/:?]
+2026-04-03T15:51:14.2161690Z 	at ai.brokk.ContextManager.lambda$checkBalanceAndNotify$88(ContextManager.java:2833) ~[main/:?]
+2026-04-03T15:51:14.2162350Z 	at ai.brokk.IContextManager.lambda$submitBackgroundTask$2(IContextManager.java:266) ~[main/:?]
+2026-04-03T15:51:14.2163000Z 	at ai.brokk.ContextManager.lambda$submitBackgroundTask$61(ContextManager.java:1887) ~[main/:?]
+2026-04-03T15:51:14.2163750Z 	at ai.brokk.concurrent.LoggingExecutorService.lambda$wrap$6(LoggingExecutorService.java:102) ~[brokk-shared-87be9bf.jar:?]
+2026-04-03T15:51:14.2164980Z 	at ai.brokk.concurrent.LoggingExecutorService.lambda$submit$0(LoggingExecutorService.java:34) ~[brokk-shared-87be9bf.jar:?]
+2026-04-03T15:51:14.2165860Z 	at java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:572) ~[?:?]
+2026-04-03T15:51:14.2166360Z 	at java.util.concurrent.FutureTask.run(FutureTask.java:317) ~[?:?]
+2026-04-03T15:51:14.2166930Z 	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1144) ~[?:?]
+2026-04-03T15:51:14.2167580Z 	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:642) ~[?:?]
+2026-04-03T15:51:14.2168040Z 	at java.lang.Thread.run(Thread.java:1583) [?:?]
+2026-04-03T15:51:14.2168630Z 15:50:11.161 [AWT-EventQueue-0] WARN  ExceptionReporter - Unable to report exceptions in headless mode
+2026-04-03T15:51:14.2169400Z [ERROR]Internal error java.lang.IllegalArgumentException: Key must have format `brk+<userId>+<token>`; found ``
+2026-04-03T15:51:14.2170320Z 15:50:11.162 [BackgroundTask-3] INFO  ContextManager - Reused existing empty session 019d5409-a3ca-70d0-ae90-d11c59a21d7d with name 'New Session'
+2026-04-03T15:51:14.2171230Z 15:50:11.163 [BackgroundTask-3] DEBUG ContextManager - Switched to session: New Session (019d5409-a3ca-70d0-ae90-d11c59a21d7d)
+2026-04-03T15:51:14.2172290Z 15:50:11.165 [BackgroundTask-3] DEBUG ContextManager - Skipping task list migration for session 019d5409-a3ca-70d0-ae90-d11c59a21d7d (modified 1775231411146 >= cutoff 1764460800000)
+2026-04-03T15:51:14.2173310Z [INFO]Your previously active session was unreadable and has been moved to the 'unreadable' folder. A new session has been created.
+2026-04-03T15:51:14.2173940Z 15:50:11.170 [Test worker] INFO  JobRunner - Shutting down JobRunner
+2026-04-03T15:51:14.2174800Z 15:50:11.171 [ForkJoinPool.commonPool-worker-1] INFO  DependencyUpdateScheduler - Closed dependency update scheduler for junit-5098082245658811345
+2026-04-03T15:51:14.2175620Z 15:50:11.172 [Test worker] INFO  SimpleHttpServer - SimpleHttpServer stopped
+2026-04-03T15:51:14.2176250Z 15:50:11.172 [Test worker] INFO  HeadlessExecutorMain - HeadlessExecutorMain stopped
+2026-04-03T15:51:14.2176610Z 
+2026-04-03T15:51:14.2176620Z 
+2026-04-03T15:51:14.2176850Z ================================================================================
+2026-04-03T15:51:14.3196830Z 
+2026-04-03T15:51:14.3197190Z Total tests: 3700
+2026-04-03T15:51:14.3319300Z 3700 tests completed, 1 failed, 77 skipped
+2026-04-03T15:51:14.3319580Z Passed: 3622
+2026-04-03T15:51:14.3440210Z Failed: 1
+2026-04-03T15:51:14.3708430Z Skipped: 77
+2026-04-03T15:51:14.3990080Z ================================================================================
+2026-04-03T15:51:18.5058040Z 
+2026-04-03T15:51:18.5161390Z > Task :app:test FAILED
+2026-04-03T15:51:18.5273630Z gradle/actions: Writing build results to /Users/runner/work/_temp/.gradle-actions/build-results/__run_3-1775231169869.json
+2026-04-03T15:51:18.6974720Z 
+2026-04-03T15:51:18.6975350Z 39 actionable tasks: 23 executed, 12 from cache, 4 up-to-date
+2026-04-03T15:51:18.7085800Z FAILURE: Build failed with an exception.
+2026-04-03T15:51:18.7192510Z 
+2026-04-03T15:51:18.7293720Z * What went wrong:
+2026-04-03T15:51:18.7294150Z Execution failed for task ':app:test'.
+2026-04-03T15:51:18.7295020Z > There were failing tests. See the report at: file:///Users/runner/work/brokk/brokk/app/build/reports/tests/test/index.html
+2026-04-03T15:51:18.7396080Z 
+2026-04-03T15:51:18.7498640Z * Try:
+2026-04-03T15:51:18.7626030Z > Run with --scan to get full insights from a Build Scan (powered by Develocity).
+2026-04-03T15:51:18.7728140Z 
+2026-04-03T15:51:18.7830140Z BUILD FAILED in 5m 11s
+2026-04-03T15:51:20.4391520Z ##[error]Process completed with exit code 1.
+2026-04-03T15:51:20.4857970Z Post job cleanup.
+2026-04-03T15:51:21.2080950Z In post-action step
+2026-04-03T15:51:21.2087620Z Cache is read-only: will not save state for use in subsequent builds.
+2026-04-03T15:51:21.2091230Z Generating Job Summary
+2026-04-03T15:51:21.2124370Z Completed post-action step
+2026-04-03T15:51:21.2268700Z Post job cleanup.
+2026-04-03T15:51:21.4608680Z Post job cleanup.
+2026-04-03T15:51:21.5958670Z [command]/opt/homebrew/bin/git version
+2026-04-03T15:51:21.6040900Z git version 2.53.0
+2026-04-03T15:51:21.6081130Z Copying '/Users/runner/.gitconfig' to '/Users/runner/work/_temp/3d6aba4b-cd53-4aa3-9d3f-8cfa0a364ee5/.gitconfig'
+2026-04-03T15:51:21.6091360Z Temporarily overriding HOME='/Users/runner/work/_temp/3d6aba4b-cd53-4aa3-9d3f-8cfa0a364ee5' before making global git config changes
+2026-04-03T15:51:21.6092510Z Adding repository directory to the temporary git global config as a safe directory
+2026-04-03T15:51:21.6101930Z [command]/opt/homebrew/bin/git config --global --add safe.directory /Users/runner/work/brokk/brokk
+2026-04-03T15:51:21.6220450Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-04-03T15:51:21.6329150Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-04-03T15:51:21.8137090Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-04-03T15:51:21.8200580Z http.https://github.com/.extraheader
+2026-04-03T15:51:21.8236540Z [command]/opt/homebrew/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-04-03T15:51:21.8321690Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-04-03T15:51:21.9282780Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-04-03T15:51:21.9344950Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-04-03T15:51:22.0501570Z Cleaning up orphan processes
+2026-04-03T15:51:22.5846980Z Terminate orphan process: pid (20684) (java)
+2026-04-03T15:51:22.6627730Z Terminate orphan process: pid (20084) (java)
+2026-04-03T15:51:22.9360500Z ##[warning]Node.js 20 actions are deprecated. The following actions are running on Node.js 20 and may not work as expected: actions/checkout@v4, actions/setup-java@v4, actions/setup-node@v4, astral-sh/setup-uv@v3, gradle/actions/setup-gradle@v4. Actions will be forced to run with Node.js 24 by default starting June 2nd, 2026. Node.js 20 will be removed from the runner on September 16th, 2026. Please check if updated versions of these actions are available that support Node.js 24. To opt into Node.js 24 now, set the FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true environment variable on the runner or in your workflow file. Once Node.js 24 becomes the default, you can temporarily opt out by setting ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

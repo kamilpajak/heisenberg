@@ -9,6 +9,7 @@ import (
 	"github.com/kamilpajak/heisenberg/pkg/ci"
 	gh "github.com/kamilpajak/heisenberg/pkg/github"
 	"github.com/kamilpajak/heisenberg/pkg/llm"
+	"github.com/kamilpajak/heisenberg/pkg/logclean"
 	"github.com/kamilpajak/heisenberg/pkg/trace"
 )
 
@@ -112,11 +113,7 @@ func (h *ToolHandler) getJobLogs(ctx context.Context, args map[string]any) (stri
 		return errorResult(err), false, nil
 	}
 
-	// Truncate large logs
-	const maxLen = 80000
-	if len(logs) > maxLen {
-		logs = logs[len(logs)-maxLen:]
-	}
+	logs, _ = logclean.Extract(logs, 80000)
 
 	return logs, false, nil
 }

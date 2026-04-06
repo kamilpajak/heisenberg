@@ -1,0 +1,574 @@
+:50.0614862Z  * [new branch]      feat/story-40-1-diagnose-eager-loading   -> origin/feat/story-40-1-diagnose-eager-loading
+2026-04-03T06:32:50.0617372Z  * [new branch]      feat/story-40-2-lazy-loading-universe    -> origin/feat/story-40-2-lazy-loading-universe
+2026-04-03T06:32:50.0621108Z  * [new branch]      feat/story-40-3-lazy-loading-account-tables -> origin/feat/story-40-3-lazy-loading-account-tables
+2026-04-03T06:32:50.0623917Z  * [new branch]      feat/story-41-1-duplication-audit        -> origin/feat/story-41-1-duplication-audit
+2026-04-03T06:32:50.0627935Z  * [new branch]      feat/story-41-3-refactor-functional-duplication -> origin/feat/story-41-3-refactor-functional-duplication
+2026-04-03T06:32:50.0630755Z  * [new branch]      feat/story-41-4-evaluate-summary-merge   -> origin/feat/story-41-4-evaluate-summary-merge
+2026-04-03T06:32:50.0633035Z  * [new branch]      feat/story-5-1                           -> origin/feat/story-5-1
+2026-04-03T06:32:50.0634736Z  * [new branch]      feat/story-5-2                           -> origin/feat/story-5-2
+2026-04-03T06:32:50.0636442Z  * [new branch]      feat/story-5-3                           -> origin/feat/story-5-3
+2026-04-03T06:32:50.0638153Z  * [new branch]      feat/story-5-4                           -> origin/feat/story-5-4
+2026-04-03T06:32:50.0639883Z  * [new branch]      feat/story-6-1                           -> origin/feat/story-6-1
+2026-04-03T06:32:50.0641585Z  * [new branch]      feat/story-6-2                           -> origin/feat/story-6-2
+2026-04-03T06:32:50.0643519Z  * [new branch]      feat/story-6-3                           -> origin/feat/story-6-3
+2026-04-03T06:32:50.0645436Z  * [new branch]      feat/story-6-4                           -> origin/feat/story-6-4
+2026-04-03T06:32:50.0647226Z  * [new branch]      feat/story-6-5                           -> origin/feat/story-6-5
+2026-04-03T06:32:50.0648912Z  * [new branch]      feat/story-7-1                           -> origin/feat/story-7-1
+2026-04-03T06:32:50.0650995Z  * [new branch]      feat/story-7-2                           -> origin/feat/story-7-2
+2026-04-03T06:32:50.0652978Z  * [new branch]      feat/story-7-3                           -> origin/feat/story-7-3
+2026-04-03T06:32:50.0654782Z  * [new branch]      feat/story-8-1                           -> origin/feat/story-8-1
+2026-04-03T06:32:50.0656529Z  * [new branch]      feat/story-8-2                           -> origin/feat/story-8-2
+2026-04-03T06:32:50.0658223Z  * [new branch]      feat/story-8-3                           -> origin/feat/story-8-3
+2026-04-03T06:32:50.0660119Z  * [new branch]      feat/story-8-4                           -> origin/feat/story-8-4
+2026-04-03T06:32:50.0661942Z  * [new branch]      feat/story-8-5                           -> origin/feat/story-8-5
+2026-04-03T06:32:50.0664110Z  * [new branch]      feat/story-9-1                           -> origin/feat/story-9-1
+2026-04-03T06:32:50.0665804Z  * [new branch]      feat/story-9-2                           -> origin/feat/story-9-2
+2026-04-03T06:32:50.0667502Z  * [new branch]      feat/story-AR.11                         -> origin/feat/story-AR.11
+2026-04-03T06:32:50.0669224Z  * [new branch]      feat/story-AR.8                          -> origin/feat/story-AR.8
+2026-04-03T06:32:50.0670928Z  * [new branch]      feat/story-AR.9                          -> origin/feat/story-AR.9
+2026-04-03T06:32:50.0673219Z  * [new branch]      feat/story-AU.13-e2e-account-selection   -> origin/feat/story-AU.13-e2e-account-selection
+2026-04-03T06:32:50.0676097Z  * [new branch]      feat/story-AU.5-tdd-open-positions-account-selection -> origin/feat/story-AU.5-tdd-open-positions-account-selection
+2026-04-03T06:32:50.0679388Z  * [new branch]      feat/story-AU.6-wire-open-positions-to-account-selection -> origin/feat/story-AU.6-wire-open-positions-to-account-selection
+2026-04-03T06:32:50.0682814Z  * [new branch]      feat/story-AU.7-tdd-sold-positions-account-selection -> origin/feat/story-AU.7-tdd-sold-positions-account-selection
+2026-04-03T06:32:50.0686077Z  * [new branch]      feat/story-AU.8-wire-sold-positions-to-account-selection -> origin/feat/story-AU.8-wire-sold-positions-to-account-selection
+2026-04-03T06:32:50.0688630Z  * [new branch]      feat/story-AX.1                          -> origin/feat/story-AX.1
+2026-04-03T06:32:50.0690308Z  * [new branch]      feat/story-AX.3                          -> origin/feat/story-AX.3
+2026-04-03T06:32:50.0691987Z  * [new branch]      feat/story-AY.3                          -> origin/feat/story-AY.3
+2026-04-03T06:32:50.0693784Z  * [new branch]      feat/story-AY.4                          -> origin/feat/story-AY.4
+2026-04-03T06:32:50.0695584Z  * [new branch]      feat/story-AY.5                          -> origin/feat/story-AY.5
+2026-04-03T06:32:50.0697256Z  * [new branch]      feat/story-AY.6                          -> origin/feat/story-AY.6
+2026-04-03T06:32:50.0699336Z  * [new branch]      feature/196-open-positions-lazy-loading  -> origin/feature/196-open-positions-lazy-loading
+2026-04-03T06:32:50.0701752Z  * [new branch]      feature/AJ.5-e2e-tests-screener-table    -> origin/feature/AJ.5-e2e-tests-screener-table
+2026-04-03T06:32:50.0704327Z  * [new branch]      feature/AK.1-tdd-universe-button-tests   -> origin/feature/AK.1-tdd-universe-button-tests
+2026-04-03T06:32:50.0706621Z  * [new branch]      feature/AK.2-wire-universe-button        -> origin/feature/AK.2-wire-universe-button
+2026-04-03T06:32:50.0708874Z  * [new branch]      feature/AK.3-tdd-notification-tests      -> origin/feature/AK.3-tdd-notification-tests
+2026-04-03T06:32:50.0711190Z  * [new branch]      feature/AK.4-implement-notifications     -> origin/feature/AK.4-implement-notifications
+2026-04-03T06:32:50.0713611Z  * [new branch]      feature/AK.5-tdd-e2e-universe-sync       -> origin/feature/AK.5-tdd-e2e-universe-sync
+2026-04-03T06:32:50.0715916Z  * [new branch]      feature/AK.6-refine-e2e-implementation   -> origin/feature/AK.6-refine-e2e-implementation
+2026-04-03T06:32:50.0718307Z  * [new branch]      feature/AL.1-tdd-update-fields-service   -> origin/feature/AL.1-tdd-update-fields-service
+2026-04-03T06:32:50.0720847Z  * [new branch]      feature/AL.2-implement-update-fields-service -> origin/feature/AL.2-implement-update-fields-service
+2026-04-03T06:32:50.0723677Z  * [new branch]      feature/AL.3-tdd-wire-update-fields-button -> origin/feature/AL.3-tdd-wire-update-fields-button
+2026-04-03T06:32:50.0726520Z  * [new branch]      feature/AL.4-wire-update-fields-button   -> origin/feature/AL.4-wire-update-fields-button
+2026-04-03T06:32:50.0729276Z  * [new branch]      feature/AL.5-e2e-update-fields           -> origin/feature/AL.5-e2e-update-fields
+2026-04-03T06:32:50.0731532Z  * [new branch]      feature/AL.6-refine-e2e-implementation   -> origin/feature/AL.6-refine-e2e-implementation
+2026-04-03T06:32:50.0733997Z  * [new branch]      feature/AM.1-tdd-add-symbol-dialog       -> origin/feature/AM.1-tdd-add-symbol-dialog
+2026-04-03T06:32:50.0736314Z  * [new branch]      feature/AM.2-implement-add-symbol-dialog -> origin/feature/AM.2-implement-add-symbol-dialog
+2026-04-03T06:32:50.0738588Z  * [new branch]      feature/AM.3-tdd-symbol-search           -> origin/feature/AM.3-tdd-symbol-search
+2026-04-03T06:32:50.0740801Z  * [new branch]      feature/AM.4-implement-symbol-search     -> origin/feature/AM.4-implement-symbol-search
+2026-04-03T06:32:50.0743349Z  * [new branch]      feature/AM.5-tdd-validation-error-handling -> origin/feature/AM.5-tdd-validation-error-handling
+2026-04-03T06:32:50.0746217Z  * [new branch]      feature/AM.6-validation-error-handling   -> origin/feature/AM.6-validation-error-handling
+2026-04-03T06:32:50.0748507Z  * [new branch]      feature/AM.7-e2e-add-symbol-tests        -> origin/feature/AM.7-e2e-add-symbol-tests
+2026-04-03T06:32:50.0750592Z  * [new branch]      feature/AM.8-e2e-green-phase             -> origin/feature/AM.8-e2e-green-phase
+2026-04-03T06:32:50.0753093Z  * [new branch]      feature/AN.1-universe-table-smartngrx-tests -> origin/feature/AN.1-universe-table-smartngrx-tests
+2026-04-03T06:32:50.0755691Z  * [new branch]      feature/AN.10-expired-filter-implementation -> origin/feature/AN.10-expired-filter-implementation
+2026-04-03T06:32:50.0758138Z  * [new branch]      feature/AN.11-e2e-universe-table-tests   -> origin/feature/AN.11-e2e-universe-table-tests
+2026-04-03T06:32:50.0760489Z  * [new branch]      feature/AN.12-refine-e2e-implementation  -> origin/feature/AN.12-refine-e2e-implementation
+2026-04-03T06:32:50.0763238Z  * [new branch]      feature/AN.2-implement-universe-table-smartngrx -> origin/feature/AN.2-implement-universe-table-smartngrx
+2026-04-03T06:32:50.0766102Z  * [new branch]      feature/AN.3-tdd-distribution-fields-editing -> origin/feature/AN.3-tdd-distribution-fields-editing
+2026-04-03T06:32:50.0768916Z  * [new branch]      feature/AN.4-implement-distribution-fields-editing -> origin/feature/AN.4-implement-distribution-fields-editing
+2026-04-03T06:32:50.0771577Z  * [new branch]      feature/AN.6-implement-exdate-editing    -> origin/feature/AN.6-implement-exdate-editing
+2026-04-03T06:32:50.0774064Z  * [new branch]      feature/AN.7-tdd-symbol-risk-filters     -> origin/feature/AN.7-tdd-symbol-risk-filters
+2026-04-03T06:32:50.0776437Z  * [new branch]      feature/AN.8-implement-symbol-risk-filters -> origin/feature/AN.8-implement-symbol-risk-filters
+2026-04-03T06:32:50.0778758Z  * [new branch]      feature/AN.9-expired-filter-tests        -> origin/feature/AN.9-expired-filter-tests
+2026-04-03T06:32:50.0780928Z  * [new branch]      feature/AP.4-capital-gains-display       -> origin/feature/AP.4-capital-gains-display
+2026-04-03T06:32:50.0783260Z  * [new branch]      feature/AP.5-tdd-date-filtering          -> origin/feature/AP.5-tdd-date-filtering
+2026-04-03T06:32:50.0785464Z  * [new branch]      feature/AP.6-implement-date-filtering    -> origin/feature/AP.6-implement-date-filtering
+2026-04-03T06:32:50.0787668Z  * [new branch]      feature/AP.7-e2e-sold-positions          -> origin/feature/AP.7-e2e-sold-positions
+2026-04-03T06:32:50.0789849Z  * [new branch]      feature/AQ.1-tdd-wire-dividends-table    -> origin/feature/AQ.1-tdd-wire-dividends-table
+2026-04-03T06:32:50.0792414Z  * [new branch]      feature/AQ.2-implement-wire-dividends-table -> origin/feature/AQ.2-implement-wire-dividends-table
+2026-04-03T06:32:50.0794976Z  * [new branch]      feature/AQ.3-tdd-wire-add-dividend-dialog -> origin/feature/AQ.3-tdd-wire-add-dividend-dialog
+2026-04-03T06:32:50.0797576Z  * [new branch]      feature/AQ.4-implement-wire-add-dividend-dialog -> origin/feature/AQ.4-implement-wire-add-dividend-dialog
+2026-04-03T06:32:50.0800499Z  * [new branch]      feature/AQ.5-tdd-implement-edit-functionality -> origin/feature/AQ.5-tdd-implement-edit-functionality
+2026-04-03T06:32:50.0803263Z  * [new branch]      feature/AQ.6-implement-edit-functionality -> origin/feature/AQ.6-implement-edit-functionality
+2026-04-03T06:32:50.0805896Z  * [new branch]      feature/AQ.7-tdd-implement-delete-functionality -> origin/feature/AQ.7-tdd-implement-delete-functionality
+2026-04-03T06:32:50.0808697Z  * [new branch]      feature/AQ.8-implement-delete-functionality -> origin/feature/AQ.8-implement-delete-functionality
+2026-04-03T06:32:50.0810942Z  * [new branch]      feature/AQ.9-add-e2e-tests               -> origin/feature/AQ.9-add-e2e-tests
+2026-04-03T06:32:50.0813014Z  * [new branch]      feature/AR.1-csv-parser                  -> origin/feature/AR.1-csv-parser
+2026-04-03T06:32:50.0814935Z  * [new branch]      feature/AR.1-tdd-csv-parser              -> origin/feature/AR.1-tdd-csv-parser
+2026-04-03T06:32:50.0816934Z  * [new branch]      feature/AR.2-tdd-import-service          -> origin/feature/AR.2-tdd-import-service
+2026-04-03T06:32:50.0818964Z  * [new branch]      feature/AR.6-e2e-import-flow             -> origin/feature/AR.6-e2e-import-flow
+2026-04-03T06:32:50.0820764Z  * [new branch]      feature/AS.10-523                        -> origin/feature/AS.10-523
+2026-04-03T06:32:50.0823318Z  * [new branch]      feature/AU.1-tdd-account-selection-signal-service-tests -> origin/feature/AU.1-tdd-account-selection-signal-service-tests
+2026-04-03T06:32:50.0826342Z  * [new branch]      feature/AU.11-add-unit-tests-integration-scenarios -> origin/feature/AU.11-add-unit-tests-integration-scenarios
+2026-04-03T06:32:50.0829341Z  * [new branch]      feature/AU.2-implement-account-selection-signal-service -> origin/feature/AU.2-implement-account-selection-signal-service
+2026-04-03T06:32:50.0832251Z  * [new branch]      feature/AU.4-wire-summary-to-account-selection -> origin/feature/AU.4-wire-summary-to-account-selection
+2026-04-03T06:32:50.0834780Z  * [new branch]      feature/ah3-edit-account-name            -> origin/feature/ah3-edit-account-name
+2026-04-03T06:32:50.0836869Z  * [new branch]      feature/ah4-delete-account               -> origin/feature/ah4-delete-account
+2026-04-03T06:32:50.0838934Z  * [new branch]      feature/ah5-e2e-tests-account-crud       -> origin/feature/ah5-e2e-tests-account-crud
+2026-04-03T06:32:50.0841412Z  * [new branch]      feature/ai1-tdd-screener-service-tests   -> origin/feature/ai1-tdd-screener-service-tests
+2026-04-03T06:32:50.0843755Z  * [new branch]      feature/aj1-wire-screener-smartngrx      -> origin/feature/aj1-wire-screener-smartngrx
+2026-04-03T06:32:50.0846040Z  * [new branch]      feature/aj2-implement-checkbox-editing   -> origin/feature/aj2-implement-checkbox-editing
+2026-04-03T06:32:50.0848444Z  * [new branch]      feature/aj4-unit-tests-screener-operations -> origin/feature/aj4-unit-tests-screener-operations
+2026-04-03T06:32:50.0850744Z  * [new branch]      feature/ao.1-tdd-open-positions          -> origin/feature/ao.1-tdd-open-positions
+2026-04-03T06:32:50.0852977Z  * [new branch]      fix/routing-token-and-prompts            -> origin/fix/routing-token-and-prompts
+2026-04-03T06:32:50.0855237Z  * [new branch]      issue-222/ac3-editable-date-cell-component -> origin/issue-222/ac3-editable-date-cell-component
+2026-04-03T06:32:50.0857725Z  * [new branch]      issue-224/ac4-symbol-autocomplete-component -> origin/issue-224/ac4-symbol-autocomplete-component
+2026-04-03T06:32:50.0860243Z  * [new branch]      issue-226/ac4-symbol-autocomplete-component -> origin/issue-226/ac4-symbol-autocomplete-component
+2026-04-03T06:32:50.0862880Z  * [new branch]      issue-228/ac6-summary-display-component  -> origin/issue-228/ac6-summary-display-component
+2026-04-03T06:32:50.0865147Z  * [new branch]      issue-230/ac7-notification-service       -> origin/issue-230/ac7-notification-service
+2026-04-03T06:32:50.0867303Z  * [new branch]      issue-232/ac8-confirm-dialog-tests       -> origin/issue-232/ac8-confirm-dialog-tests
+2026-04-03T06:32:50.0869643Z  * [new branch]      issue-234/ad1-migrate-global-universe    -> origin/issue-234/ad1-migrate-global-universe
+2026-04-03T06:32:50.0871464Z  * [new branch]      main                                     -> origin/main
+2026-04-03T06:32:50.0873052Z  * [new branch]      story-AX.12                              -> origin/story-AX.12
+2026-04-03T06:32:50.0874610Z  * [new branch]      story-AX.14                              -> origin/story-AX.14
+2026-04-03T06:32:50.0876118Z  * [new branch]      story-AX.4                               -> origin/story-AX.4
+2026-04-03T06:32:50.0878050Z  * [new branch]      story-AX.5/tdd-open-trades-partial-array -> origin/story-AX.5/tdd-open-trades-partial-array
+2026-04-03T06:32:50.0880007Z  * [new branch]      story-AX.6                               -> origin/story-AX.6
+2026-04-03T06:32:50.0881943Z  * [new branch]      story-AX.9/tdd-sold-trades-partial-array -> origin/story-AX.9/tdd-sold-trades-partial-array
+2026-04-03T06:32:50.0884330Z  * [new branch]      story-aa.2-install-angular-material      -> origin/story-aa.2-install-angular-material
+2026-04-03T06:32:50.0886522Z  * [new branch]      story-aa.3-custom-material-theme         -> origin/story-aa.3-custom-material-theme
+2026-04-03T06:32:50.0888711Z  * [new branch]      story-aa.4-copy-core-infrastructure      -> origin/story-aa.4-copy-core-infrastructure
+2026-04-03T06:32:50.0890931Z  * [new branch]      story-aa.5-setup-app-configuration       -> origin/story-aa.5-setup-app-configuration
+2026-04-03T06:32:50.0893350Z  * [new branch]      story-ab.1-migrate-shell-component       -> origin/story-ab.1-migrate-shell-component
+2026-04-03T06:32:50.0895565Z  * [new branch]      story-ab.2-migrate-login-component       -> origin/story-ab.2-migrate-login-component
+2026-04-03T06:32:50.0897826Z  * [new branch]      story-ab.3-migrate-profile-components    -> origin/story-ab.3-migrate-profile-components
+2026-04-03T06:32:50.0899957Z  * [new branch]      story-ao4-editable-cells                 -> origin/story-ao4-editable-cells
+2026-04-03T06:32:50.0902455Z  * [new branch]      story/AA.1-generate-rms-material-application -> origin/story/AA.1-generate-rms-material-application
+2026-04-03T06:32:50.0904929Z  * [new branch]      story/AI.2-implement-screener-service    -> origin/story/AI.2-implement-screener-service
+2026-04-03T06:32:50.0907169Z  * [new branch]      story/AI.3-tdd-refresh-button-tests      -> origin/story/AI.3-tdd-refresh-button-tests
+2026-04-03T06:32:50.0909272Z  * [new branch]      story/AI.4-wire-refresh-button           -> origin/story/AI.4-wire-refresh-button
+2026-04-03T06:32:50.0911561Z  * [new branch]      story/AI.5-tdd-loading-error-handling-tests -> origin/story/AI.5-tdd-loading-error-handling-tests
+2026-04-03T06:32:50.0914029Z  * [new branch]      story/AI.6-loading-error-handling        -> origin/story/AI.6-loading-error-handling
+2026-04-03T06:32:50.0916221Z  * [new branch]      story/AI.7-e2e-tests-screener-refresh    -> origin/story/AI.7-e2e-tests-screener-refresh
+2026-04-03T06:32:50.0918389Z  * [new branch]      story/AO.7-tdd-auto-close-logic          -> origin/story/AO.7-tdd-auto-close-logic
+2026-04-03T06:32:50.0920330Z  * [new branch]      story/AR.7-bug-fixes-498                 -> origin/story/AR.7-bug-fixes-498
+2026-04-03T06:32:50.0922503Z  * [new branch]      story/AV.1-tdd-state-persistence-service -> origin/story/AV.1-tdd-state-persistence-service
+2026-04-03T06:32:50.0925054Z  * [new branch]      story/AV.10-implement-state-restoration-on-load -> origin/story/AV.10-implement-state-restoration-on-load
+2026-04-03T06:32:50.0927773Z  * [new branch]      story/AV.2-implement-state-persistence-service -> origin/story/AV.2-implement-state-persistence-service
+2026-04-03T06:32:50.0930497Z  * [new branch]      story/AV.3-tdd-global-tab-selection-persistence -> origin/story/AV.3-tdd-global-tab-selection-persistence
+2026-04-03T06:32:50.0933443Z  * [new branch]      story/AV.4-implement-global-tab-selection-persistence -> origin/story/AV.4-implement-global-tab-selection-persistence
+2026-04-03T06:32:50.0936366Z  * [new branch]      story/AV.5-tdd-account-selection-persistence -> origin/story/AV.5-tdd-account-selection-persistence
+2026-04-03T06:32:50.0939160Z  * [new branch]      story/AV.6-implement-account-selection-persistence -> origin/story/AV.6-implement-account-selection-persistence
+2026-04-03T06:32:50.0942010Z  * [new branch]      story/AV.7-tdd-account-tab-selection-persistence -> origin/story/AV.7-tdd-account-tab-selection-persistence
+2026-04-03T06:32:50.0945016Z  * [new branch]      story/AV.8-implement-account-tab-selection-persistence -> origin/story/AV.8-implement-account-tab-selection-persistence
+2026-04-03T06:32:50.0947774Z  * [new branch]      story/AV.9-tdd-state-restoration-on-load -> origin/story/AV.9-tdd-state-restoration-on-load
+2026-04-03T06:32:50.0950132Z  * [new branch]      story/AW.1-tdd-universe-endpoint-sorting -> origin/story/AW.1-tdd-universe-endpoint-sorting
+2026-04-03T06:32:50.0952813Z  * [new branch]      story/AW.10-implement-remove-client-side-sorting -> origin/story/AW.10-implement-remove-client-side-sorting
+2026-04-03T06:32:50.0955416Z  * [new branch]      story/AW.11-verify-and-fix-implementation -> origin/story/AW.11-verify-and-fix-implementation
+2026-04-03T06:32:50.0957693Z  * [new branch]      story/AW.12-e2e-server-side-sorting      -> origin/story/AW.12-e2e-server-side-sorting
+2026-04-03T06:32:50.0960661Z  * [new branch]      story/AW.2-implement-universe-endpoint-sorting -> origin/story/AW.2-implement-universe-endpoint-sorting
+2026-04-03T06:32:50.0963587Z  * [new branch]      story/AW.3-tdd-trades-endpoints-sorting  -> origin/story/AW.3-tdd-trades-endpoints-sorting
+2026-04-03T06:32:50.0966122Z  * [new branch]      story/AW.4-implement-trades-endpoints-sorting -> origin/story/AW.4-implement-trades-endpoints-sorting
+2026-04-03T06:32:50.0968718Z  * [new branch]      story/AW.5-tdd-http-interceptor-sort-headers -> origin/story/AW.5-tdd-http-interceptor-sort-headers
+2026-04-03T06:32:50.0972060Z  * [new branch]      story/AW.6-implement-http-interceptor-sort-headers -> origin/story/AW.6-implement-http-interceptor-sort-headers
+2026-04-03T06:32:50.0975754Z  * [new branch]      story/AW.7-tdd-frontend-components-call-new-endpoints -> origin/story/AW.7-tdd-frontend-components-call-new-endpoints
+2026-04-03T06:32:50.0979011Z  * [new branch]      story/AW.8-implement-frontend-components-call-new-endpoints -> origin/story/AW.8-implement-frontend-components-call-new-endpoints
+2026-04-03T06:32:50.0982061Z  * [new branch]      story/AW.9-tdd-verify-client-side-sorting-removed -> origin/story/AW.9-tdd-verify-client-side-sorting-removed
+2026-04-03T06:32:50.0984986Z  * [new branch]      story/AX.10-implement-sold-trades-partial-array -> origin/story/AX.10-implement-sold-trades-partial-array
+2026-04-03T06:32:50.0987559Z  * [new branch]      story/AX.11-tdd-sold-positions-virtual-data -> origin/story/AX.11-tdd-sold-positions-virtual-data
+2026-04-03T06:32:50.0990092Z  * [new branch]      story/AX.2-implement-base-table-rendered-range -> origin/story/AX.2-implement-base-table-rendered-range
+2026-04-03T06:32:50.0992781Z  * [new branch]      story/AX.7-tdd-open-positions-virtual-data -> origin/story/AX.7-tdd-open-positions-virtual-data
+2026-04-03T06:32:50.0995152Z  * [new branch]      story/AX.8-open-positions-virtual-data   -> origin/story/AX.8-open-positions-virtual-data
+2026-04-03T06:32:50.0997280Z  * [new branch]      story/AY.1-unit-test-migration           -> origin/story/AY.1-unit-test-migration
+2026-04-03T06:32:50.0999310Z  * [new branch]      story/ag-2-e2e-tests-risk-groups         -> origin/story/ag-2-e2e-tests-risk-groups
+2026-04-03T06:32:50.1001492Z  * [new branch]      story/ah-1-wire-account-list-to-backend  -> origin/story/ah-1-wire-account-list-to-backend
+2026-04-03T06:32:50.1003790Z  * [new branch]      story/ah-2-account-management-ui         -> origin/story/ah-2-account-management-ui
+2026-04-03T06:32:50.1005848Z  * [new branch]      story/ao2-open-positions-table           -> origin/story/ao2-open-positions-table
+2026-04-03T06:32:50.1007850Z  * [new branch]      story/ao3-tdd-editable-cells             -> origin/story/ao3-tdd-editable-cells
+2026-04-03T06:32:50.1009957Z  * [new branch]      story/ao6-add-position-dialog            -> origin/story/ao6-add-position-dialog
+2026-04-03T06:32:50.1011973Z  * [new ref]         1e6472eadf076784506585d0e21ea7f52a33319f -> pull/894/merge
+2026-04-03T06:32:50.1016388Z ##[endgroup]
+2026-04-03T06:32:50.1017926Z ##[group]Determining the checkout info
+2026-04-03T06:32:50.1019522Z ##[endgroup]
+2026-04-03T06:32:50.1020592Z [command]/usr/bin/git sparse-checkout disable
+2026-04-03T06:32:50.1023183Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-04-03T06:32:50.1025919Z ##[group]Checking out the ref
+2026-04-03T06:32:50.1027146Z [command]/usr/bin/git checkout --progress --force refs/remotes/pull/894/merge
+2026-04-03T06:32:51.4271301Z Updating files:   0% (1/2607)
+2026-04-03T06:32:51.4286040Z Updating files:   1% (27/2607)
+2026-04-03T06:32:51.4300959Z Updating files:   2% (53/2607)
+2026-04-03T06:32:51.4313262Z Updating files:   3% (79/2607)
+2026-04-03T06:32:51.4323605Z Updating files:   4% (105/2607)
+2026-04-03T06:32:51.4336993Z Updating files:   5% (131/2607)
+2026-04-03T06:32:51.4350517Z Updating files:   6% (157/2607)
+2026-04-03T06:32:51.4364830Z Updating files:   7% (183/2607)
+2026-04-03T06:32:51.4377773Z Updating files:   8% (209/2607)
+2026-04-03T06:32:51.4397149Z Updating files:   9% (235/2607)
+2026-04-03T06:32:51.4412136Z Updating files:  10% (261/2607)
+2026-04-03T06:32:51.4427703Z Updating files:  11% (287/2607)
+2026-04-03T06:32:51.4440976Z Updating files:  12% (313/2607)
+2026-04-03T06:32:51.4451692Z Updating files:  13% (339/2607)
+2026-04-03T06:32:51.4467403Z Updating files:  14% (365/2607)
+2026-04-03T06:32:51.4479567Z Updating files:  15% (392/2607)
+2026-04-03T06:32:51.4490132Z Updating files:  16% (418/2607)
+2026-04-03T06:32:51.4499781Z Updating files:  17% (444/2607)
+2026-04-03T06:32:51.4509752Z Updating files:  18% (470/2607)
+2026-04-03T06:32:51.4519217Z Updating files:  19% (496/2607)
+2026-04-03T06:32:51.4529382Z Updating files:  20% (522/2607)
+2026-04-03T06:32:51.4539249Z Updating files:  21% (548/2607)
+2026-04-03T06:32:51.4553382Z Updating files:  22% (574/2607)
+2026-04-03T06:32:51.4572094Z Updating files:  23% (600/2607)
+2026-04-03T06:32:51.4581697Z Updating files:  24% (626/2607)
+2026-04-03T06:32:51.4593837Z Updating files:  25% (652/2607)
+2026-04-03T06:32:51.4604808Z Updating files:  26% (678/2607)
+2026-04-03T06:32:51.4613989Z Updating files:  27% (704/2607)
+2026-04-03T06:32:51.4627578Z Updating files:  28% (730/2607)
+2026-04-03T06:32:51.4647943Z Updating files:  29% (757/2607)
+2026-04-03T06:32:51.4660730Z Updating files:  30% (783/2607)
+2026-04-03T06:32:51.4672645Z Updating files:  31% (809/2607)
+2026-04-03T06:32:51.4685596Z Updating files:  32% (835/2607)
+2026-04-03T06:32:51.4699219Z Updating files:  33% (861/2607)
+2026-04-03T06:32:51.4710282Z Updating files:  34% (887/2607)
+2026-04-03T06:32:51.4720095Z Updating files:  35% (913/2607)
+2026-04-03T06:32:51.4731572Z Updating files:  36% (939/2607)
+2026-04-03T06:32:51.4739937Z Updating files:  37% (965/2607)
+2026-04-03T06:32:51.4748295Z Updating files:  38% (991/2607)
+2026-04-03T06:32:51.4759978Z Updating files:  39% (1017/2607)
+2026-04-03T06:32:51.4772997Z Updating files:  40% (1043/2607)
+2026-04-03T06:32:51.4784664Z Updating files:  41% (1069/2607)
+2026-04-03T06:32:51.4793892Z Updating files:  42% (1095/2607)
+2026-04-03T06:32:51.4805779Z Updating files:  43% (1122/2607)
+2026-04-03T06:32:51.4818190Z Updating files:  44% (1148/2607)
+2026-04-03T06:32:51.4829086Z Updating files:  45% (1174/2607)
+2026-04-03T06:32:51.4839883Z Updating files:  46% (1200/2607)
+2026-04-03T06:32:51.4858845Z Updating files:  47% (1226/2607)
+2026-04-03T06:32:51.4880179Z Updating files:  48% (1252/2607)
+2026-04-03T06:32:51.4895281Z Updating files:  49% (1278/2607)
+2026-04-03T06:32:51.4907423Z Updating files:  50% (1304/2607)
+2026-04-03T06:32:51.4916792Z Updating files:  51% (1330/2607)
+2026-04-03T06:32:51.4926668Z Updating files:  52% (1356/2607)
+2026-04-03T06:32:51.4935673Z Updating files:  53% (1382/2607)
+2026-04-03T06:32:51.4945072Z Updating files:  54% (1408/2607)
+2026-04-03T06:32:51.4954758Z Updating files:  55% (1434/2607)
+2026-04-03T06:32:51.4964154Z Updating files:  56% (1460/2607)
+2026-04-03T06:32:51.4977330Z Updating files:  57% (1486/2607)
+2026-04-03T06:32:51.4985630Z Updating files:  58% (1513/2607)
+2026-04-03T06:32:51.4996125Z Updating files:  59% (1539/2607)
+2026-04-03T06:32:51.5063767Z Updating files:  60% (1565/2607)
+2026-04-03T06:32:51.5194846Z Updating files:  61% (1591/2607)
+2026-04-03T06:32:51.5218296Z Updating files:  62% (1617/2607)
+2026-04-03T06:32:51.5229368Z Updating files:  63% (1643/2607)
+2026-04-03T06:32:51.5241892Z Updating files:  64% (1669/2607)
+2026-04-03T06:32:51.5251989Z Updating files:  65% (1695/2607)
+2026-04-03T06:32:51.5259988Z Updating files:  66% (1721/2607)
+2026-04-03T06:32:51.5269733Z Updating files:  67% (1747/2607)
+2026-04-03T06:32:51.5278818Z Updating files:  68% (1773/2607)
+2026-04-03T06:32:51.5287351Z Updating files:  69% (1799/2607)
+2026-04-03T06:32:51.5298297Z Updating files:  70% (1825/2607)
+2026-04-03T06:32:51.5309255Z Updating files:  71% (1851/2607)
+2026-04-03T06:32:51.5317792Z Updating files:  72% (1878/2607)
+2026-04-03T06:32:51.5326484Z Updating files:  73% (1904/2607)
+2026-04-03T06:32:51.5334362Z Updating files:  74% (1930/2607)
+2026-04-03T06:32:51.5341330Z Updating files:  75% (1956/2607)
+2026-04-03T06:32:51.5348085Z Updating files:  76% (1982/2607)
+2026-04-03T06:32:51.5354714Z Updating files:  77% (2008/2607)
+2026-04-03T06:32:51.5362557Z Updating files:  78% (2034/2607)
+2026-04-03T06:32:51.5368845Z Updating files:  79% (2060/2607)
+2026-04-03T06:32:51.5376071Z Updating files:  80% (2086/2607)
+2026-04-03T06:32:51.5381578Z Updating files:  81% (2112/2607)
+2026-04-03T06:32:51.5388028Z Updating files:  82% (2138/2607)
+2026-04-03T06:32:51.5396266Z Updating files:  83% (2164/2607)
+2026-04-03T06:32:51.5405004Z Updating files:  84% (2190/2607)
+2026-04-03T06:32:51.5413511Z Updating files:  85% (2216/2607)
+2026-04-03T06:32:51.5422895Z Updating files:  86% (2243/2607)
+2026-04-03T06:32:51.5431782Z Updating files:  87% (2269/2607)
+2026-04-03T06:32:51.5440247Z Updating files:  88% (2295/2607)
+2026-04-03T06:32:51.5451227Z Updating files:  89% (2321/2607)
+2026-04-03T06:32:51.5461469Z Updating files:  90% (2347/2607)
+2026-04-03T06:32:51.5469470Z Updating files:  91% (2373/2607)
+2026-04-03T06:32:51.5477809Z Updating files:  92% (2399/2607)
+2026-04-03T06:32:51.5497394Z Updating files:  93% (2425/2607)
+2026-04-03T06:32:51.5533326Z Updating files:  94% (2451/2607)
+2026-04-03T06:32:51.5541583Z Updating files:  95% (2477/2607)
+2026-04-03T06:32:51.5549523Z Updating files:  96% (2503/2607)
+2026-04-03T06:32:51.5559048Z Updating files:  97% (2529/2607)
+2026-04-03T06:32:51.5619989Z Updating files:  98% (2555/2607)
+2026-04-03T06:32:51.5719864Z Updating files:  99% (2581/2607)
+2026-04-03T06:32:51.5720787Z Updating files: 100% (2607/2607)
+2026-04-03T06:32:51.5721309Z Updating files: 100% (2607/2607), done.
+2026-04-03T06:32:51.5758263Z Note: switching to 'refs/remotes/pull/894/merge'.
+2026-04-03T06:32:51.5759764Z 
+2026-04-03T06:32:51.5760115Z You are in 'detached HEAD' state. You can look around, make experimental
+2026-04-03T06:32:51.5761079Z changes and commit them, and you can discard any commits you make in this
+2026-04-03T06:32:51.5761834Z state without impacting any branches by switching back to a branch.
+2026-04-03T06:32:51.5762422Z 
+2026-04-03T06:32:51.5762723Z If you want to create a new branch to retain commits you create, you may
+2026-04-03T06:32:51.5763444Z do so (now or later) by using -c with the switch command. Example:
+2026-04-03T06:32:51.5763849Z 
+2026-04-03T06:32:51.5764028Z   git switch -c <new-branch-name>
+2026-04-03T06:32:51.5764305Z 
+2026-04-03T06:32:51.5764457Z Or undo this operation with:
+2026-04-03T06:32:51.5764709Z 
+2026-04-03T06:32:51.5764828Z   git switch -
+2026-04-03T06:32:51.5765011Z 
+2026-04-03T06:32:51.5765340Z Turn off this advice by setting config variable advice.detachedHead to false
+2026-04-03T06:32:51.5765811Z 
+2026-04-03T06:32:51.5766316Z HEAD is now at 1e6472e Merge ae1b84ecd269e779ffb52e8cfff9f67a47cbdf29 into 7b3e704ea4e16d78bfcee7ee97b749ac7e76f161
+2026-04-03T06:32:51.5769205Z ##[endgroup]
+2026-04-03T06:32:51.5806310Z [command]/usr/bin/git log -1 --format=%H
+2026-04-03T06:32:51.5827509Z 1e6472eadf076784506585d0e21ea7f52a33319f
+2026-04-03T06:32:51.5999655Z ##[group]Run pnpm/action-setup@v4
+2026-04-03T06:32:51.5999916Z with:
+2026-04-03T06:32:51.6000100Z   version: 10.12.1
+2026-04-03T06:32:51.6000283Z   run_install: false
+2026-04-03T06:32:51.6000485Z   dest: ~/setup-pnpm
+2026-04-03T06:32:51.6000678Z   cache: false
+2026-04-03T06:32:51.6000882Z   cache_dependency_path: pnpm-lock.yaml
+2026-04-03T06:32:51.6001173Z   package_json_file: package.json
+2026-04-03T06:32:51.6001426Z   standalone: false
+2026-04-03T06:32:51.6001598Z env:
+2026-04-03T06:32:51.6002186Z   NX_CLOUD_ACCESS_TOKEN: ***
+2026-04-03T06:32:51.6002615Z ##[endgroup]
+2026-04-03T06:32:51.7273414Z ##[group]Running self-installer...
+2026-04-03T06:32:52.3078484Z Progress: resolved 1, reused 0, downloaded 0, added 0
+2026-04-03T06:32:52.3159873Z Packages: +1
+2026-04-03T06:32:52.3160453Z +
+2026-04-03T06:32:52.7299589Z Progress: resolved 1, reused 0, downloaded 1, added 1, done
+2026-04-03T06:32:52.7547701Z 
+2026-04-03T06:32:52.7548134Z dependencies:
+2026-04-03T06:32:52.7548522Z + pnpm 10.12.1 (10.33.0 is available)
+2026-04-03T06:32:52.7548692Z 
+2026-04-03T06:32:52.7577457Z Done in 866ms
+2026-04-03T06:32:52.7688451Z ##[endgroup]
+2026-04-03T06:32:52.7691498Z Installation Completed!
+2026-04-03T06:32:52.7823837Z ##[group]Run actions/setup-node@v4
+2026-04-03T06:32:52.7824181Z with:
+2026-04-03T06:32:52.7824463Z   node-version: 22.21.1
+2026-04-03T06:32:52.7824728Z   cache: pnpm
+2026-04-03T06:32:52.7824997Z   always-auth: false
+2026-04-03T06:32:52.7825242Z   check-latest: false
+2026-04-03T06:32:52.7825663Z   token: ***
+2026-04-03T06:32:52.7825946Z env:
+2026-04-03T06:32:52.7826403Z   NX_CLOUD_ACCESS_TOKEN: ***
+2026-04-03T06:32:52.7826723Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-04-03T06:32:52.7827107Z ##[endgroup]
+2026-04-03T06:32:52.9392669Z Attempting to download 22.21.1...
+2026-04-03T06:32:53.4570060Z Acquiring 22.21.1 - x64 from https://github.com/actions/node-versions/releases/download/22.21.1-18894912842/node-22.21.1-linux-x64.tar.gz
+2026-04-03T06:32:54.0213756Z Extracting ...
+2026-04-03T06:32:54.0301222Z [command]/usr/bin/tar xz --strip 1 --warning=no-unknown-keyword --overwrite -C /home/runner/work/_temp/4bbafadf-2248-4248-b7e1-b7879a035733 -f /home/runner/work/_temp/c3ee1a38-4124-4518-afa7-ffb0c95dc16a
+2026-04-03T06:32:55.1774191Z Adding to the cache ...
+2026-04-03T06:32:56.5865075Z ##[group]Environment details
+2026-04-03T06:32:56.7989395Z node: v22.21.1
+2026-04-03T06:32:56.7989822Z npm: 10.9.4
+2026-04-03T06:32:56.7990068Z yarn: 1.22.22
+2026-04-03T06:32:56.7990679Z ##[endgroup]
+2026-04-03T06:32:56.8008734Z [command]/home/runner/setup-pnpm/node_modules/.bin/pnpm store path --silent
+2026-04-03T06:32:57.1669956Z /home/runner/setup-pnpm/node_modules/.bin/store/v10
+2026-04-03T06:32:57.3095175Z Cache hit for: node-cache-Linux-x64-pnpm-d132d57842fad8e6f854be6fdf234a134030200c1bc9c2ee93d5ba59360054f6
+2026-04-03T06:32:58.4524663Z Received 92274688 of 353802440 (26.1%), 87.8 MBs/sec
+2026-04-03T06:32:59.4623449Z Received 268435456 of 353802440 (75.9%), 127.2 MBs/sec
+2026-04-03T06:33:00.0438396Z Received 353802440 of 353802440 (100.0%), 130.1 MBs/sec
+2026-04-03T06:33:00.0439711Z Cache Size: ~337 MB (353802440 B)
+2026-04-03T06:33:00.0505473Z [command]/usr/bin/tar -xf /home/runner/work/_temp/8eecf57d-8525-47a0-872b-025e0da1ec33/cache.tzst -P -C /home/runner/work/dms-workspace/dms-workspace --use-compress-program unzstd
+2026-04-03T06:33:03.0942096Z Cache restored successfully
+2026-04-03T06:33:03.1072805Z Cache restored from key: node-cache-Linux-x64-pnpm-d132d57842fad8e6f854be6fdf234a134030200c1bc9c2ee93d5ba59360054f6
+2026-04-03T06:33:03.1336634Z ##[group]Run pnpm i --frozen-lockfile
+2026-04-03T06:33:03.1337023Z [36;1mpnpm i --frozen-lockfile[0m
+2026-04-03T06:33:03.1359116Z shell: /usr/bin/bash -e {0}
+2026-04-03T06:33:03.1359597Z env:
+2026-04-03T06:33:03.1360325Z   NX_CLOUD_ACCESS_TOKEN: ***
+2026-04-03T06:33:03.1360635Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-04-03T06:33:03.1360943Z ##[endgroup]
+2026-04-03T06:33:03.5131313Z Lockfile is up to date, resolution step is skipped
+2026-04-03T06:33:03.6354375Z Progress: resolved 1, reused 0, downloaded 0, added 0
+2026-04-03T06:33:03.8473014Z Packages: +2121
+2026-04-03T06:33:03.8473741Z ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+2026-04-03T06:33:04.6676217Z Progress: resolved 2121, reused 1332, downloaded 0, added 0
+2026-04-03T06:33:05.6681883Z Progress: resolved 2121, reused 2119, downloaded 0, added 513
+2026-04-03T06:33:06.6686062Z Progress: resolved 2121, reused 2119, downloaded 0, added 1840
+2026-04-03T06:33:06.9587216Z Progress: resolved 2121, reused 2119, downloaded 0, added 2121, done
+2026-04-03T06:33:08.6484973Z 
+2026-04-03T06:33:08.6485415Z dependencies:
+2026-04-03T06:33:08.6485761Z + @angular-devkit/build-angular 21.2.5
+2026-04-03T06:33:08.6486288Z + @angular/animations 21.2.6
+2026-04-03T06:33:08.6486652Z + @angular/cdk 21.2.4
+2026-04-03T06:33:08.6486967Z + @angular/common 21.2.6
+2026-04-03T06:33:08.6487295Z + @angular/compiler 21.2.6
+2026-04-03T06:33:08.6487663Z + @angular/core 21.2.6
+2026-04-03T06:33:08.6488017Z + @angular/forms 21.2.6
+2026-04-03T06:33:08.6488398Z + @angular/material 21.2.4
+2026-04-03T06:33:08.6488832Z + @angular/platform-browser 21.2.6
+2026-04-03T06:33:08.6489304Z + @angular/platform-server 21.2.6
+2026-04-03T06:33:08.6489767Z + @angular/router 21.2.6
+2026-04-03T06:33:08.6490163Z + @angular/ssr 21.2.5
+2026-04-03T06:33:08.6490497Z + @aws-amplify/auth 6.19.1
+2026-04-03T06:33:08.6490848Z + @aws-amplify/core 6.16.1
+2026-04-03T06:33:08.6491214Z + @aws-sdk/client-ssm 3.1019.0
+2026-04-03T06:33:08.6491605Z + @fastify/autoload 6.3.1
+2026-04-03T06:33:08.6491954Z + @fastify/cookie 11.0.2
+2026-04-03T06:33:08.6492557Z + @fastify/cors 11.2.0
+2026-04-03T06:33:08.6492946Z + @fastify/multipart 9.4.0
+2026-04-03T06:33:08.6493374Z + @fastify/sensible 6.0.4
+2026-04-03T06:33:08.6493792Z + @primeng/themes 21.0.4
+2026-04-03T06:33:08.6494307Z + @prisma/adapter-better-sqlite3 7.2.0
+2026-04-03T06:33:08.6494988Z + @smarttools/smart-core 3.0.0
+2026-04-03T06:33:08.6495499Z + @smarttools/smart-signals 3.0.0
+2026-04-03T06:33:08.6495931Z + axios 1.13.5
+2026-04-03T06:33:08.6496262Z + chart.js 4.5.1
+2026-04-03T06:33:08.6496604Z + cheerio 1.1.0
+2026-04-03T06:33:08.6496929Z + dotenv 17.3.1
+2026-04-03T06:33:08.6497266Z + express 5.2.1
+2026-04-03T06:33:08.6497569Z + fastify 5.8.3
+2026-04-03T06:33:08.6497855Z + fastify-plugin 5.1.0
+2026-04-03T06:33:08.6498170Z + jsonwebtoken 9.0.2
+2026-04-03T06:33:08.6498472Z + jwks-rsa 3.2.2
+2026-04-03T06:33:08.6498775Z + ng2-charts 10.0.0
+2026-04-03T06:33:08.6499102Z + nyse-holidays 1.2.0
+2026-04-03T06:33:08.6499463Z + primeicons 7.0.0
+2026-04-03T06:33:08.6499783Z + primeng 21.1.1
+2026-04-03T06:33:08.6500100Z + rxjs 7.8.2
+2026-04-03T06:33:08.6500427Z + yahoo-finance2 3.13.0
+2026-04-03T06:33:08.6500676Z 
+2026-04-03T06:33:08.6500802Z devDependencies:
+2026-04-03T06:33:08.6501263Z + @analogjs/vite-plugin-angular 2.3.1
+2026-04-03T06:33:08.6501798Z + @analogjs/vitest-angular 2.1.3
+2026-04-03T06:33:08.6502250Z + @angular-devkit/core 21.2.5
+2026-04-03T06:33:08.6518501Z + @angular-devkit/schematics 21.2.5
+2026-04-03T06:33:08.6519107Z + @angular-eslint/eslint-plugin 21.3.1
+2026-04-03T06:33:08.6519746Z + @angular-eslint/eslint-plugin-template 21.3.1
+2026-04-03T06:33:08.6520390Z + @angular-eslint/template-parser 21.3.1
+2026-04-03T06:33:08.6520902Z + @angular/build 21.2.5
+2026-04-03T06:33:08.6521636Z + @angular/cli 21.2.5
+2026-04-03T06:33:08.6522108Z + @angular/compiler-cli 21.2.6
+2026-04-03T06:33:08.6542170Z + @angular/language-service 21.2.6
+2026-04-03T06:33:08.6542991Z + @axe-core/playwright 4.11.1
+2026-04-03T06:33:08.6543819Z + @eslint/eslintrc 3.3.3
+2026-04-03T06:33:08.6544269Z + @eslint/js 9.29.0
+2026-04-03T06:33:08.6544655Z + @ngrx/entity 21.0.1
+2026-04-03T06:33:08.6545073Z + @ngrx/eslint-plugin 21.0.1
+2026-04-03T06:33:08.6545677Z + @ngrx/signals 21.0.1
+2026-04-03T06:33:08.6546072Z + @ngrx/store 21.0.1
+2026-04-03T06:33:08.6546452Z + @nx/angular 22.6.3
+2026-04-03T06:33:08.6546803Z + @nx/devkit 22.6.3
+2026-04-03T06:33:08.6547201Z + @nx/esbuild 22.6.3
+2026-04-03T06:33:08.6547586Z + @nx/eslint 22.6.3
+2026-04-03T06:33:08.6547962Z + @nx/eslint-plugin 22.6.3
+2026-04-03T06:33:08.6548381Z + @nx/js 22.6.3
+2026-04-03T06:33:08.6548741Z + @nx/node 22.6.3
+2026-04-03T06:33:08.6549126Z + @nx/playwright 22.6.3
+2026-04-03T06:33:08.6549542Z + @nx/plugin 22.6.3
+2026-04-03T06:33:08.6549926Z + @nx/storybook 22.6.3
+2026-04-03T06:33:08.6550321Z + @nx/vite 22.6.3
+2026-04-03T06:33:08.6550676Z + @nx/vitest 22.6.3
+2026-04-03T06:33:08.6551023Z + @nx/web 22.6.3
+2026-04-03T06:33:08.6551402Z + @nx/workspace 22.6.3
+2026-04-03T06:33:08.6551875Z + @playwright/test 1.55.1
+2026-04-03T06:33:08.6574348Z + @prisma/client 7.2.0
+2026-04-03T06:33:08.6574785Z + @schematics/angular 21.1.2
+2026-04-03T06:33:08.6575098Z + @smarttools/eslint-plugin 1.0.5
+2026-04-03T06:33:08.6575584Z + @smarttools/eslint-plugin-rxjs 1.0.22
+2026-04-03T06:33:08.6575913Z + @storybook/addon-themes 10.3.3
+2026-04-03T06:33:08.6576187Z + @storybook/angular 10.3.3
+2026-04-03T06:33:08.6576464Z + @stylistic/eslint-plugin-js 4.4.1
+2026-04-03T06:33:08.6576930Z + @swc-node/register 1.11.1
+2026-04-03T06:33:08.6577297Z + @swc/core 1.15.8
+2026-04-03T06:33:08.6577648Z + @swc/helpers 0.5.18
+2026-04-03T06:33:08.6578041Z + @tailwindcss/postcss 4.2.2
+2026-04-03T06:33:08.6578475Z + @tailwindcss/vite 4.2.1
+2026-04-03T06:33:08.6578857Z + @types/aws-sdk 2.7.4
+2026-04-03T06:33:08.6579331Z + @types/better-sqlite3 7.6.13
+2026-04-03T06:33:08.6579758Z + @types/express 5.0.6
+2026-04-03T06:33:08.6580192Z + @types/jsonwebtoken 9.0.10
+2026-04-03T06:33:08.6580621Z + @types/node 20.19.9
+2026-04-03T06:33:08.6581123Z + @typescript-eslint/eslint-plugin 8.50.1
+2026-04-03T06:33:08.6581855Z + @typescript-eslint/parser 8.50.1
+2026-04-03T06:33:08.6582771Z + @typescript-eslint/utils 8.50.1
+2026-04-03T06:33:08.6583267Z + @vitest/coverage-v8 4.0.9
+2026-04-03T06:33:08.6583734Z + @vitest/eslint-plugin 1.6.12
+2026-04-03T06:33:08.6584144Z + @vitest/ui 4.0.9
+2026-04-03T06:33:08.6584501Z + angular-eslint 21.3.1
+2026-04-03T06:33:08.6584894Z + autoprefixer 10.4.27
+2026-04-03T06:33:08.6585266Z + better-sqlite3 12.6.2
+2026-04-03T06:33:08.6585619Z + esbuild 0.25.7
+2026-04-03T06:33:08.6585938Z + eslint 9.39.4
+2026-04-03T06:33:08.6586371Z + eslint-config-prettier 10.1.5
+2026-04-03T06:33:08.6586820Z + eslint-plugin-cypress 4.3.0
+2026-04-03T06:33:08.6587400Z + eslint-plugin-eslint-comments 3.2.0
+2026-04-03T06:33:08.6587937Z + eslint-plugin-functional 9.0.2
+2026-04-03T06:33:08.6588420Z + eslint-plugin-import 2.31.0
+2026-04-03T06:33:08.6588895Z + eslint-plugin-jest 29.12.0
+2026-04-03T06:33:08.6589342Z + eslint-plugin-jsdoc 62.8.0
+2026-04-03T06:33:08.6589945Z + eslint-plugin-max-params-no-constructor 0.0.4
+2026-04-03T06:33:08.6590583Z + eslint-plugin-playwright 2.2.0
+2026-04-03T06:33:08.6591149Z + eslint-plugin-simple-import-sort 12.1.1
+2026-04-03T06:33:08.6591696Z + eslint-plugin-sonarjs 3.0.5
+2026-04-03T06:33:08.6592202Z + eslint-plugin-unicorn 61.0.2
+2026-04-03T06:33:08.6592877Z + eslint-plugin-unused-imports 4.4.1
+2026-04-03T06:33:08.6593340Z + htmlhint 1.5.1
+2026-04-03T06:33:08.6593709Z + http-server 14.1.1
+2026-04-03T06:33:08.6594074Z + jiti 2.6.1
+2026-04-03T06:33:08.6594388Z + jscpd 4.0.8
+2026-04-03T06:33:08.6594709Z + jsdom 29.0.1
+2026-04-03T06:33:08.6594988Z + nx 22.6.3
+2026-04-03T06:33:08.6595293Z + playwright 1.55.1
+2026-04-03T06:33:08.6595617Z + postcss 8.5.6
+2026-04-03T06:33:08.6595950Z + prettier 2.8.8
+2026-04-03T06:33:08.6596288Z + prisma 7.2.0
+2026-04-03T06:33:08.6596638Z + storybook 10.3.3
+2026-04-03T06:33:08.6596997Z + tailwindcss 4.2.2
+2026-04-03T06:33:08.6597399Z + tailwindcss-primeui 0.6.1
+2026-04-03T06:33:08.6597794Z + tslib 2.8.1
+2026-04-03T06:33:08.6598401Z + typescript 5.9.3
+2026-04-03T06:33:08.6598795Z + typescript-eslint 8.53.1
+2026-04-03T06:33:08.6599166Z + vite 7.3.0
+2026-04-03T06:33:08.6599480Z + vitest 4.0.9
+2026-04-03T06:33:08.6599801Z 
+2026-04-03T06:33:08.7765311Z . postinstall$ if [ "$CI" = "true" ]; then prisma generate; fi
+2026-04-03T06:33:09.6533789Z . postinstall: Loaded Prisma config from prisma.config.ts.
+2026-04-03T06:33:09.6837601Z . postinstall: Prisma schema loaded from prisma/schema.prisma.
+2026-04-03T06:33:09.8609746Z . postinstall: â Generated Prisma Client (v7.2.0) to ./node_modules/.pnpm/@prisma+client@7.2.0_prisma@7.2.0_@types+react@18.3.28_better-sqlite3@12.6.2_magicast@0_7d97835d8049c7d1848e9e15be334c61/node_modules/@prisma/client in 108ms
+2026-04-03T06:33:09.8611285Z . postinstall: Start by importing your Prisma Client (See: https://pris.ly/d/importing-client)
+2026-04-03T06:33:09.8612075Z . postinstall: Tip: Want to turn off tips and other hints? https://pris.ly/tip-4-nohints
+2026-04-03T06:33:09.8730482Z . postinstall: Done
+2026-04-03T06:33:09.8887743Z Done in 6.7s using pnpm v10.12.1
+2026-04-03T06:33:09.9115276Z ##[group]Run git fetch origin main:main
+2026-04-03T06:33:09.9115620Z [36;1mgit fetch origin main:main[0m
+2026-04-03T06:33:09.9133290Z shell: /usr/bin/bash -e {0}
+2026-04-03T06:33:09.9133545Z env:
+2026-04-03T06:33:09.9134038Z   NX_CLOUD_ACCESS_TOKEN: ***
+2026-04-03T06:33:09.9134344Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-04-03T06:33:09.9134637Z ##[endgroup]
+2026-04-03T06:33:10.1459207Z From https://github.com/DaveMBush/dms-workspace
+2026-04-03T06:33:10.1460575Z  * [new branch]      main       -> main
+2026-04-03T06:33:10.1529198Z ##[group]Run pnpm format:check
+2026-04-03T06:33:10.1529497Z [36;1mpnpm format:check[0m
+2026-04-03T06:33:10.1545686Z shell: /usr/bin/bash -e {0}
+2026-04-03T06:33:10.1545932Z env:
+2026-04-03T06:33:10.1546401Z   NX_CLOUD_ACCESS_TOKEN: ***
+2026-04-03T06:33:10.1546689Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-04-03T06:33:10.1546975Z ##[endgroup]
+2026-04-03T06:33:10.4264556Z 
+2026-04-03T06:33:10.4265769Z > @dms-workspace/source@0.0.0 format:check /home/runner/work/dms-workspace/dms-workspace
+2026-04-03T06:33:10.4266594Z > nx format:check
+2026-04-03T06:33:10.4266874Z 
+2026-04-03T06:33:12.8464009Z [@stylistic/eslint-plugin-js] This package is deprecated in favor of the unified @stylistic/eslint-plugin, please consider migrating to the main package
+2026-04-03T06:33:14.5391554Z apps/dms-material/src/app/shared/components/base-table/base-table.component.html
+2026-04-03T06:33:14.5393012Z apps/dms-material/src/app/shared/components/summary-display/summary-display.html
+2026-04-03T06:33:14.5685631Z âELIFECYCLEâ Command failed with exit code 1.
+2026-04-03T06:33:14.5847294Z ##[error]Process completed with exit code 1.
+2026-04-03T06:33:14.5916777Z ##[group]Run actions/upload-artifact@v4
+2026-04-03T06:33:14.5917061Z with:
+2026-04-03T06:33:14.5917272Z   name: visual-regression-diffs
+2026-04-03T06:33:14.5917650Z   path: test-results/storybook-visual/
+apps/dms-material-e2e/playwright-report/
+
+2026-04-03T06:33:14.5918052Z   if-no-files-found: warn
+2026-04-03T06:33:14.5918284Z   compression-level: 6
+2026-04-03T06:33:14.5918490Z   overwrite: false
+2026-04-03T06:33:14.5918712Z   include-hidden-files: false
+2026-04-03T06:33:14.5918938Z env:
+2026-04-03T06:33:14.5919381Z   NX_CLOUD_ACCESS_TOKEN: ***
+2026-04-03T06:33:14.5919667Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-04-03T06:33:14.5919964Z ##[endgroup]
+2026-04-03T06:33:14.8189037Z Multiple search paths detected. Calculating the least common ancestor of all paths
+2026-04-03T06:33:14.8195621Z The least common ancestor is /home/runner/work/dms-workspace/dms-workspace. This will be the root directory of the artifact
+2026-04-03T06:33:14.8214168Z ##[warning]No files were found with the provided path: test-results/storybook-visual/
+apps/dms-material-e2e/playwright-report/. No artifacts will be uploaded.
+2026-04-03T06:33:14.8309871Z Post job cleanup.
+2026-04-03T06:33:14.9705764Z Pruning is unnecessary.
+2026-04-03T06:33:14.9831552Z Post job cleanup.
+2026-04-03T06:33:15.0742722Z [command]/usr/bin/git version
+2026-04-03T06:33:15.0781293Z git version 2.53.0
+2026-04-03T06:33:15.0839946Z Temporarily overriding HOME='/home/runner/work/_temp/a3ccac68-626c-4e8a-aca9-be5e43cf2bc4' before making global git config changes
+2026-04-03T06:33:15.0843384Z Adding repository directory to the temporary git global config as a safe directory
+2026-04-03T06:33:15.0847228Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/dms-workspace/dms-workspace
+2026-04-03T06:33:15.0882807Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-04-03T06:33:15.0916670Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-04-03T06:33:15.1143288Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-04-03T06:33:15.1167243Z http.https://github.com/.extraheader
+2026-04-03T06:33:15.1182258Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-04-03T06:33:15.1214379Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-04-03T06:33:15.1439854Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-04-03T06:33:15.1471985Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-04-03T06:33:15.1768950Z Cleaning up orphan processes
+2026-04-03T06:33:15.1986925Z ##[warning]Node.js 20 actions are deprecated. The following actions are running on Node.js 20 and may not work as expected: actions/checkout@v4, actions/setup-node@v4, actions/upload-artifact@v4, pnpm/action-setup@v4. Actions will be forced to run with Node.js 24 by default starting June 2nd, 2026. Node.js 20 will be removed from the runner on September 16th, 2026. Please check if updated versions of these actions are available that support Node.js 24. To opt into Node.js 24 now, set the FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true environment variable on the runner or in your workflow file. Once Node.js 24 becomes the default, you can temporarily opt out by setting ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
