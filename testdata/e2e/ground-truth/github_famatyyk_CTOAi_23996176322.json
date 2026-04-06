@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-famatyyk-CTOAi-23996176322",
+  "repo": "famatyyk/CTOAi",
+  "run_id": 23996176322,
+  "tags": [],
+  "transition": {
+    "failing_commit": "fec25bc9e0826d96c2d22e78271049c7b1a16e84",
+    "fix_commit": "0e4d23efd013210fbc752369c8b9c3c8ce445645",
+    "pr_url": "https://github.com/famatyyk/CTOAi/pull/42",
+    "pr_title": "fix(ci): make legacy sprint gates optional when scripts missing",
+    "files_changed": [
+      ".github/workflows/ctoa-pipeline.yml"
+    ],
+    "fix_size_lines": 6
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix(ci): make legacy sprint gates optional when scripts missing",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "timeout",
+        "bug_location": "infrastructure"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-06",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES. The test failure log shows that the \"Response Guardrails\" status is \"PASS\", but the provided diff adds a check for the existence of specific workflow files (\"workflows/backlog-sprint-027.yaml\" an"
+  }
+}
