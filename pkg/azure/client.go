@@ -382,11 +382,15 @@ func (c *Client) DownloadAndExtract(ctx context.Context, artifactID int64) ([]by
 	return ci.ExtractFirstFile(zipData)
 }
 
-func (c *Client) GetRepoFile(ctx context.Context, filePath string) (string, error) {
+func (c *Client) GetRepoFile(ctx context.Context, filePath, ref string) (string, error) {
 	params := url.Values{
 		"path":        {filePath},
 		"$format":     {"text"},
 		apiVersionKey: {apiVersionValue},
+	}
+	if ref != "" {
+		params.Set("versionDescriptor.version", ref)
+		params.Set("versionDescriptor.versionType", "commit")
 	}
 	apiURL := fmt.Sprintf(azureRepoItemsURL, c.baseURL, c.project, c.project, params.Encode())
 
@@ -643,7 +647,7 @@ func (c *Client) doRequest(ctx context.Context, reqURL string, result interface{
 
 // GetFileFromRepo fetches a file from a specific repository, potentially
 // in a different project than the client's primary project.
-func (c *Client) GetFileFromRepo(ctx context.Context, repo ci.RepoRef, filePath string) (string, error) {
+func (c *Client) GetFileFromRepo(ctx context.Context, repo ci.RepoRef, filePath, ref string) (string, error) {
 	project := repo.Project
 	if project == "" {
 		project = c.project

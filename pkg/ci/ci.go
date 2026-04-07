@@ -52,8 +52,9 @@ type Provider interface {
 	// DownloadAndExtract downloads an artifact ZIP and extracts its first file.
 	DownloadAndExtract(ctx context.Context, artifactID int64) ([]byte, error)
 
-	// GetRepoFile fetches a file from the repository's default branch.
-	GetRepoFile(ctx context.Context, path string) (string, error)
+	// GetRepoFile fetches a file from the repository. When ref is non-empty,
+	// the file is fetched at that specific commit SHA; otherwise the default branch is used.
+	GetRepoFile(ctx context.Context, path, ref string) (string, error)
 
 	// ListDirectory returns file/directory names at the given path.
 	// Directory names have a trailing "/".
@@ -178,7 +179,8 @@ type CrossRepoProvider interface {
 	// DiscoverRepos returns additional repository references used by the build pipeline.
 	DiscoverRepos(ctx context.Context, buildID int64) ([]RepoRef, error)
 	// GetFileFromRepo fetches a file from a specific repository.
-	GetFileFromRepo(ctx context.Context, repo RepoRef, path string) (string, error)
+	// When ref is non-empty, the file is fetched at that specific commit SHA.
+	GetFileFromRepo(ctx context.Context, repo RepoRef, path, ref string) (string, error)
 }
 
 // RepoRef identifies a repository within a CI platform.

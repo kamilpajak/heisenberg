@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 
@@ -316,16 +317,20 @@ func (c *Client) DownloadAndExtract(ctx context.Context, artifactID int64) ([]by
 	return ci.ExtractFirstFile(zipData)
 }
 
-// GetRepoFile fetches a file from the repo's default branch via the contents API.
-func (c *Client) GetRepoFile(ctx context.Context, path string) (string, error) {
-	url := fmt.Sprintf("%s/repos/%s/%s/contents/%s", c.baseURL, c.owner, c.repo, path)
+// GetRepoFile fetches a file from the repo via the contents API.
+// When ref is non-empty, the file is fetched at that specific commit SHA.
+func (c *Client) GetRepoFile(ctx context.Context, path, ref string) (string, error) {
+	reqURL := fmt.Sprintf("%s/repos/%s/%s/contents/%s", c.baseURL, c.owner, c.repo, path)
+	if ref != "" {
+		reqURL += "?ref=" + url.QueryEscape(ref)
+	}
 
 	var result struct {
 		Content  string `json:"content"`
 		Encoding string `json:"encoding"`
 	}
 
-	if err := c.doRequest(ctx, url, &result); err != nil {
+	if err := c.doRequest(ctx, reqURL, &result); err != nil {
 		return "", err
 	}
 
