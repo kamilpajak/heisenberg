@@ -99,7 +99,7 @@ func Run(ctx context.Context, p Params) (*llm.AnalysisResult, error) {
 	}
 
 	stampRunMeta(result, p, ciRun)
-	calibrateResult(ctx, result, p.CI, jobs, ciRun)
+	result.Calibration = calibrateResult(ctx, result, p.CI, jobs, ciRun)
 	matchPatterns(ctx, p.PatternMatcher, result)
 	return result, err
 }

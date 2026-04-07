@@ -26,33 +26,22 @@ type diffProvider interface {
 	GetChangedFiles(ctx context.Context, ref ci.ChangeRef) ([]ci.ChangedFile, error)
 }
 
-// CalibrationSignals contains deterministic signals for confidence adjustment.
-// Exported with JSON tags to enable logging as training data for future
-// data-driven calibration (#50).
-type CalibrationSignals struct {
-	BlastRadius            float64 `json:"blast_radius"`
-	DiffIntersection       bool    `json:"diff_intersection"`
-	AllSameErrorType       bool    `json:"all_same_error_type"`
-	HasNetworkErrors       bool    `json:"has_network_errors"`
-	BugLocationIsCode      bool    `json:"bug_location_is_code"`
-	BugLocConfLow          bool    `json:"bug_loc_conf_low"`
-	HasHiddenInfraEvidence bool    `json:"has_hidden_infra_evidence"`
-	DiffTouchesErrorPaths  bool    `json:"diff_touches_error_paths"`
-	LowIterations          bool    `json:"low_iterations"`
-}
+// CalibrationSignals is an alias for llm.CalibrationSignals used locally.
+type CalibrationSignals = llm.CalibrationSignals
 
 // calibrateResult adjusts confidence based on heuristic signals that the LLM
 // cannot self-assess: diff-fault intersection, blast radius, and internal
-// consistency of the diagnosis.
+// consistency of the diagnosis. Returns the computed signals for logging.
 func calibrateResult(ctx context.Context, result *llm.AnalysisResult,
-	provider diffProvider, jobs []ci.Job, run *ci.Run) {
+	provider diffProvider, jobs []ci.Job, run *ci.Run) *CalibrationSignals {
 
 	if result == nil || result.Category != llm.CategoryDiagnosis {
-		return
+		return nil
 	}
 
 	signals := computeSignals(ctx, result, provider, jobs, run)
 	applyConfidenceCaps(result, signals)
+	return &signals
 }
 
 // Confidence cap thresholds aligned with the LLM rubric:

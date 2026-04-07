@@ -126,6 +126,22 @@ type AnalysisResult struct {
 	Eval               *EvalMeta           `json:"eval,omitempty"`                // Performance metadata for eval
 	OriginalConfidence int                 `json:"original_confidence,omitempty"` // Pre-calibration confidence (0 = not adjusted)
 	CalibrationReason  string              `json:"calibration_reason,omitempty"`  // Why confidence was capped
+	Calibration        *CalibrationSignals `json:"calibration_signals,omitempty"` // Deterministic signals used for confidence adjustment
+}
+
+// CalibrationSignals contains deterministic signals for confidence adjustment.
+// Exported with JSON tags to enable logging as training data for future
+// data-driven calibration (#50).
+type CalibrationSignals struct {
+	BlastRadius            float64 `json:"blast_radius"`
+	DiffIntersection       bool    `json:"diff_intersection"`
+	AllSameErrorType       bool    `json:"all_same_error_type"`
+	HasNetworkErrors       bool    `json:"has_network_errors"`
+	BugLocationIsCode      bool    `json:"bug_location_is_code"`
+	BugLocConfLow          bool    `json:"bug_loc_conf_low"`
+	HasHiddenInfraEvidence bool    `json:"has_hidden_infra_evidence"`
+	DiffTouchesErrorPaths  bool    `json:"diff_touches_error_paths"`
+	LowIterations          bool    `json:"low_iterations"`
 }
 
 // EvalMeta captures performance metrics from the agent loop for evaluation.
