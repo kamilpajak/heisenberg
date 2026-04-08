@@ -42,8 +42,14 @@ def github_get(url, token, params=None):
     if "/search/" in url:
         time.sleep(2.1)
 
-    for _ in range(MAX_RETRIES):
-        resp = requests.get(url, headers=headers, params=params)
+    for attempt in range(MAX_RETRIES):
+        try:
+            resp = requests.get(url, headers=headers, params=params, timeout=30)
+        except (requests.ConnectionError, requests.Timeout) as e:
+            wait = min(2 ** attempt, 30)
+            print(f"  ⏳ Network error ({type(e).__name__}), retrying in {wait}s...")
+            time.sleep(wait)
+            continue
 
         if resp.status_code == 429:
             wait = int(resp.headers.get("Retry-After", 60)) + 1
@@ -62,8 +68,7 @@ def github_get(url, token, params=None):
         return resp
 
     # Exhausted retries
-    resp.raise_for_status()
-    return resp
+    raise requests.ConnectionError(f"Failed after {MAX_RETRIES} retries: {url}")
 SEARCH_QUERIES = [
     # PR title searches
     'in:title "fix CI" is:merged',

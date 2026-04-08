@@ -177,6 +177,41 @@ class TestGithubRequest:
             github_get(f"{GITHUB_API}/test", token="t")
 
 
+    @responses.activate
+    def test_retries_on_connection_error(self):
+        from mine_ground_truth import github_get
+        responses.add(
+            responses.GET, f"{GITHUB_API}/test",
+            body=requests.ConnectionError("Connection reset"),
+        )
+        responses.add(responses.GET, f"{GITHUB_API}/test", json={"ok": True})
+        resp = github_get(f"{GITHUB_API}/test", token="t")
+        assert resp.json() == {"ok": True}
+        assert len(responses.calls) == 2
+
+    @responses.activate
+    def test_retries_on_timeout(self):
+        from mine_ground_truth import github_get
+        responses.add(
+            responses.GET, f"{GITHUB_API}/test",
+            body=requests.Timeout("Read timed out"),
+        )
+        responses.add(responses.GET, f"{GITHUB_API}/test", json={"ok": True})
+        resp = github_get(f"{GITHUB_API}/test", token="t")
+        assert resp.json() == {"ok": True}
+
+    @responses.activate
+    def test_gives_up_after_max_retries_on_network_error(self):
+        from mine_ground_truth import github_get, MAX_RETRIES
+        for _ in range(MAX_RETRIES):
+            responses.add(
+                responses.GET, f"{GITHUB_API}/test",
+                body=requests.ConnectionError("Connection reset"),
+            )
+        with pytest.raises(requests.ConnectionError, match="Failed after"):
+            github_get(f"{GITHUB_API}/test", token="t")
+
+
 class TestSearchQueries:
     """Verify search queries cover multiple sources per Perplexity recommendation."""
 
