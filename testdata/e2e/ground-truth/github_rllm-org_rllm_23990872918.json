@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-rllm-org-rllm-23990872918",
+  "repo": "rllm-org/rllm",
+  "run_id": 23990872918,
+  "tags": [],
+  "transition": {
+    "failing_commit": "19dac0564066ee3784a43271edd5f4ada4873f79",
+    "fix_commit": "e6d76d358ee8c2572ac5205473b9c6eb4790a994",
+    "pr_url": "https://github.com/rllm-org/rllm/pull/486",
+    "pr_title": "fix: resolve CI failures \u2014 E501 lint, tinker test deps, disable Claude actions",
+    "files_changed": [
+      ".github/workflows/pre-commit.yml"
+    ],
+    "fix_size_lines": 17
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix: resolve CI failures \u2014 E501 lint, tinker test deps, disable Claude actions",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "infrastructure"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "",
+    "llm_correlation": "YES\nThe diff modifies the pre-commit configuration and execution, which is likely related to linting errors (E501) mentioned in the PR title. The changes include fetching the full git history, caching"
+  }
+}

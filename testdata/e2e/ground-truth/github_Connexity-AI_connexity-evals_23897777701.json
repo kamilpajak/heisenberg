@@ -2,7 +2,9 @@
   "case_id": "gh-Connexity-AI-connexity-evals-23897777701",
   "repo": "Connexity-AI/connexity-evals",
   "run_id": 23897777701,
-  "tags": [],
+  "tags": [
+    "smoke"
+  ],
   "transition": {
     "failing_commit": "53ab98ac9dbf5b54e79178892ba522524e411a87",
     "fix_commit": "b7695cb30a28f94b722b98843b5881a575b2ae4c",

@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-plishka-org-backend-24035093526",
+  "repo": "plishka-org/backend",
+  "run_id": 24035093526,
+  "tags": [],
+  "transition": {
+    "failing_commit": "32751b7a5de1d9fe8a5742e07ab7692aeeb05c29",
+    "fix_commit": "98f4b0e6d6839c30c02ad94135a2e8cfe8075abf",
+    "pr_url": "https://github.com/plishka-org/backend/pull/7",
+    "pr_title": "fix railway workflow",
+    "files_changed": [
+      ".github/workflows/deploy-railway.yml"
+    ],
+    "fix_size_lines": 15
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix railway workflow",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "infrastructure"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "Vague PR title \u2014 actual_cause needs human review",
+    "llm_correlation": "YES\nThe log shows the maven build process, including downloading dependencies, compiling code, and running tests. The diff modifies the GitHub Actions workflow file, specifically the steps for setting"
+  }
+}

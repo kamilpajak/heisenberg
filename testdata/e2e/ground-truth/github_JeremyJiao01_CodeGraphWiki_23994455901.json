@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-JeremyJiao01-CodeGraphWiki-23994455901",
+  "repo": "JeremyJiao01/CodeGraphWiki",
+  "run_id": 23994455901,
+  "tags": [],
+  "transition": {
+    "failing_commit": "2f7dced60e595efbfcb5cc40af96b2b2be9c0592",
+    "fix_commit": "ebc4c08fdefa4de1b55978f9115556e56c4a314c",
+    "pr_url": "https://github.com/JeremyJiao01/CodeGraphWiki/pull/27",
+    "pr_title": "fix(ci): whitelist stable unit tests, exclude LLM-dependent and broke\u2026",
+    "files_changed": [
+      ".github/workflows/ci.yml"
+    ],
+    "fix_size_lines": 2
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix(ci): whitelist stable unit tests, exclude LLM-dependent and broke\u2026",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "infrastructure"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES. The diff modifies the CI configuration to exclude Python 3.10 from the test matrix. The log shows that the test failure occurs during the installation of dependencies for `code-graph-builder` in "
+  }
+}

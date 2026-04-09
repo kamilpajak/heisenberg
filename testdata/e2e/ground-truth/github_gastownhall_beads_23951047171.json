@@ -1,0 +1,45 @@
+{
+  "case_id": "gh-gastownhall-beads-23951047171",
+  "repo": "gastownhall/beads",
+  "run_id": 23951047171,
+  "tags": [],
+  "transition": {
+    "failing_commit": "af5bd173e09a09d3f9ccc79b27884d3b977bde54",
+    "fix_commit": "2b9d476bc03366dae0fd016830a6c61d10f33fde",
+    "pr_url": "https://github.com/gastownhall/beads/pull/2983",
+    "pr_title": "fix: resolve remaining 11 CI test failures",
+    "files_changed": [
+      "cmd/bd/diff_embedded_test.go",
+      "cmd/bd/show_embedded_test.go"
+    ],
+    "fix_size_lines": 13
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix: resolve remaining 11 CI test failures",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "production"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "",
+    "llm_correlation": "YES. The diff includes changes to `internal/storage/embeddeddolt` and specifically addresses releasing the flock (file lock) held by the embedded Dolt database. The added comments \"release flock befor"
+  }
+}

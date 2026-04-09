@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-tta-lab-ttal-cli-24137554157",
+  "repo": "tta-lab/ttal-cli",
+  "run_id": 24137554157,
+  "tags": [],
+  "transition": {
+    "failing_commit": "0a1befecf76570901a0003ab3747d6053b5bae26",
+    "fix_commit": "901ae1101bee71d7ca14aee5c5b9484b22597b8f",
+    "pr_url": "https://github.com/tta-lab/ttal-cli/pull/530",
+    "pr_title": "fix(skills): migrate pipeline skills from per-stage to per-role model",
+    "files_changed": [
+      "cmd/pipeline_test.go"
+    ],
+    "fix_size_lines": 12
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix(skills): migrate pipeline skills from per-stage to per-role model",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "production"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES\nThe test failure log shows tests related to extracting hex IDs and parsing UUIDs. The provided code diff focuses on resolving pipeline prompts, specifically addressing the scenario where no enviro"
+  }
+}

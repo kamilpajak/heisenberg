@@ -1,0 +1,45 @@
+{
+  "case_id": "gh-opensearch-project-opensearch-jvector-24048871814",
+  "repo": "opensearch-project/opensearch-jvector",
+  "run_id": 24048871814,
+  "tags": [],
+  "transition": {
+    "failing_commit": "dcf09cdb61140d2bdce197d6cee173193325a6a5",
+    "fix_commit": "830be3c33b950bf4b9c8b1ce77f2bc2b56f10128",
+    "pr_url": "https://github.com/opensearch-project/opensearch-jvector/pull/362",
+    "pr_title": "Fix flaky org.opensearch.knn.index.codec.jvector.KNNJVectorTests.testJVectorKnnIndex_mergeEnabled (2nd attempt)",
+    "files_changed": [
+      "src/test/java/org/opensearch/knn/index/codec/jvector/KNNJVectorTests.java",
+      "src/test/java/org/opensearch/knn/index/engine/CommonTestUtils.java"
+    ],
+    "fix_size_lines": 12
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "Fix flaky org.opensearch.knn.index.codec.jvector.KNNJVectorTests.testJVectorKnnIndex_mergeEnabled (2nd attempt)",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "production"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "",
+    "llm_correlation": "YES\n\nThe test failure log doesn't show an explicit error, but the PR title indicates flakiness in `testJVectorKnnIndex_mergeEnabled`. The diff modifies `testJVectorKnnIndex_mergeEnabled` by increasing"
+  }
+}

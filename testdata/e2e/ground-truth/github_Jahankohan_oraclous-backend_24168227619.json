@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-Jahankohan-oraclous-backend-24168227619",
+  "repo": "Jahankohan/oraclous-backend",
+  "run_id": 24168227619,
+  "tags": [],
+  "transition": {
+    "failing_commit": "7cc311f03027254d9e04a0d8a90fd1e66ca456f5",
+    "fix_commit": "3c3f9b9fcec0078960bce8f2be5386759c027b61",
+    "pr_url": "https://github.com/Jahankohan/oraclous-backend/pull/13",
+    "pr_title": "fix(tests): restore stale mock patch-target fixes lost in ORA-205 merge (ORA-219)",
+    "files_changed": [
+      "knowledge-graph-builder/tests/integration/test_service_accounts_api.py"
+    ],
+    "fix_size_lines": 16
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix(tests): restore stale mock patch-target fixes lost in ORA-205 merge (ORA-219)",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "test"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "",
+    "llm_correlation": "YES\n\nThe PR title indicates that the fix restores stale mock patch-target fixes, which were lost in a merge. The diff itself shows changes to the patching of `app.services.service_account_service.serv"
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "case_id": "gh-tta-lab-lenos-24066836467",
+  "repo": "tta-lab/lenos",
+  "run_id": 24066836467,
+  "tags": [],
+  "transition": {
+    "failing_commit": "4bcbc619b47031ec9cf4cdd736ccd83ab053d4b5",
+    "fix_commit": "f121ac1cb88f18b329917acf1754a092e0e9f544",
+    "pr_url": "https://github.com/tta-lab/lenos/pull/10",
+    "pr_title": "fix: taskwarrior title and todo list resolution broken in lenos TUI",
+    "files_changed": [
+      "internal/agent/agent_test.go",
+      "internal/taskwarrior/poller_test.go"
+    ],
+    "fix_size_lines": 6
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix: taskwarrior title and todo list resolution broken in lenos TUI",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "assertion",
+        "bug_location": "production"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "",
+    "llm_correlation": "YES.\n\nThe PR title indicates issues with taskwarrior title and todo list resolution, and the diff modifies the `TestGenerateTitle` and `TestParseSubtasks` functions, which are likely related to these "
+  }
+}

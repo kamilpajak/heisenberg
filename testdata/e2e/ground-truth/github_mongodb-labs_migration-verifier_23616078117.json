@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-mongodb-labs-migration-verifier-23616078117",
+  "repo": "mongodb-labs/migration-verifier",
+  "run_id": 23616078117,
+  "tags": [],
+  "transition": {
+    "failing_commit": "4ecfa5a04ead9b4d974ec6c57d18c7bf134687bd",
+    "fix_commit": "b1ab3f347c294fc35a0cf5041e4c7e2df9d17045",
+    "pr_url": "https://github.com/mongodb-labs/migration-verifier/pull/273",
+    "pr_title": "REP-7166 Fix regression in namespace-mismatch queries after REP-7130",
+    "files_changed": [
+      "internal/verifier/migration_verifier_test.go"
+    ],
+    "fix_size_lines": 6
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "REP-7166 Fix regression in namespace-mismatch queries after REP-7130",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "production"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES. The test failure log shows a failure in `TestChangeStreamFilter_InitialNonempty/36`. The PR title indicates a fix for a regression in namespace-mismatch queries. The diff adds code to create the "
+  }
+}

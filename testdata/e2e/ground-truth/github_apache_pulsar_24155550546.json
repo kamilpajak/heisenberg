@@ -1,0 +1,46 @@
+{
+  "case_id": "gh-apache-pulsar-24155550546",
+  "repo": "apache/pulsar",
+  "run_id": 24155550546,
+  "tags": [
+    "smoke"
+  ],
+  "transition": {
+    "failing_commit": "5745c6cbabe02d04bd3333ac275b894485716356",
+    "fix_commit": "1e2b9532dacf9222595f41f1050a8c5e78889c9c",
+    "pr_url": "https://github.com/apache/pulsar/pull/25497",
+    "pr_title": "[fix][test] Fix flaky ServerCnxTest.testCreateProducerTimeoutThenCreateSameNamedProducerShouldFail",
+    "files_changed": [
+      "pulsar-broker/src/test/java/org/apache/pulsar/broker/service/ServerCnxTest.java"
+    ],
+    "fix_size_lines": 2
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "[fix][test] Fix flaky ServerCnxTest.testCreateProducerTimeoutThenCreateSameNamedProducerShouldFail",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "timeout",
+        "bug_location": "production"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES. The PR title indicates the fix addresses a flaky test, and the diff removes `invocationCount = 10` from the `@Test` annotation, which likely caused the flakiness by running the test multiple time"
+  }
+}

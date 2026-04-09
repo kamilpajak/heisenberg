@@ -1,0 +1,46 @@
+{
+  "case_id": "gh-DanilloMello-fit-api-23801490564",
+  "repo": "DanilloMello/fit-api",
+  "run_id": 23801490564,
+  "tags": [
+    "smoke"
+  ],
+  "transition": {
+    "failing_commit": "746ce7c4ccda753f1a983628da15925f36e6f3fa",
+    "fix_commit": "93c9915bc84b0859b86562dad631b492143759f6",
+    "pr_url": "https://github.com/DanilloMello/fit-api/pull/30",
+    "pr_title": "fix(test): fix AuthIntegrationTest compile errors and stale assertions",
+    "files_changed": [
+      "bootstrap/src/test/java/com/connecthealth/bootstrap/AuthIntegrationTest.java"
+    ],
+    "fix_size_lines": 8
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix(test): fix AuthIntegrationTest compile errors and stale assertions",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "production"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES\nThe PR title indicates that the changes are to fix compile errors and stale assertions in `AuthIntegrationTest`. The diff shows changes to the `magicLinkFlow_sendAndVerify_returnsTokens` test meth"
+  }
+}

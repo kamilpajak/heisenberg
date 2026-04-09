@@ -1,0 +1,46 @@
+{
+  "case_id": "gh-BrokkAi-brokk-24130931607",
+  "repo": "BrokkAi/brokk",
+  "run_id": 24130931607,
+  "tags": [
+    "smoke"
+  ],
+  "transition": {
+    "failing_commit": "dc717145ab1a75c003c1392c6d7f2672b695c4b7",
+    "fix_commit": "3e4ce0f1f1e23b126a7c4ec580205f878b00d398",
+    "pr_url": "https://github.com/BrokkAi/brokk/pull/3270",
+    "pr_title": "fix: Windows CI path separators and flaky TempDir cleanup",
+    "files_changed": [
+      "app/src/main/java/ai/brokk/watchservice/JavaProjectWatchService.java"
+    ],
+    "fix_size_lines": 4
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix: Windows CI path separators and flaky TempDir cleanup",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "production"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES\nThe PR title mentions \"Windows CI path separators\" and \"flaky TempDir cleanup\". While the provided code diff doesn't show the path separator or TempDir cleanup changes directly, the PR title sugge"
+  }
+}

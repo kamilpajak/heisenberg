@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-ThreeFish-AI-negentropy-24146261583",
+  "repo": "ThreeFish-AI/negentropy",
+  "run_id": 24146261583,
+  "tags": [],
+  "transition": {
+    "failing_commit": "e485f5976e1cc4d0fbda368b16f6ec9d11cb7217",
+    "fix_commit": "ff547a9f975c3e5574dcc10e971a1c1acdd79f3c",
+    "pr_url": "https://github.com/ThreeFish-AI/negentropy/pull/336",
+    "pr_title": "fix(CI): \u4fee\u590d Backend Integration Tests \u5168\u91cf\u5931\u8d25\uff08CTE \u53c2\u6570\u7ed1\u5b9a + KgRelation \u5fc5\u586b\u5b57\u6bb5\u7f3a\u5931\uff09",
+    "files_changed": [
+      "apps/negentropy/src/negentropy/knowledge/kg_entity_service.py"
+    ],
+    "fix_size_lines": 2
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix(CI): \u4fee\u590d Backend Integration Tests \u5168\u91cf\u5931\u8d25\uff08CTE \u53c2\u6570\u7ed1\u5b9a + KgRelation \u5fc5\u586b\u5b57\u6bb5\u7f3a\u5931\uff09",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "production"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES\nThe error log indicates a `NotNullViolationError` on the `app_name` column of the `kg_relations` table. The diff adds a default value of `\"negentropy\"` for the `app_name` parameter in the `sync_re"
+  }
+}

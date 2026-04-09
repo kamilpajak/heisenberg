@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-kumahq-kuma-24085419531",
+  "repo": "kumahq/kuma",
+  "run_id": 24085419531,
+  "tags": [],
+  "transition": {
+    "failing_commit": "02f104eb8ac9a680c2377b8120bbea8ad7492e8c",
+    "fix_commit": "e47d088aa491c72c590adf360f185af72627928b",
+    "pr_url": "https://github.com/kumahq/kuma/pull/16133",
+    "pr_title": "fix(e2e): use stable metric in MeshMetric profile test",
+    "files_changed": [
+      "test/e2e_env/kubernetes/meshmetric/meshmetric.go"
+    ],
+    "fix_size_lines": 4
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix(e2e): use stable metric in MeshMetric profile test",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "assertion",
+        "bug_location": "test"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES\nThe PR title indicates the change is related to the `MeshMetric` profile test. The diff modifies the expectations within the `MeshMetric` function, specifically related to the metrics being checke"
+  }
+}

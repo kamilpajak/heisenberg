@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-SoonIter-skills-package-manager-24116500096",
+  "repo": "SoonIter/skills-package-manager",
+  "run_id": 24116500096,
+  "tags": [],
+  "transition": {
+    "failing_commit": "fd8c483c114deb7672be749d9f54ce70762cb8e2",
+    "fix_commit": "b4edf566243ce79f347d709a9249ee47765fa479",
+    "pr_url": "https://github.com/SoonIter/skills-package-manager/pull/6",
+    "pr_title": "fix: add CI workflow for unit tests and fix windows error",
+    "files_changed": [
+      ".github/workflows/test.yml"
+    ],
+    "fix_size_lines": 2
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix: add CI workflow for unit tests and fix windows error",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "assertion",
+        "bug_location": "infrastructure"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES. The diff modifies the `concurrency.group` setting in the CI workflow. The PR title indicates this change is related to fixing a Windows error, and the log shows the CI is running on Windows. Ther"
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-mlflow-mlflow-24005346195",
+  "repo": "mlflow/mlflow",
+  "run_id": 24005346195,
+  "tags": [],
+  "transition": {
+    "failing_commit": "2ba145b76d1012caecdd284a109cd271ee10a919",
+    "fix_commit": "b6468f376a68ddf1795039fdd1a59408802643a8",
+    "pr_url": "https://github.com/mlflow/mlflow/pull/22343",
+    "pr_title": "Fix flaky `test_start_span_context_manager[True]` due to non-deterministic span ordering",
+    "files_changed": [
+      "tests/tracing/test_fluent.py"
+    ],
+    "fix_size_lines": 3
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "Fix flaky `test_start_span_context_manager[True]` due to non-deterministic span ordering",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "test"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES\nThe PR title indicates the fix addresses flaky tests due to non-deterministic span ordering. The code change introduces a `time.sleep(0.001)` call to ensure different `start_time_ns` values, which"
+  }
+}

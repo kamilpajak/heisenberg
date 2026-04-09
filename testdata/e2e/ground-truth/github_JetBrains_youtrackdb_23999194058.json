@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-JetBrains-youtrackdb-23999194058",
+  "repo": "JetBrains/youtrackdb",
+  "run_id": 23999194058,
+  "tags": [],
+  "transition": {
+    "failing_commit": "8c6111440b43e79dd04d454c115d0abfd53642ad",
+    "fix_commit": "7b1ebb78b7116d250f56a0c633c0d4396d913007",
+    "pr_url": "https://github.com/JetBrains/youtrackdb/pull/932",
+    "pr_title": "[no-test-number-check] Fix WOWCacheDeleteTimeoutIT flaky failure by cancelling flush future",
+    "files_changed": [
+      "core/src/test/java/com/jetbrains/youtrackdb/internal/core/storage/cache/local/WOWCacheFlushErrorTest.java"
+    ],
+    "fix_size_lines": 44
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "[no-test-number-check] Fix WOWCacheDeleteTimeoutIT flaky failure by cancelling flush future",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "production"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "hard",
+    "notes": "",
+    "llm_correlation": "YES\nThe PR title and the code diff both indicate that the fix addresses a flaky failure related to `WOWCache` and its flush future. The diff includes a new test case `testStopFlushWithInterruptedFlush"
+  }
+}

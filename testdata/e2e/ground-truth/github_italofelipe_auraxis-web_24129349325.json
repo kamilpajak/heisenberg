@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-italofelipe-auraxis-web-24129349325",
+  "repo": "italofelipe/auraxis-web",
+  "run_id": 24129349325,
+  "tags": [],
+  "transition": {
+    "failing_commit": "e9b0474cd88e6fbe2b988613e7f8fbadc15b6a10",
+    "fix_commit": "ef251247939d3c4c0367d527be5f5c1bcd0710a3",
+    "pr_url": "https://github.com/italofelipe/auraxis-web/pull/590",
+    "pr_title": "fix(playwright): flaky E2E \u2014 viewport sidebar click + summary-grid selector",
+    "files_changed": [
+      "e2e/specs/navigation.spec.ts"
+    ],
+    "fix_size_lines": 15
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix(playwright): flaky E2E \u2014 viewport sidebar click + summary-grid selector",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "timeout",
+        "bug_location": "test"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "",
+    "llm_correlation": "YES\n\nThe test failure log shows prerendering of various routes, including `/tools`, `/terms-of-service`, `/privacy-policy`, etc. While the log doesn't directly indicate a failure, the PR title \"fix(pl"
+  }
+}

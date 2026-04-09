@@ -1,0 +1,46 @@
+{
+  "case_id": "gh-BrokkAi-brokk-23847780497",
+  "repo": "BrokkAi/brokk",
+  "run_id": 23847780497,
+  "tags": [
+    "smoke"
+  ],
+  "transition": {
+    "failing_commit": "5f060996a1cf721cca2fdef5abc9a3e3ac03f4ae",
+    "fix_commit": "f62c429437bf6d1267b48c499370e9946a29e713",
+    "pr_url": "https://github.com/BrokkAi/brokk/pull/3243",
+    "pr_title": "Fix broken --help output in MCP server",
+    "files_changed": [
+      "app/src/main/java/ai/brokk/mcpserver/BrokkExternalMcpServer.java"
+    ],
+    "fix_size_lines": 3
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "Fix broken --help output in MCP server",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "production"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES\nThe PR title indicates that the fix addresses broken `--help` output. While the provided log snippet doesn't show the specific failure related to the `--help` output, the code diff modifies the ou"
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-crypto-org-chain-chain-main-24026970111",
+  "repo": "crypto-org-chain/chain-main",
+  "run_id": 24026970111,
+  "tags": [],
+  "transition": {
+    "failing_commit": "1305da468c761ee03fb518509a64ee8d049c99a9",
+    "fix_commit": "387106288414ad0d5359882cb8c83566d72796b0",
+    "pr_url": "https://github.com/crypto-org-chain/chain-main/pull/1257",
+    "pr_title": "fix(inflation): add manual CLI tx command for `update-params` to fix AutoCLI failing to parse `cosmos.Dec` fields (decay_rate)",
+    "files_changed": [
+      "x/inflation/client/cli/tx_test.go"
+    ],
+    "fix_size_lines": 14
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix(inflation): add manual CLI tx command for `update-params` to fix AutoCLI failing to parse `cosmos.Dec` fields (decay_rate)",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "test"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES\nThe PR title and diff indicate that the fix addresses an issue with parsing `cosmos.Dec` fields, specifically `decay_rate`, in the `update-params` command. The test failure log shows that the buil"
+  }
+}

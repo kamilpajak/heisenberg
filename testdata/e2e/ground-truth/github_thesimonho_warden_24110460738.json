@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-thesimonho-warden-24110460738",
+  "repo": "thesimonho/warden",
+  "run_id": 24110460738,
+  "tags": [],
+  "transition": {
+    "failing_commit": "b2d0ea63f8b558cb3eba33282b0d493eee33cbf4",
+    "fix_commit": "e8e121a6ce27c9fe433aac064bfd36e00b2bd20b",
+    "pr_url": "https://github.com/thesimonho/warden/pull/173",
+    "pr_title": "fix: update icon generation workflow to run on pull requests",
+    "files_changed": [
+      ".github/workflows/icons.yml"
+    ],
+    "fix_size_lines": 27
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix: update icon generation workflow to run on pull requests",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "infrastructure"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "",
+    "llm_correlation": "YES\nThe diff modifies the `icons.yml` workflow, which is triggered by changes to icon-related files. The changes include using `github.head_ref` for concurrency, adding permissions for `contents: writ"
+  }
+}

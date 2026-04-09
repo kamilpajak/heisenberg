@@ -1,0 +1,45 @@
+{
+  "case_id": "gh-knoxio-pops-23806907774",
+  "repo": "knoxio/pops",
+  "run_id": 23806907774,
+  "tags": [],
+  "transition": {
+    "failing_commit": "2e9fc0c35debab59279e4aa5f3946ec952da8b68",
+    "fix_commit": "651e7b1ee34a11a83b08a8ce8475bbcf2ae9b830",
+    "pr_url": "https://github.com/knoxio/pops/pull/1155",
+    "pr_title": "fix: resolve pre-existing lint and test failures across all packages",
+    "files_changed": [
+      ".github/workflows/fe-quality.yml",
+      "packages/app-media/src/pages/CompareArenaPage.test.tsx"
+    ],
+    "fix_size_lines": 8
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix: resolve pre-existing lint and test failures across all packages",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "production"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "",
+    "llm_correlation": "YES\nThe PR title indicates that the change resolves pre-existing lint and test failures. The diff removes a format check step from the CI workflow and also modifies a mock function definition, which c"
+  }
+}

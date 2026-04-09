@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-ayaiayorg-agentic-devtools-24181288343",
+  "repo": "ayaiayorg/agentic-devtools",
+  "run_id": 24181288343,
+  "tags": [],
+  "transition": {
+    "failing_commit": "0b2cd86f5a2179e9281509274934b0541fa55b78",
+    "fix_commit": "ed6e894d6625a799f12d877ad308139253e6e011",
+    "pr_url": "https://github.com/ayaiayorg/agentic-devtools/pull/1165",
+    "pr_title": "fix: expand _isolate_gitignore fixture to mock run_setup_with_pr_workflow",
+    "files_changed": [
+      "tests/unit/cli/setup/commands/test_setup_cmd.py"
+    ],
+    "fix_size_lines": 22
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix: expand _isolate_gitignore fixture to mock run_setup_with_pr_workflow",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "test"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "",
+    "llm_correlation": "YES\n\nThe test failure log shows the test run is executing the `actions/github-script@v7` action, which is likely related to the PR workflow. The diff modifies the `_isolate_gitignore` fixture to mock "
+  }
+}

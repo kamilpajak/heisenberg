@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-opensearch-project-ml-commons-23814304765",
+  "repo": "opensearch-project/ml-commons",
+  "run_id": 23814304765,
+  "tags": [],
+  "transition": {
+    "failing_commit": "c584cf9b5353142ccc62a6931b6c9e52e9fa61f3",
+    "fix_commit": "51958a12f10f78f62ba3bd3252cf873cc588aff6",
+    "pr_url": "https://github.com/opensearch-project/ml-commons/pull/4759",
+    "pr_title": "Fix connection_timeout and read_timeout defaults to match seconds unit",
+    "files_changed": [
+      "common/src/test/java/org/opensearch/ml/common/connector/ConnectorClientConfigTest.java"
+    ],
+    "fix_size_lines": 4
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "Fix connection_timeout and read_timeout defaults to match seconds unit",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "timeout",
+        "bug_location": "production"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES\nThe diff changes the default values for `connectionTimeout` and `readTimeout` in the `ConnectorClientConfig` class. The PR title indicates that the original values were incorrect, and this change "
+  }
+}

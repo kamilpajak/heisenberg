@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-tg123-bbb-24074369282",
+  "repo": "tg123/bbb",
+  "run_id": 24074369282,
+  "tags": [],
+  "transition": {
+    "failing_commit": "01d6acd7ca31a3cd7005fbf1b488455d3a106aff",
+    "fix_commit": "44833b2736ca255bde1a52daa5ed24ad9f26e34a",
+    "pr_url": "https://github.com/tg123/bbb/pull/80",
+    "pr_title": "fix: e2e race condition in runAndGetStdout and add ll containers coverage",
+    "files_changed": [
+      "internal/e2e/e2e_test.go"
+    ],
+    "fix_size_lines": 2
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix: e2e race condition in runAndGetStdout and add ll containers coverage",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "production"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES.\n\nThe PR title mentions a race condition in `runAndGetStdout`, and the diff modifies the `runAndGetStdout` function by adding a `defer` function to close `ptyFile`. This change likely addresses a "
+  }
+}

@@ -70,17 +70,26 @@ def github_get(url, token, params=None):
     # Exhausted retries
     raise requests.ConnectionError(f"Failed after {MAX_RETRIES} retries: {url}")
 SEARCH_QUERIES = [
-    # PR title searches
+    # PR title searches — original
     'in:title "fix CI" is:merged',
     'in:title "fix test" is:merged',
     'in:title "fix flaky" is:merged',
     'in:title "fix e2e" is:merged',
-    # Go/build-specific (Perplexity: Go ecosystem uses "fix build"/"fix lint")
     'in:title "fix build" is:merged',
     'in:title "fix lint" is:merged',
-    # Broader: commit message search for repos that don't use descriptive PR titles
     'in:title "resolve test failure" is:merged',
     'in:title "fix failing" is:merged',
+    # Expanded queries for larger corpus
+    'in:title "fix timeout" is:merged',
+    'in:title "fix pipeline" is:merged',
+    'in:title "fix workflow" is:merged',
+    'in:title "fix integration" is:merged',
+    'in:title "fix unit test" is:merged',
+    'in:title "ci: fix" is:merged',
+    'in:title "fix: test" is:merged',
+    'in:title "fix broken" is:merged',
+    'in:title "fix regression" is:merged',
+    'in:title "fix assertion" is:merged',
 ]
 
 
@@ -92,7 +101,7 @@ def search_fix_prs(language, date_from, token):
         resp = github_get(
             f"{GITHUB_API}/search/issues",
             token=token,
-            params={"q": q, "per_page": 30, "sort": "created", "order": "desc"},
+            params={"q": q, "per_page": 100, "sort": "created", "order": "desc"},
         )
         for item in resp.json().get("items", []):
             if item.get("pull_request"):

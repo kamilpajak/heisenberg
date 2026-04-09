@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-resilient-tech-india-compliance-24080754375",
+  "repo": "resilient-tech/india-compliance",
+  "run_id": 24080754375,
+  "tags": [],
+  "transition": {
+    "failing_commit": "21569a82166af545269e4a5a6719385fa9f6cec9",
+    "fix_commit": "12b5aa7ff6ec8285faeb437c0c947188a40c71ae",
+    "pr_url": "https://github.com/resilient-tech/india-compliance/pull/4201",
+    "pr_title": "fix: refactor TDS account handling and add unit tests for tax withholding category linkage (backport #4190)",
+    "files_changed": [
+      "india_compliance/income_tax_india/overrides/test_company.py"
+    ],
+    "fix_size_lines": 4
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix: refactor TDS account handling and add unit tests for tax withholding category linkage (backport #4190)",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "test"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES\nThe test failure log shows an error originating from `frappe/utils/bench_helper.py`. While the diff doesn't directly modify that file, it changes the base class of a test case from `IntegrationTes"
+  }
+}

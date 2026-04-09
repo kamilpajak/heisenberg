@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-toru0603-chater-24111234664",
+  "repo": "toru0603/chater",
+  "run_id": 24111234664,
+  "tags": [],
+  "transition": {
+    "failing_commit": "37b13a79d5312918fa9741fef5e4c505c2dffe00",
+    "fix_commit": "786ed236a12093a6223b4bda3a8f57ce118627e9",
+    "pr_url": "https://github.com/toru0603/chater/pull/3",
+    "pr_title": "Fix CI: stable tests and skip e2e on CI",
+    "files_changed": [
+      "tests/e2e/test_browser_playwright.py"
+    ],
+    "fix_size_lines": 4
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "Fix CI: stable tests and skip e2e on CI",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "timeout",
+        "bug_location": "test"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES\nThe diff increases the timeout for a `wait_for_function` call and changes the matching logic to use a regular expression. The original timeout was 15000ms, and it's increased to 30000ms. The origi"
+  }
+}

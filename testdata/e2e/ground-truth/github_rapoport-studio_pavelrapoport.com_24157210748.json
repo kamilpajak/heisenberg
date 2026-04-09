@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-rapoport-studio-pavelrapoport.com-24157210748",
+  "repo": "rapoport-studio/pavelrapoport.com",
+  "run_id": 24157210748,
+  "tags": [],
+  "transition": {
+    "failing_commit": "52aab8a1701f58efdb18581a98395f0265770d29",
+    "fix_commit": "0f8ad348df400d08f422cde650d15d1aadce36d2",
+    "pr_url": "https://github.com/rapoport-studio/pavelrapoport.com/pull/11",
+    "pr_title": "fix(ci): audit and fix CI/CD pipeline (AI-22)",
+    "files_changed": [
+      "packages/config/src/env.ts"
+    ],
+    "fix_size_lines": 18
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix(ci): audit and fix CI/CD pipeline (AI-22)",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "production"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "",
+    "llm_correlation": "YES\nThe log shows that the CI is running type checks (`tsc --noEmit`) on several packages (`@repo/db`, `@repo/config`, `@repo/auth`, `@repo/studio`, `@repo/web`). The provided diff modifies the enviro"
+  }
+}

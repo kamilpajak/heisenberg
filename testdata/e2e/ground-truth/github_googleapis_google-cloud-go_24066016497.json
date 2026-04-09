@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-googleapis-google-cloud-go-24066016497",
+  "repo": "googleapis/google-cloud-go",
+  "run_id": 24066016497,
+  "tags": [],
+  "transition": {
+    "failing_commit": "bbbbd00e0e0010dd2b44e6d24ab839f2513b8874",
+    "fix_commit": "cd8e9812b6937d062660aadbe9169069d257cd23",
+    "pr_url": "https://github.com/googleapis/google-cloud-go/pull/14368",
+    "pr_title": "test(firestore): optimize integration tests and fix resource leaks",
+    "files_changed": [
+      "firestore/integration_test.go"
+    ],
+    "fix_size_lines": 3
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "test(firestore): optimize integration tests and fix resource leaks",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "test"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES. The log shows the `go mod tidy` command being run in several directories. While the log doesn't show an explicit failure, the PR title mentions \"optimize integration tests and fix resource leaks,"
+  }
+}

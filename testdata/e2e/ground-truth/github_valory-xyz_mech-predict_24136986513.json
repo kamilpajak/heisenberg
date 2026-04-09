@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-valory-xyz-mech-predict-24136986513",
+  "repo": "valory-xyz/mech-predict",
+  "run_id": 24136986513,
+  "tags": [],
+  "transition": {
+    "failing_commit": "218e867da837fa995c9627f6e2e770dbe34222d6",
+    "fix_commit": "15f90edd0fa931072419604a9701d36720a197b0",
+    "pr_url": "https://github.com/valory-xyz/mech-predict/pull/200",
+    "pr_title": "fix: eliminate Polymarket regression in prediction-request-reasoning calibration",
+    "files_changed": [
+      "benchmark/PREDICTION_REQUEST_REASONING_PROMPT_AB_TEST.md"
+    ],
+    "fix_size_lines": 21
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix: eliminate Polymarket regression in prediction-request-reasoning calibration",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "assertion",
+        "bug_location": "test"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "",
+    "llm_correlation": "YES\nThe test failure log shows that the tool is running predictions with different engines, including those for Polymarket. The code diff shows changes to the analysis of V3b results, specifically add"
+  }
+}

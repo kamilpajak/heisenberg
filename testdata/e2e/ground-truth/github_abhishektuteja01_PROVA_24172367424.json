@@ -1,0 +1,45 @@
+{
+  "case_id": "gh-abhishektuteja01-PROVA-24172367424",
+  "repo": "abhishektuteja01/PROVA",
+  "run_id": 24172367424,
+  "tags": [],
+  "transition": {
+    "failing_commit": "bd6192522a672ff0e60035abb77c31a5e138b8ef",
+    "fix_commit": "882ee041502f7b20797ff2ace477823c602fe67d",
+    "pr_url": "https://github.com/abhishektuteja01/PROVA/pull/68",
+    "pr_title": "fix: polyfill missing canvas DOM objects and add load timeout for pdf\u2026",
+    "files_changed": [
+      "src/lib/parsers/pdf.test.ts",
+      "src/lib/parsers/pdf.ts"
+    ],
+    "fix_size_lines": 25
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix: polyfill missing canvas DOM objects and add load timeout for pdf\u2026",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "production"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "",
+    "llm_correlation": "YES\nThe PR title mentions \"polyfill missing canvas DOM objects\" which is related to the code being added in the diff. The test failure log shows the test running on Ubuntu 24.04, which may be missing "
+  }
+}

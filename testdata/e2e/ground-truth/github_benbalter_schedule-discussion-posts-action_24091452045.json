@@ -1,0 +1,46 @@
+{
+  "case_id": "gh-benbalter-schedule-discussion-posts-action-24091452045",
+  "repo": "benbalter/schedule-discussion-posts-action",
+  "run_id": 24091452045,
+  "tags": [],
+  "transition": {
+    "failing_commit": "f3e02e038bf8ccf58735e7ab5640b013b0bdb6b5",
+    "fix_commit": "c372062a3a3146d542f39e65d6899bce5ef8c71f",
+    "pr_url": "https://github.com/benbalter/schedule-discussion-posts-action/pull/45",
+    "pr_title": "Fix dry-run mode failing when discussion_token is absent",
+    "files_changed": [
+      "dist/index.js",
+      "dist/index.js.map",
+      "src/octokit.ts"
+    ],
+    "fix_size_lines": 16
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "Fix dry-run mode failing when discussion_token is absent",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "production"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "",
+    "llm_correlation": "YES\nThe PR title and the code changes indicate that the fix addresses a failure in dry-run mode when the `discussion_token` is not provided. The code now allows for `discussion_token` to be optional i"
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "case_id": "gh-globaltcad-swing-tree-23094024707",
+  "repo": "globaltcad/swing-tree",
+  "run_id": 23094024707,
+  "tags": [],
+  "transition": {
+    "failing_commit": "e9ff797a41ff38be06a4a87fafc25d101ae97d1e",
+    "fix_commit": "20dd4d8addac7404f6ff79f3d3d3d1c7583fb4ab",
+    "pr_url": "https://github.com/globaltcad/swing-tree/pull/433",
+    "pr_title": "432 fix text rendering offset cancels itself out and fix text rendering regression",
+    "files_changed": [
+      "src/main/java/swingtree/style/StyleRenderer.java",
+      "src/test/groovy/swingtree/Individual_Component_Styling_Spec.groovy"
+    ],
+    "fix_size_lines": 12
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "432 fix text rendering offset cancels itself out and fix text rendering regression",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "production"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "",
+    "llm_correlation": "YES\nThe test failure log shows warnings related to `CatchAndPrintStackTrace`, `EmptyCatch`, and `StringCaseLocaleUsage`. The provided diff does not directly address any of these warnings. However, the"
+  }
+}

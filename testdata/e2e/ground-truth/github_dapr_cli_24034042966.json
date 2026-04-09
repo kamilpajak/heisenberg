@@ -1,0 +1,45 @@
+{
+  "case_id": "gh-dapr-cli-24034042966",
+  "repo": "dapr/cli",
+  "run_id": 24034042966,
+  "tags": [],
+  "transition": {
+    "failing_commit": "9205c777cf3041e75f4db2e70fdb3acac790fa0b",
+    "fix_commit": "fd76b460db5e793eff519075cd3710b5c8249e0c",
+    "pr_url": "https://github.com/dapr/cli/pull/1619",
+    "pr_title": "Fix e2e test flakes",
+    "files_changed": [
+      "tests/e2e/standalone/run_template_test.go",
+      "tests/e2e/standalone/workflow_test.go"
+    ],
+    "fix_size_lines": 8
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "Fix e2e test flakes",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "timeout",
+        "bug_location": "test"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "Vague PR title \u2014 actual_cause needs human review",
+    "llm_correlation": "YES\nThe log shows a warning \"App channel is not initialized. Did you configure an app-port?\". The provided diff increases the timeout for `waitForLogContent` in `TestRunWithTemplateFile` from 60 secon"
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-KatherLab-MediSwarm-24005900773",
+  "repo": "KatherLab/MediSwarm",
+  "run_id": 24005900773,
+  "tags": [],
+  "transition": {
+    "failing_commit": "28697b9027f6f6da076e5931b21f5ea1e9bd4aa7",
+    "fix_commit": "bf3ef3cfc26f924138f87b52569f66873e055767",
+    "pr_url": "https://github.com/KatherLab/MediSwarm/pull/261",
+    "pr_title": "Fix flaky CI swarm tests and self-hosted runner reliability",
+    "files_changed": [
+      "docker_config/Dockerfile_STAMP"
+    ],
+    "fix_size_lines": 2
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "Fix flaky CI swarm tests and self-hosted runner reliability",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "infrastructure"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES\nThe diff adds `zip` and `unzip` to the Docker image. While the log doesn't explicitly show a failure related to missing zip/unzip, the PR title mentions \"flaky CI swarm tests and self-hosted runne"
+  }
+}

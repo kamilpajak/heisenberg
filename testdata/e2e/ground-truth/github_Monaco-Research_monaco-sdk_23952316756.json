@@ -2,7 +2,9 @@
   "case_id": "gh-Monaco-Research-monaco-sdk-23952316756",
   "repo": "Monaco-Research/monaco-sdk",
   "run_id": 23952316756,
-  "tags": [],
+  "tags": [
+    "smoke"
+  ],
   "transition": {
     "failing_commit": "436142835023af0aa343ea5f6d52ea3931045489",
     "fix_commit": "d37910f538b12ab04d7779ec5a40eaa112acb27f",

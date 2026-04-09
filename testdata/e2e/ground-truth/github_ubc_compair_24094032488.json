@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-ubc-compair-24094032488",
+  "repo": "ubc/compair",
+  "run_id": 24094032488,
+  "tags": [],
+  "transition": {
+    "failing_commit": "517fad843a5c9e3ae3c055572eb43f6cf95c9262",
+    "fix_commit": "3399ac884c7df718d01bdbbb9efe62c29584d207",
+    "pr_url": "https://github.com/ubc/compair/pull/1069",
+    "pr_title": "Fix/1059: Re-enable BE unit tests for CI",
+    "files_changed": [
+      ".github/workflows/main.yml"
+    ],
+    "fix_size_lines": 2
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "Fix/1059: Re-enable BE unit tests for CI",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "infrastructure"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES. The diff modifies the `python-version` in the CI workflow configuration. The PR title indicates this is to re-enable BE unit tests, suggesting the previous configuration was preventing these test"
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-rekurt-go-propisyu-24113142991",
+  "repo": "rekurt/go-propisyu",
+  "run_id": 24113142991,
+  "tags": [],
+  "transition": {
+    "failing_commit": "ddc51065801a29905f91e8393347881ed4123a25",
+    "fix_commit": "50a7efc38b952b53b2dae0726fbcfaf5305cb7d6",
+    "pr_url": "https://github.com/rekurt/go-propisyu/pull/13",
+    "pr_title": "fix(ci): migrate golangci-lint config to v2 schema",
+    "files_changed": [
+      ".golangci.yml"
+    ],
+    "fix_size_lines": 1
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix(ci): migrate golangci-lint config to v2 schema",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "infrastructure"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES. The log shows the workflow downloading and using `golangci/golangci-lint-action@v6`. The diff modifies the `golangci-lint` configuration file. Therefore, the code change directly addresses the te"
+  }
+}

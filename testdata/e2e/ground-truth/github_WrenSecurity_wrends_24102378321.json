@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-WrenSecurity-wrends-24102378321",
+  "repo": "WrenSecurity/wrends",
+  "run_id": 24102378321,
+  "tags": [],
+  "transition": {
+    "failing_commit": "86d5e54c6387a968a965d4ba4a54fda115f2073a",
+    "fix_commit": "4d8c8e6048f0dd8a318656e2880a35756a3e8d27",
+    "pr_url": "https://github.com/WrenSecurity/wrends/pull/127",
+    "pr_title": "Additional flaky integration test fixes",
+    "files_changed": [
+      "opendj-server-legacy/src/test/java/org/opends/server/replication/service/ReplicationDomainTest.java"
+    ],
+    "fix_size_lines": 29
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "Additional flaky integration test fixes",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "assertion",
+        "bug_location": "production"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "",
+    "llm_correlation": "YES\nThe code change modifies the `initializeFromRemote` method within the `ReplicationDomain` class. The original method returned a boolean, but the updated method is void and uses `TestCaseUtils.repe"
+  }
+}

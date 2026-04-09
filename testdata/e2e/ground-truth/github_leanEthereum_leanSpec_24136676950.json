@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-leanEthereum-leanSpec-24136676950",
+  "repo": "leanEthereum/leanSpec",
+  "run_id": 24136676950,
+  "tags": [],
+  "transition": {
+    "failing_commit": "7bd74403ca85964fefa4c60272e8a14e8a989b58",
+    "fix_commit": "122e71db84960c25f7c26b15277ee4524678b096",
+    "pr_url": "https://github.com/leanEthereum/leanSpec/pull/537",
+    "pr_title": "fix: resolve flaky interop test timeout on CI",
+    "files_changed": [
+      "tests/interop/test_consensus_lifecycle.py"
+    ],
+    "fix_size_lines": 13
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix: resolve flaky interop test timeout on CI",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "assertion",
+        "bug_location": "test"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES\nThe original test expected all 3 validators to have proposed by slot 3, which is failing on CI due to resource constraints causing validators to miss slots. The fix relaxes this constraint to requ"
+  }
+}

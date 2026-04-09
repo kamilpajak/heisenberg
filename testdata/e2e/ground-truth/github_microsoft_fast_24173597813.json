@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-microsoft-fast-24173597813",
+  "repo": "microsoft/fast",
+  "run_id": 24173597813,
+  "tags": [],
+  "transition": {
+    "failing_commit": "f807f6acfe3877b28a0f3b465b839fb4cddf3d8f",
+    "fix_commit": "34942efa7b23b77146e4c8db01b022cbeac91df8",
+    "pr_url": "https://github.com/microsoft/fast/pull/7410",
+    "pr_title": "fix(fast-build): properly decode multi-byte UTF-8 in JSON string parser",
+    "files_changed": [
+      "crates/microsoft-fast-build/src/json.rs"
+    ],
+    "fix_size_lines": 21
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix(fast-build): properly decode multi-byte UTF-8 in JSON string parser",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "timeout",
+        "bug_location": "production"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "",
+    "llm_correlation": "YES\nThe test failure log shows tests related to emitting marker attributes with different types of bindings. The provided code change fixes an issue with UTF-8 decoding in the JSON string parser. Whil"
+  }
+}

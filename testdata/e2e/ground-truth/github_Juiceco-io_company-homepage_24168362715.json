@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-Juiceco-io-company-homepage-24168362715",
+  "repo": "Juiceco-io/company-homepage",
+  "run_id": 24168362715,
+  "tags": [],
+  "transition": {
+    "failing_commit": "db234f1f2e6f6327bfc025fda13066aa96e293ca",
+    "fix_commit": "e0cc0461a7607d98c3f63b7b66f9d36415246dbf",
+    "pr_url": "https://github.com/Juiceco-io/company-homepage/pull/86",
+    "pr_title": "fix: make deploy workflow branch mapping PR-aware",
+    "files_changed": [
+      ".github/workflows/deploy.yml"
+    ],
+    "fix_size_lines": 4
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix: make deploy workflow branch mapping PR-aware",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "infrastructure"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES. The log shows that the `BRANCH_NAME` is being incorrectly set to `fix/deploy-workflow-pr-aware-branch-mapping` when the event is a pull request. The diff changes the workflow to use `github.base_"
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "case_id": "gh-pattern-stack-stack-bench-24017444168",
+  "repo": "pattern-stack/stack-bench",
+  "run_id": 24017444168,
+  "tags": [],
+  "transition": {
+    "failing_commit": "e258a997ae0b12ccc9895563d2280ac22d910dae",
+    "fix_commit": "3072273f6cc06aa6553c6a23fb2b742c1deacebb",
+    "pr_url": "https://github.com/pattern-stack/stack-bench/pull/197",
+    "pr_title": "fix: resolve CI lint, type-check, and test failures",
+    "files_changed": [
+      "app/backend/__tests__/features/test_conversations.py",
+      "app/backend/src/features/conversations/models.py",
+      "app/backend/src/features/conversations/service.py",
+      "app/backend/src/molecules/runtime/job_execution_bridge.py",
+      "app/backend/src/molecules/runtime/stub_runner.py",
+      "app/backend/src/organisms/api/routers/conversations.py"
+    ],
+    "fix_size_lines": 43
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix: resolve CI lint, type-check, and test failures",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "production"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "hard",
+    "notes": "",
+    "llm_correlation": "YES.\n\nThe PR title indicates that the changes are intended to resolve CI test failures, and the diff includes changes to type hints and property definitions within the `ConversationContext` model and "
+  }
+}

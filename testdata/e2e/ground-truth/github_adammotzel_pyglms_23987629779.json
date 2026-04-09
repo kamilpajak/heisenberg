@@ -1,0 +1,49 @@
+{
+  "case_id": "gh-adammotzel-pyglms-23987629779",
+  "repo": "adammotzel/pyglms",
+  "run_id": 23987629779,
+  "tags": [
+    "smoke"
+  ],
+  "transition": {
+    "failing_commit": "dc59fae84f46f0783fc2aab2937b87796866fcbc",
+    "fix_commit": "fe22294d1ef6d5fc459987683976ce8b62071e3f",
+    "pr_url": "https://github.com/adammotzel/pyglms/pull/7",
+    "pr_title": "REFACTOR: Fix PCA, update type hints, move unit tests",
+    "files_changed": [
+      "pyproject.toml",
+      "tests/test_stats.py",
+      "turtles/stats/_stats.py",
+      "uv.lock"
+    ],
+    "fix_size_lines": 36
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "REFACTOR: Fix PCA, update type hints, move unit tests",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "assertion",
+        "bug_location": "test"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "hard",
+    "notes": "",
+    "llm_correlation": "YES.\n\nThe diff includes changes to the PCA function itself, updates the expected values in the `test_pca` unit test, and adds logic to enforce a deterministic sign in the PCA calculation. These change"
+  }
+}

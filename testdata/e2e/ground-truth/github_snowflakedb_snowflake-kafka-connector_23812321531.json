@@ -1,0 +1,45 @@
+{
+  "case_id": "gh-snowflakedb-snowflake-kafka-connector-23812321531",
+  "repo": "snowflakedb/snowflake-kafka-connector",
+  "run_id": 23812321531,
+  "tags": [],
+  "transition": {
+    "failing_commit": "0f6428c28cb5becdab4c1c659d2c2c6c0868d610",
+    "fix_commit": "57a10f65cc2094e7fcc0de6460b883417820026d",
+    "pr_url": "https://github.com/snowflakedb/snowflake-kafka-connector/pull/1389",
+    "pr_title": "Add iceberg E2E tests and fix SE DDL for iceberg tables",
+    "files_changed": [
+      "test/tests/iceberg/test_iceberg_avro.py",
+      "test/tests/iceberg/test_iceberg_se_avro.py"
+    ],
+    "fix_size_lines": 10
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "Add iceberg E2E tests and fix SE DDL for iceberg tables",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "assertion",
+        "bug_location": "test"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "",
+    "llm_correlation": "YES.\n\nThe test failure log shows a configuration being applied to a Snowflake connector, specifically related to schema evolution (\"snowpipe_streaming_schema_evolution\"). The diff includes changes to "
+  }
+}

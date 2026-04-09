@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-soxoj-maigret-24107925370",
+  "repo": "soxoj/maigret",
+  "run_id": 24107925370,
+  "tags": [],
+  "transition": {
+    "failing_commit": "e73f977408e4ec94eb755fdb70f4fccff8521950",
+    "fix_commit": "32aed52abc4e048298511eb52f26ad5a97b660b4",
+    "pr_url": "https://github.com/soxoj/maigret/pull/2468",
+    "pr_title": "Fix failing test for custom DB path resolution",
+    "files_changed": [
+      "tests/test_db_updater.py"
+    ],
+    "fix_size_lines": 7
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "Fix failing test for custom DB path resolution",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "timeout",
+        "bug_location": "test"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES\nThe test failure log shows the system is in the middle of unpacking debian packages, which is not directly related to the provided code change. However, the PR title indicates that the fix address"
+  }
+}

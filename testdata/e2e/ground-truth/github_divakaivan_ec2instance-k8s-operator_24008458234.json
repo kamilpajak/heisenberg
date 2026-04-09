@@ -1,0 +1,47 @@
+{
+  "case_id": "gh-divakaivan-ec2instance-k8s-operator-24008458234",
+  "repo": "divakaivan/ec2instance-k8s-operator",
+  "run_id": 24008458234,
+  "tags": [],
+  "transition": {
+    "failing_commit": "1cb67b734bc1e53ea2384044ab00fbc17af7d184",
+    "fix_commit": "746db41d21db0bc60e888872e2992aeb68b703fd",
+    "pr_url": "https://github.com/divakaivan/ec2instance-k8s-operator/pull/1",
+    "pr_title": "Remove debug noise, fix CI failures, add Helm chart and DockerHub publish pipeline",
+    "files_changed": [
+      ".github/workflows/publish.yml",
+      ".github/workflows/test-chart.yml",
+      "README.md",
+      "dist/chart/values.yaml"
+    ],
+    "fix_size_lines": 48
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "Remove debug noise, fix CI failures, add Helm chart and DockerHub publish pipeline",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "timeout",
+        "bug_location": "infrastructure"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "hard",
+    "notes": "",
+    "llm_correlation": "YES\nThe diff changes the image tag used in the Helm chart from `divakaivan/k8s-operator:latest` to `divakaivan/ec2instance-k8s-operator:latest`. This suggests that the previous image tag was incorrect"
+  }
+}

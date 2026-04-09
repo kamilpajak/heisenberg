@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-dt-gosendsafely-23547394092",
+  "repo": "dt/gosendsafely",
+  "run_id": 23547394092,
+  "tags": [],
+  "transition": {
+    "failing_commit": "20c655639081fb8321981f7bd76ff992c0ed1d65",
+    "fix_commit": "014f12d290f30b7456fb1fa521828957efa061b2",
+    "pr_url": "https://github.com/dt/gosendsafely/pull/4",
+    "pr_title": "Fix keyCode length assertion: 64 \u2192 43",
+    "files_changed": [
+      "sendsafely/upload_test.go"
+    ],
+    "fix_size_lines": 4
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "Fix keyCode length assertion: 64 \u2192 43",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "test"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES\nThe test failure log doesn't show the specific error, but the PR title and diff indicate that the test `TestDropzoneClient_CreatePackage` was failing because the assertion on the length of `keyCod"
+  }
+}

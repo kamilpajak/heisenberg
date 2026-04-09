@@ -2,7 +2,9 @@
   "case_id": "gh-AutomoxCommunity-automox-mcp-23876960032",
   "repo": "AutomoxCommunity/automox-mcp",
   "run_id": 23876960032,
-  "tags": [],
+  "tags": [
+    "smoke"
+  ],
   "transition": {
     "failing_commit": "1f4ca490122a2cd750aac86bff1ee825c44f1817",
     "fix_commit": "7ccc6cdae946adb0d896815fe66d358fae0415a2",

@@ -1,0 +1,45 @@
+{
+  "case_id": "gh-serkonda7-textmate-grammar-test-24035638366",
+  "repo": "serkonda7/textmate-grammar-test",
+  "run_id": 24035638366,
+  "tags": [],
+  "transition": {
+    "failing_commit": "f374cbabc19daab617e65ead8d36756613dec6b8",
+    "fix_commit": "53d184488be272b9951295f9fa96862810255269",
+    "pr_url": "https://github.com/serkonda7/textmate-grammar-test/pull/78",
+    "pr_title": "fix: Restore support for disjoint caret assertions on one line",
+    "files_changed": [
+      "src/unit/parser.ts",
+      "test/unit/parser.test.ts"
+    ],
+    "fix_size_lines": 30
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix: Restore support for disjoint caret assertions on one line",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "assertion",
+        "bug_location": "production"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "",
+    "llm_correlation": "YES\nThe PR title and the code diff clearly indicate that the fix is related to parsing caret assertions on a single line. The diff modifies the `AssertionParser` class to handle multiple caret asserti"
+  }
+}

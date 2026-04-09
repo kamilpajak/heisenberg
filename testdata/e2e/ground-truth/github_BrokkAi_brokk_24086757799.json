@@ -1,0 +1,46 @@
+{
+  "case_id": "gh-BrokkAi-brokk-24086757799",
+  "repo": "BrokkAi/brokk",
+  "run_id": 24086757799,
+  "tags": [
+    "smoke"
+  ],
+  "transition": {
+    "failing_commit": "c294719847e63e86396498d2fd38fb7655c6625d",
+    "fix_commit": "91888e9cc3ef101f24dbdd09a80e3a01dfb90d6f",
+    "pr_url": "https://github.com/BrokkAi/brokk/pull/3265",
+    "pr_title": "fix: eliminate race in flaky Windows logout test",
+    "files_changed": [
+      "brokk-code/tests/test_login_logout_commands.py"
+    ],
+    "fix_size_lines": 4
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix: eliminate race in flaky Windows logout test",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "timeout",
+        "bug_location": "test"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES. The PR title indicates the fix addresses a flaky test, and the diff modifies the logout test by adding a timeout to prevent hangs. This directly addresses the potential for the test to fail due t"
+  }
+}

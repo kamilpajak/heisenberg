@@ -1,0 +1,45 @@
+{
+  "case_id": "gh-B3dmar-sp3cmar-23976495906",
+  "repo": "B3dmar/sp3cmar",
+  "run_id": 23976495906,
+  "tags": [],
+  "transition": {
+    "failing_commit": "df8ab0862a84c3dfd850313e4f2f4c285be6cf16",
+    "fix_commit": "81d7b27d3a2abedf9e1f19c79392aaa776861539",
+    "pr_url": "https://github.com/B3dmar/sp3cmar/pull/13",
+    "pr_title": "fix: untangle personal workflows and fix README",
+    "files_changed": [
+      "tests/test_codex_provider_install.py",
+      "tests/test_install.py"
+    ],
+    "fix_size_lines": 26
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix: untangle personal workflows and fix README",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "assertion",
+        "bug_location": "test"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "",
+    "llm_correlation": "YES\n\nThe diff modifies test cases and skill/agent file names related to \"review-codebase\", \"review-kill\", and \"review-pr\". The test failure log doesn't show the full error, but the diff suggests a ref"
+  }
+}

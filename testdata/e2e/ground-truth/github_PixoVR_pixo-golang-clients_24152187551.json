@@ -1,0 +1,46 @@
+{
+  "case_id": "gh-PixoVR-pixo-golang-clients-24152187551",
+  "repo": "PixoVR/pixo-golang-clients",
+  "run_id": 24152187551,
+  "tags": [],
+  "transition": {
+    "failing_commit": "910b743adf5f1cf67c303258d8b7b558364cc5ee",
+    "fix_commit": "529111d08e1740c2e3244c99b8e38790361c669a",
+    "pr_url": "https://github.com/PixoVR/pixo-golang-clients/pull/272",
+    "pr_title": "fix: bump server-utilities to v0.2.74 (CVE-2026-25679) and fix org/module tests",
+    "files_changed": [
+      "pixo-platform/platform/orgs.go",
+      "pixo-platform/platform/orgs_test.go",
+      "pixo-platform/platform/success_factors_test.go"
+    ],
+    "fix_size_lines": 26
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix: bump server-utilities to v0.2.74 (CVE-2026-25679) and fix org/module tests",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "test"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "",
+    "llm_correlation": "YES\nThe PR title mentions \"fix org/module tests\" and the diff includes changes to both the `Org` struct and the `Orgs API` tests. The addition of `AffiliateID` to the `Org` struct and the correspondin"
+  }
+}

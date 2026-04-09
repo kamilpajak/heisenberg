@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-david-gulik-SER401_Team5-23986623459",
+  "repo": "david-gulik/SER401_Team5",
+  "run_id": 23986623459,
+  "tags": [],
+  "transition": {
+    "failing_commit": "aaeb6f0948585f37eabaec60bb3172e6703bd6dd",
+    "fix_commit": "a4115df5c6cffb8550296904337c8416273b5557",
+    "pr_url": "https://github.com/david-gulik/SER401_Team5/pull/37",
+    "pr_title": "Fix import order and failing test case",
+    "files_changed": [
+      "IVE/tests/infra/canvas/test_http_canvas_client.py"
+    ],
+    "fix_size_lines": 5
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "Fix import order and failing test case",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "timeout",
+        "bug_location": "test"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES\nThe diff modifies the expected header and data in the `test_fetch_gradebook_csv_builds_csv_from_grouped_submissions` test. This suggests that the test was failing because the expected CSV format w"
+  }
+}

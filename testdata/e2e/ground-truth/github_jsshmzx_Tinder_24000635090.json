@@ -1,0 +1,45 @@
+{
+  "case_id": "gh-jsshmzx-Tinder-24000635090",
+  "repo": "jsshmzx/Tinder",
+  "run_id": 24000635090,
+  "tags": [],
+  "transition": {
+    "failing_commit": "abdb97abec5710d5e29b99c0b24f05dff2da3e84",
+    "fix_commit": "eb08a0ee3309504d6fb642ee94529873592de02f",
+    "pr_url": "https://github.com/jsshmzx/Tinder/pull/33",
+    "pr_title": "Fix CI test failures: bcrypt compatibility and error message assertions",
+    "files_changed": [
+      "requirements.txt",
+      "tests/unit/test_auth_router.py"
+    ],
+    "fix_size_lines": 6
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "Fix CI test failures: bcrypt compatibility and error message assertions",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "assertion",
+        "bug_location": "test"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "",
+    "llm_correlation": "YES\n\nThe log shows the CI process fetching and checking out code. The diff includes a change to the `bcrypt` version and updates error message assertions. While the log doesn't explicitly state a bcry"
+  }
+}

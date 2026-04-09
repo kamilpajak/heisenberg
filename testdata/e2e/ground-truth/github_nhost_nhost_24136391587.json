@@ -1,0 +1,45 @@
+{
+  "case_id": "gh-nhost-nhost-24136391587",
+  "repo": "nhost/nhost",
+  "run_id": 24136391587,
+  "tags": [],
+  "transition": {
+    "failing_commit": "d31346b6758b18b167ff06f42aeb682f5b0b732e",
+    "fix_commit": "db0cd869da1830b148e2b99c7b1aaf665dd3b449",
+    "pr_url": "https://github.com/nhost/nhost/pull/4132",
+    "pr_title": "fix(dashboard): prevent remote schema type collisions in e2e tests",
+    "files_changed": [
+      "dashboard/e2e/database/tables/table-relationships.test.ts",
+      "dashboard/e2e/remote-schemas/create-remote-schema.test.ts"
+    ],
+    "fix_size_lines": 36
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix(dashboard): prevent remote schema type collisions in e2e tests",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "timeout",
+        "bug_location": "test"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "",
+    "llm_correlation": "YES\n\nThe test failure is a timeout while waiting for the \"The remote schema has been created successfully.\" message to appear. The code change modifies how the remote schema is created, specifically t"
+  }
+}

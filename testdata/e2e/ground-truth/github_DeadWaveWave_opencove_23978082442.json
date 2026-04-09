@@ -2,7 +2,9 @@
   "case_id": "gh-DeadWaveWave-opencove-23978082442",
   "repo": "DeadWaveWave/opencove",
   "run_id": 23978082442,
-  "tags": [],
+  "tags": [
+    "smoke"
+  ],
   "transition": {
     "failing_commit": "aead4e6dca48ab16bd6b491e50e02c2ea3de69c6",
     "fix_commit": "bdfee3d0c635b8d4e0c3d80d50225ecb26e09a37",

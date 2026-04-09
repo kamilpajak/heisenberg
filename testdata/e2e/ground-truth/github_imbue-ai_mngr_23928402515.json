@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-imbue-ai-mngr-23928402515",
+  "repo": "imbue-ai/mngr",
+  "run_id": 23928402515,
+  "tags": [],
+  "transition": {
+    "failing_commit": "272537d9816243f57cbd8a07a12e5498e5d39219",
+    "fix_commit": "f54b89e0a3f99a60c5e805d786e9eb31ab0784ac",
+    "pr_url": "https://github.com/imbue-ai/mngr/pull/1144",
+    "pr_title": "fix flaky test_extra_context_tool_conversations_no_db",
+    "files_changed": [
+      "libs/mngr_claude_mind/imbue/mngr_claude_mind/provisioning_test.py"
+    ],
+    "fix_size_lines": 5
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix flaky test_extra_context_tool_conversations_no_db",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "timeout",
+        "bug_location": "test"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES\nThe PR title indicates the fix addresses a flaky test named `test_extra_context_tool_conversations_no_db`. The diff modifies the `extra_context_env` function, which seems to be a setup fixture for"
+  }
+}

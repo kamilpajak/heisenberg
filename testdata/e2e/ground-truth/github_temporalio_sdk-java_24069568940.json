@@ -1,0 +1,45 @@
+{
+  "case_id": "gh-temporalio-sdk-java-24069568940",
+  "repo": "temporalio/sdk-java",
+  "run_id": 24069568940,
+  "tags": [],
+  "transition": {
+    "failing_commit": "e314a620451b90999bc8f69bdca007d613b964a9",
+    "fix_commit": "2401c8a3f79c13f09d8c020de8037dbcb89d0ada",
+    "pr_url": "https://github.com/temporalio/sdk-java/pull/2832",
+    "pr_title": "Fix native-image CI docker build flake",
+    "files_changed": [
+      ".github/workflows/build-native-image.yml",
+      "docker/native-image/dockerfile"
+    ],
+    "fix_size_lines": 3
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "Fix native-image CI docker build flake",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "infrastructure"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "",
+    "llm_correlation": "YES\n\nThe test failure log shows the CI environment is Ubuntu 24.04. The diff modifies the Dockerfile used for native image builds, specifically changing the PPA used for toolchain updates from `ppa:ub"
+  }
+}

@@ -442,7 +442,26 @@ func TestEval_Suite(t *testing.T) {
 		model = llm.DefaultModel
 	}
 
-	cases := loadGroundTruth(t)
+	allCases := loadGroundTruth(t)
+
+	// Filter by eval tier: HEISENBERG_EVAL_TIER=smoke runs only tagged cases.
+	// Default (empty or "full") runs all cases.
+	tier := os.Getenv("HEISENBERG_EVAL_TIER")
+	var cases []groundTruth
+	if tier == "smoke" {
+		for _, gt := range allCases {
+			for _, tag := range gt.Tags {
+				if tag == "smoke" {
+					cases = append(cases, gt)
+					break
+				}
+			}
+		}
+		t.Logf("Smoke tier: %d/%d cases", len(cases), len(allCases))
+	} else {
+		cases = allCases
+	}
+
 	logPath := filepath.Join("..", "..", "testdata", "e2e", "eval.jsonl")
 	report := evalReport{}
 

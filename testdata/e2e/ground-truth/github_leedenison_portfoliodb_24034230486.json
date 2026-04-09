@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-leedenison-portfoliodb-24034230486",
+  "repo": "leedenison/portfoliodb",
+  "run_id": 24034230486,
+  "tags": [],
+  "transition": {
+    "failing_commit": "a54ea14159ed11be9ef2ed688edcb6783e28c838",
+    "fix_commit": "53621581d9a68d10eda36fe32ff74b81fb27cfe9",
+    "pr_url": "https://github.com/leedenison/portfoliodb/pull/179",
+    "pr_title": "Fix Fidelity parser failing on Pending completion dates",
+    "files_changed": [
+      "client/lib/csv/converters/fidelity.test.ts"
+    ],
+    "fix_size_lines": 15
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "Fix Fidelity parser failing on Pending completion dates",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "assertion",
+        "bug_location": "production"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "",
+    "llm_correlation": "YES\nThe PR title and the diff clearly indicate that the fix addresses an issue with the Fidelity parser when encountering \"Pending\" completion dates. The diff includes a new test case specifically for"
+  }
+}

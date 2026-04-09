@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-pulumi-pulumi-24092622678",
+  "repo": "pulumi/pulumi",
+  "run_id": 24092622678,
+  "tags": [],
+  "transition": {
+    "failing_commit": "1c98936d3cd35a1d492a3d53c3b1a432d98f4726",
+    "fix_commit": "f10f474af09f9cc5a603f468cbb4549ddb6d1567",
+    "pr_url": "https://github.com/pulumi/pulumi/pull/22496",
+    "pr_title": "Fix flaky TestAnalyzerCancellation",
+    "files_changed": [
+      "pkg/engine/lifecycletest/analyzer_test.go"
+    ],
+    "fix_size_lines": 25
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "Fix flaky TestAnalyzerCancellation",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "timeout",
+        "bug_location": "production"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "",
+    "llm_correlation": "YES\n\nThe PR title indicates the fix addresses flakiness in `TestAnalyzerCancellation`. The diff modifies the `TestAnalyzerCancellation` test, specifically adding synchronization to ensure the cancella"
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "case_id": "gh-Airgap-Castaways-deck-24124605931",
+  "repo": "Airgap-Castaways/deck",
+  "run_id": 24124605931,
+  "tags": [
+    "smoke"
+  ],
+  "transition": {
+    "failing_commit": "d123c5cf9907c81194045110f88ec4a29d061b0e",
+    "fix_commit": "e6e1df149ee583f572f7c8c1015ad2f8b746069f",
+    "pr_url": "https://github.com/Airgap-Castaways/deck/pull/170",
+    "pr_title": "fix: preserve hosted E2E Docker env expansion",
+    "files_changed": [
+      ".github/e2e/hosted/fixtures/smoke/workflows/prepare.yaml",
+      ".github/scripts/run-hosted-e2e.sh",
+      ".github/workflows/hosted-e2e-nightly.yml"
+    ],
+    "fix_size_lines": 15
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix: preserve hosted E2E Docker env expansion",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "infrastructure"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "",
+    "llm_correlation": "YES.\n\nThe diff modifies the path used in the `prepare.yaml` file, replacing `__FIXTURE_ROOT__` with `workdir`. It also updates the `actions/upload-artifact` version. The python script replaces the `__"
+  }
+}

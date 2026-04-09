@@ -1,0 +1,45 @@
+{
+  "case_id": "gh-kubecopilot-kubecopilot-core-24149450587",
+  "repo": "kubecopilot/kubecopilot-core",
+  "run_id": 24149450587,
+  "tags": [],
+  "transition": {
+    "failing_commit": "6ec091535a5619b02355f280ea47ae265c174c58",
+    "fix_commit": "f456e8332b4399d8a70fec4a57121a93c8b8aa04",
+    "pr_url": "https://github.com/kubecopilot/kubecopilot-core/pull/26",
+    "pr_title": "fix(lint): extract repeated \"default\" string into constant in webhook package",
+    "files_changed": [
+      "internal/webhook/server.go",
+      "internal/webhook/server_test.go"
+    ],
+    "fix_size_lines": 14
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix(lint): extract repeated \"default\" string into constant in webhook package",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "assertion",
+        "bug_location": "production"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "",
+    "llm_correlation": "YES\n\nThe diff extracts the string \"default\" into a constant `defaultNamespace` and uses it in the webhook server's handler functions and tests. The PR title also indicates that this change is related "
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "case_id": "gh-bitshifted-protofx-24076705462",
+  "repo": "bitshifted/protofx",
+  "run_id": 24076705462,
+  "tags": [
+    "smoke"
+  ],
+  "transition": {
+    "failing_commit": "a9ac9d71612cbf56f48eb832fa6ef2787e8cb404",
+    "fix_commit": "7c77cd86ccd23d0bde336967fb5d60673f4657ad",
+    "pr_url": "https://github.com/bitshifted/protofx/pull/3",
+    "pr_title": "ci: deployment fixes",
+    "files_changed": [
+      ".github/workflows/build-pipeline.yml"
+    ],
+    "fix_size_lines": 5
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "ci: deployment fixes",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "timeout",
+        "bug_location": "infrastructure"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "Vague PR title \u2014 actual_cause needs human review",
+    "llm_correlation": "YES\nThe log shows Maven dependencies being downloaded, suggesting a build process. The diff modifies the \"Build and test\" job in the CI workflow to install and run `xvfb`. This suggests the tests migh"
+  }
+}

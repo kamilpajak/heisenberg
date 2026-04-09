@@ -1,0 +1,49 @@
+{
+  "case_id": "gh-vaadin-hilla-23588938386",
+  "repo": "vaadin/hilla",
+  "run_id": 23588938386,
+  "tags": [],
+  "transition": {
+    "failing_commit": "496c9782f23469ddbc7907e051232b61437a5e0a",
+    "fix_commit": "f6e186053b6abc201353d220b7a115e950a62e2c",
+    "pr_url": "https://github.com/vaadin/hilla/pull/4963",
+    "pr_title": "fix: eslint linter errors (25.0)",
+    "files_changed": [
+      "packages/ts/file-router/src/vite-plugin/applyLayouts.ts",
+      "packages/ts/generator-plugin-signals/src/SignalProcessor.ts",
+      "packages/ts/generator-utils/src/ast.ts",
+      "packages/ts/react-crud/src/autoform-field.tsx",
+      "packages/ts/react-form/test/useForm.spec.tsx",
+      "packages/ts/react-signals/src/ListSignal.ts"
+    ],
+    "fix_size_lines": 15
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix: eslint linter errors (25.0)",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "production"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "hard",
+    "notes": "",
+    "llm_correlation": "YES\nThe test failure log shows that the build failed during the `spotless:check` phase, which is related to code formatting and linting. The provided diff shows changes to fix eslint linter errors, wh"
+  }
+}

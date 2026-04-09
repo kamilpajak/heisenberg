@@ -1,61 +1,95 @@
 # Coverage matrix for ground truth mining.
-# Adjusted after first batch: network over-represented, test/infra under-represented.
+# Expanded for 100+ case target (was 35, need 3x more).
 
-# Exclude over-represented and low-quality categories
+# Only exclude truly low-quality categories
 exclude:
-  - failure_type: network
   - failure_type: unknown
   - bug_location: unknown
 
 buckets:
-  # --- FILLING THE 'TEST' BUG GAP ---
+  # --- ASSERTIONS ---
   - language: typescript
     failure_type: assertion
     bug_location: test
+    target: 10
+  - language: typescript
+    failure_type: assertion
+    bug_location: production
+    target: 10
+  - language: python
+    failure_type: assertion
+    bug_location: test
+    target: 8
+  - language: python
+    failure_type: assertion
+    bug_location: production
+    target: 8
+  - language: go
+    failure_type: assertion
+    bug_location: test
+    target: 6
+  - language: go
+    failure_type: assertion
+    bug_location: production
+    target: 6
+  - language: java
+    failure_type: assertion
+    bug_location: test
+    target: 6
+  - language: java
+    failure_type: assertion
+    bug_location: production
+    target: 6
+
+  # --- TIMEOUTS ---
+  - language: typescript
+    failure_type: timeout
+    target: 8
+  - language: python
+    failure_type: timeout
+    target: 6
+  - language: go
+    failure_type: timeout
+    target: 4
+  - language: java
+    failure_type: timeout
+    target: 4
+
+  # --- INFRASTRUCTURE ---
+  - language: typescript
+    failure_type: infra
+    target: 6
+  - language: python
+    failure_type: infra
+    target: 6
+  - language: go
+    failure_type: infra
+    target: 4
+  - language: java
+    failure_type: infra
+    target: 4
+
+  # --- NETWORK ---
+  - language: typescript
+    failure_type: network
     target: 4
   - language: python
-    failure_type: assertion
-    bug_location: test
+    failure_type: network
     target: 4
   - language: go
-    failure_type: assertion
-    bug_location: test
+    failure_type: network
+    target: 3
+  - language: java
+    failure_type: network
     target: 3
 
-  # --- FILLING THE 'INFRA' FAILURE TYPE GAP ---
+  # --- FLAKES ---
   - language: typescript
-    failure_type: infra
+    failure_type: flake
     target: 3
   - language: python
-    failure_type: infra
-    target: 3
-  - language: go
-    failure_type: infra
+    failure_type: flake
     target: 3
 
-  # --- BALANCING PRODUCTION ASSERTIONS ---
-  - language: typescript
-    failure_type: assertion
-    bug_location: production
-    target: 2
-  - language: python
-    failure_type: assertion
-    bug_location: production
-    target: 2
-  - language: go
-    failure_type: assertion
-    bug_location: production
-    target: 2
-
-  # --- TIMEOUTS (still need more) ---
-  - language: typescript
-    failure_type: timeout
-    target: 3
-  - language: python
-    failure_type: timeout
-    target: 3
-  - language: go
-    failure_type: timeout
-    target: 2
-
-  # No catch-all bucket — only accept what we explicitly want
+  # Catch-all for categories not explicitly listed
+  - target: 20

@@ -1,0 +1,46 @@
+{
+  "case_id": "gh-RegretfulWinter-strong_shortner-24000564363",
+  "repo": "RegretfulWinter/strong_shortner",
+  "run_id": 24000564363,
+  "tags": [
+    "smoke"
+  ],
+  "transition": {
+    "failing_commit": "cb1ee4d6dc11b2a142d77f03b119cb300196cb2f",
+    "fix_commit": "9cca56ddf0985a2075a8718daf8262db9247c2ea",
+    "pr_url": "https://github.com/RegretfulWinter/strong_shortner/pull/1",
+    "pr_title": "fix: health endpoint unit test and integration test",
+    "files_changed": [
+      "tests/test_integration.py"
+    ],
+    "fix_size_lines": 5
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix: health endpoint unit test and integration test",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "timeout",
+        "bug_location": "test"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES\nThe diff modifies the health endpoint unit test, changing the expected response format. While the provided log snippet doesn't show the *reason* for the failure, the PR title and the diff strongly"
+  }
+}

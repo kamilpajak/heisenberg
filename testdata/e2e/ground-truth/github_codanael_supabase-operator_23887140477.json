@@ -1,0 +1,45 @@
+{
+  "case_id": "gh-codanael-supabase-operator-23887140477",
+  "repo": "codanael/supabase-operator",
+  "run_id": 23887140477,
+  "tags": [],
+  "transition": {
+    "failing_commit": "ff9ad9ea2baa9f144c2206a663b957fa7fb28a6f",
+    "fix_commit": "97bf09f5f8820f189f749be61f10f0688ffbb8e9",
+    "pr_url": "https://github.com/codanael/supabase-operator/pull/2",
+    "pr_title": "Add admin guide, rewrite README, and fix CI pipelines",
+    "files_changed": [
+      ".github/workflows/lint.yml",
+      "Makefile"
+    ],
+    "fix_size_lines": 4
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "Add admin guide, rewrite README, and fix CI pipelines",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "infrastructure"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "",
+    "llm_correlation": "YES\nThe log shows the CI pipeline failing while downloading `golangci/golangci-lint`. The diff updates the version of `golangci-lint` used in the CI pipeline from `v2.1.0` to `v2.11.4`. This change di"
+  }
+}
