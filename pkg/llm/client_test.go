@@ -392,8 +392,8 @@ func TestGenerate_MaxRetriesExhausted(t *testing.T) {
 	var apiErr *APIError
 	require.ErrorAs(t, err, &apiErr)
 	assert.Equal(t, 429, apiErr.StatusCode)
-	assert.Equal(t, 3, apiErr.Retries, "should report retry count")
-	assert.Equal(t, 4, attempts, "1 initial + 3 retries")
+	assert.Equal(t, apiRetries, apiErr.Retries, "should report retry count")
+	assert.Equal(t, apiRetries+1, attempts, "1 initial + N retries")
 	assert.Equal(t, "250 req/day for gemini-3.1-pro", apiErr.QuotaDetail)
 	assert.Equal(t, "5h", apiErr.RetryAfter)
 }
