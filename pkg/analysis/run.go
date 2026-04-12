@@ -26,6 +26,7 @@ type Params struct {
 	CI             ci.Provider
 	GoogleAPIKey   string                  // Google API key override (empty = env var)
 	PatternMatcher patterns.PatternMatcher // nil = no pattern matching
+	LLMOptions     []llm.ClientOption      // Optional LLM client settings (e.g., VCR HTTP client)
 }
 
 // Run executes the full analysis pipeline: resolve run ID, fetch metadata, and
@@ -135,7 +136,7 @@ func runSingle(ctx context.Context, p Params,
 		artifacts:    artifacts,
 	}
 
-	llmClient, err := llm.NewClient(p.Model, p.GoogleAPIKey)
+	llmClient, err := llm.NewClient(p.Model, p.GoogleAPIKey, p.LLMOptions...)
 	if err != nil {
 		return nil, err
 	}
@@ -165,7 +166,7 @@ func runClustered(ctx context.Context, p Params,
 
 	// Run LLM agent loop per cluster
 	var results []clusterAnalysis
-	llmClient, err := llm.NewClient(p.Model, p.GoogleAPIKey)
+	llmClient, err := llm.NewClient(p.Model, p.GoogleAPIKey, p.LLMOptions...)
 	if err != nil {
 		return nil, err
 	}

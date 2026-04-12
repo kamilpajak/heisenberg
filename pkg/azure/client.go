@@ -47,15 +47,20 @@ type Client struct {
 
 // NewClient creates a new Azure DevOps client bound to a specific org/project.
 // If pat is empty, falls back to the AZURE_DEVOPS_PAT environment variable.
-func NewClient(org, project, pat string) *Client {
+// An optional httpClient can be provided (e.g., for VCR recording/replay).
+func NewClient(org, project, pat string, httpClient ...*http.Client) *Client {
 	if pat == "" {
 		pat = os.Getenv("AZURE_DEVOPS_PAT")
+	}
+	hc := &http.Client{}
+	if len(httpClient) > 0 && httpClient[0] != nil {
+		hc = httpClient[0]
 	}
 	return &Client{
 		org:        org,
 		project:    project,
 		pat:        pat,
-		httpClient: &http.Client{},
+		httpClient: hc,
 		baseURL:    "https://dev.azure.com/" + org,
 	}
 }

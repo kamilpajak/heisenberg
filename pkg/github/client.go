@@ -30,15 +30,20 @@ type Client struct {
 
 // NewClient creates a new GitHub client bound to a specific repository.
 // If token is empty, falls back to the GITHUB_TOKEN environment variable.
-func NewClient(owner, repo, token string) *Client {
+// An optional httpClient can be provided (e.g., for VCR recording/replay).
+func NewClient(owner, repo, token string, httpClient ...*http.Client) *Client {
 	if token == "" {
 		token = os.Getenv("GITHUB_TOKEN")
+	}
+	hc := &http.Client{}
+	if len(httpClient) > 0 && httpClient[0] != nil {
+		hc = httpClient[0]
 	}
 	return &Client{
 		owner:      owner,
 		repo:       repo,
 		token:      token,
-		httpClient: &http.Client{},
+		httpClient: hc,
 		baseURL:    "https://api.github.com",
 	}
 }

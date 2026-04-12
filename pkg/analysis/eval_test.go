@@ -7,12 +7,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/kamilpajak/heisenberg/internal/vcr"
 	"github.com/kamilpajak/heisenberg/pkg/analysis"
 	"github.com/kamilpajak/heisenberg/pkg/azure"
 	"github.com/kamilpajak/heisenberg/pkg/ci"
@@ -92,24 +94,75 @@ type evalEntry struct {
 	RCAs             []llm.RootCauseAnalysis `json:"rca_details"`
 }
 
-// buildEvalProvider creates the appropriate CI provider from ground truth config.
-func buildEvalProvider(t *testing.T, gt groundTruth) ci.Provider {
+// setupVCR creates a VCR recorder for the given test case. In record mode
+// (HEISENBERG_EVAL_RECORD=1), real API calls are made and saved. In replay
+// mode (default), cached responses are used without network calls.
+func setupVCR(t *testing.T, caseName string) *http.Client {
 	t.Helper()
+
+	cassettePath := filepath.Join("..", "..", "testdata", "e2e", "cassettes", caseName)
+
+	mode := vcr.ModeReplay
+	if os.Getenv("HEISENBERG_EVAL_RECORD") == "1" {
+		mode = vcr.ModeRecord
+	}
+
+	scrub := vcr.WithScrub(func(ix *vcr.Interaction) {
+		ix.Request.Header.Del("Authorization")
+		ix.Request.Header.Del("X-Goog-Api-Key")
+		if u := ix.Request.URL; strings.Contains(u, "key=") {
+			parts := strings.SplitN(u, "key=", 2)
+			if len(parts) == 2 {
+				end := strings.IndexByte(parts[1], '&')
+				if end == -1 {
+					ix.Request.URL = parts[0] + "key=REDACTED"
+				} else {
+					ix.Request.URL = parts[0] + "key=REDACTED" + parts[1][end:]
+				}
+			}
+		}
+	})
+
+	r, err := vcr.New(cassettePath, mode, scrub)
+	if err != nil && mode == vcr.ModeReplay {
+		t.Logf("VCR: cassette not found, falling back to record: %v", err)
+		r, err = vcr.New(cassettePath, vcr.ModeRecord, scrub)
+	}
+	require.NoError(t, err)
+	t.Logf("VCR: mode=%d cassette=%s", mode, cassettePath)
+
+	t.Cleanup(func() {
+		if err := r.Stop(); err != nil {
+			t.Logf("VCR: stop error: %v", err)
+		}
+	})
+	return r.HTTPClient()
+}
+
+func buildEvalProvider(t *testing.T, gt groundTruth, httpClient *http.Client) ci.Provider {
+	t.Helper()
+	isReplay := httpClient != nil && os.Getenv("HEISENBERG_EVAL_RECORD") != "1"
 	switch gt.Provider {
 	case "azure":
 		pat := os.Getenv("AZURE_DEVOPS_PAT")
-		if pat == "" {
+		if pat == "" && !isReplay {
 			t.Skip("AZURE_DEVOPS_PAT not set")
 		}
-		return azure.NewClient(gt.AzureOrg, gt.AzureProject, pat)
+		if pat == "" {
+			pat = "vcr-replay"
+		}
+		return azure.NewClient(gt.AzureOrg, gt.AzureProject, pat, httpClient)
 	default: // "github" or empty
 		token := os.Getenv("GITHUB_TOKEN")
-		if token == "" {
+		if token == "" && !isReplay {
 			t.Skip("GITHUB_TOKEN not set")
+		}
+		if token == "" {
+			token = "vcr-replay"
 		}
 		parts := strings.SplitN(gt.Repo, "/", 2)
 		require.Len(t, parts, 2, "repo must be owner/name")
-		return github.NewClient(parts[0], parts[1], token)
+		return github.NewClient(parts[0], parts[1], token, httpClient)
 	}
 }
 
@@ -257,10 +310,13 @@ func TestScoreResult_NoDuplicateCounting(t *testing.T) {
 
 func requireEnv(t *testing.T) {
 	t.Helper()
-	if os.Getenv("GOOGLE_API_KEY") == "" {
-		t.Skip("GOOGLE_API_KEY not set")
+	// In VCR replay mode, API keys are not required.
+	if os.Getenv("HEISENBERG_EVAL_RECORD") == "1" || os.Getenv("HEISENBERG_EVAL_VCR") == "0" {
+		if os.Getenv("GOOGLE_API_KEY") == "" {
+			t.Skip("GOOGLE_API_KEY not set (required for live/record mode)")
+		}
 	}
-	// Provider-specific tokens are checked per-case in buildEvalProvider.
+	// In replay mode (default), no env check needed — cassettes provide responses.
 }
 
 func loadGroundTruth(t *testing.T) []groundTruth {
@@ -465,12 +521,28 @@ func TestEval_Suite(t *testing.T) {
 	logPath := filepath.Join("..", "..", "testdata", "e2e", "eval.jsonl")
 	report := evalReport{}
 
+	useVCR := os.Getenv("HEISENBERG_EVAL_RECORD") == "1" || os.Getenv("HEISENBERG_EVAL_VCR") != "0"
+	isReplay := useVCR && os.Getenv("HEISENBERG_EVAL_RECORD") != "1"
+
+	googleAPIKey := os.Getenv("GOOGLE_API_KEY")
+	if googleAPIKey == "" && isReplay {
+		googleAPIKey = "vcr-replay"
+	}
+
 	for _, gt := range cases {
 		gt := gt
 		name := fmt.Sprintf("%s/%d", gt.Repo, gt.RunID)
 
 		t.Run(name, func(t *testing.T) {
-			provider := buildEvalProvider(t, gt)
+			var vcrClient *http.Client
+			var llmOpts []llm.ClientOption
+			if useVCR {
+				cassetteName := strings.ReplaceAll(gt.Repo, "/", "_") + "_" + fmt.Sprint(gt.RunID)
+				vcrClient = setupVCR(t, cassetteName)
+				llmOpts = append(llmOpts, llm.WithHTTPClient(vcrClient))
+			}
+
+			provider := buildEvalProvider(t, gt, vcrClient)
 
 			parts := strings.SplitN(gt.Repo, "/", 2)
 			require.Len(t, parts, 2)
@@ -485,6 +557,8 @@ func TestEval_Suite(t *testing.T) {
 				SnapshotHTML: trace.SnapshotHTML,
 				Model:        model,
 				CI:           provider,
+				GoogleAPIKey: googleAPIKey,
+				LLMOptions:   llmOpts,
 			})
 			emitter.Close()
 			if err != nil {
