@@ -35,6 +35,9 @@ Thumbs.db
 .env.local
 .envrc
 
+# Secrets blocklist (contains private/corporate names)
+.secrets-blocklist
+
 # Ad-hoc e2e test artifacts (baselines are in testdata/e2e/snapshots/)
 result*.json
 e2e-stderr*.log

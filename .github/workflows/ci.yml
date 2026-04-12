@@ -7,6 +7,31 @@ on:
     branches: [main]
 
 jobs:
+  pr-blocklist:
+    name: PR Content Check
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Check PR for blocked terms
+        env:
+          BLOCKLIST: ${{ secrets.PR_BLOCKLIST }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          if [ -z "$BLOCKLIST" ]; then
+            echo "PR_BLOCKLIST secret not set, skipping"
+            exit 0
+          fi
+          pattern=$(echo "$BLOCKLIST" | tr ',' '|')
+          if echo "$PR_TITLE" "$PR_BODY" | grep -iqE "$pattern"; then
+            echo "::error::PR contains blocked corporate/private terms. Review title and body."
+            exit 1
+          fi
+          echo "PR content check passed"
+
   license-boundary:
     name: License Boundary
     runs-on: ubuntu-latest
