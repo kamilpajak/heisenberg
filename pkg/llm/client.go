@@ -70,8 +70,8 @@ func previewExcerpt(s string, maxLen int) string {
 }
 
 const (
-	apiRetries        = 3
-	apiRetryBaseDelay = 2 * time.Second
+	apiRetries        = 5
+	apiRetryBaseDelay = 5 * time.Second
 )
 
 // Client handles Gemini API calls with function calling support.
