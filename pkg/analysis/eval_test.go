@@ -534,10 +534,19 @@ func TestEval_Suite(t *testing.T) {
 		name := fmt.Sprintf("%s/%d", gt.Repo, gt.RunID)
 
 		t.Run(name, func(t *testing.T) {
+			cassetteName := strings.ReplaceAll(gt.Repo, "/", "_") + "_" + fmt.Sprint(gt.RunID)
+			cassettePath := filepath.Join("..", "..", "testdata", "e2e", "cassettes", cassetteName+".json.gz")
+
+			// In record mode, skip cases that already have a cassette.
+			if os.Getenv("HEISENBERG_EVAL_RECORD") == "1" {
+				if _, err := os.Stat(cassettePath); err == nil {
+					t.Skipf("cassette exists, skipping re-record")
+				}
+			}
+
 			var vcrClient *http.Client
 			var llmOpts []llm.ClientOption
 			if useVCR {
-				cassetteName := strings.ReplaceAll(gt.Repo, "/", "_") + "_" + fmt.Sprint(gt.RunID)
 				vcrClient = setupVCR(t, cassetteName)
 				llmOpts = append(llmOpts, llm.WithHTTPClient(vcrClient))
 			}
