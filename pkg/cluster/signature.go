@@ -6,9 +6,15 @@ import (
 	"unicode"
 )
 
-// maxLogTail is the number of bytes from the end of a log to scan for errors.
-// Most CI failures appear near the end of the output.
-const maxLogTail = 30000
+const (
+	// maxLogTail is the number of bytes from the end of a log to scan for errors.
+	// Most CI failures appear near the end of the output.
+	maxLogTail = 30000
+
+	// maxTopFrames caps the distinct stack-frame locations captured per signature.
+	// Used by semantic clustering to compare top-of-stack context.
+	maxTopFrames = 3
+)
 
 // GitHub Actions timestamp prefix: 2024-01-15T10:30:00.1234567Z
 var timestampRe = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z\s?`)
@@ -128,14 +134,7 @@ func tryStackTrace(text string) ErrorSignature {
 			}
 			m := matches[idx]
 			raw := m[0]
-			location := m[1]
-			if len(m) > 2 {
-				// Python: File + line combined
-				location = m[1] + ":" + m[2]
-			}
-			// Strip directory, keep filename:line
-			parts := strings.Split(location, "/")
-			short := parts[len(parts)-1]
+			short := shortFrame(m)
 
 			norm := normalize(short)
 			return ErrorSignature{
@@ -143,10 +142,41 @@ func tryStackTrace(text string) ErrorSignature {
 				Normalized: norm,
 				RawExcerpt: raw,
 				Tokens:     tokenize(norm),
+				TopFrames:  collectTopFrames(matches),
 			}
 		}
 	}
 	return ErrorSignature{}
+}
+
+// shortFrame extracts the filename:line from a stack-trace regex match.
+func shortFrame(m []string) string {
+	location := m[1]
+	if len(m) > 2 {
+		// Python: File + line combined
+		location = m[1] + ":" + m[2]
+	}
+	parts := strings.Split(location, "/")
+	return parts[len(parts)-1]
+}
+
+// collectTopFrames returns up to maxTopFrames distinct short frame locations
+// in log order.
+func collectTopFrames(matches [][]string) []string {
+	seen := make(map[string]bool, maxTopFrames)
+	var frames []string
+	for _, m := range matches {
+		f := shortFrame(m)
+		if f == "" || seen[f] {
+			continue
+		}
+		seen[f] = true
+		frames = append(frames, f)
+		if len(frames) >= maxTopFrames {
+			break
+		}
+	}
+	return frames
 }
 
 func tryErrorMessage(text string) ErrorSignature {

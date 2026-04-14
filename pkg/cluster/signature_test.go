@@ -8,6 +8,46 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestExtractSignature_TopFrames_Go(t *testing.T) {
+	log := `2026-03-29T10:00:00.1234567Z goroutine 1 [running]:
+2026-03-29T10:00:00.1234567Z main.init.func1()
+2026-03-29T10:00:00.1234567Z 	/home/runner/work/proj/main.go:42 +0x1a4
+2026-03-29T10:00:00.1234567Z main.main()
+2026-03-29T10:00:00.1234567Z 	/home/runner/work/proj/main.go:10 +0x20
+2026-03-29T10:00:00.1234567Z 	/home/runner/work/proj/config.go:88 +0x10`
+
+	sig := ExtractSignature(log)
+	require.Equal(t, "stack_trace", sig.Category)
+	require.NotEmpty(t, sig.TopFrames)
+	assert.LessOrEqual(t, len(sig.TopFrames), 3, "cap at 3 frames")
+	// First frame (crash site) must always be present.
+	assert.Contains(t, sig.TopFrames[0], "main.go:42")
+}
+
+func TestExtractSignature_TopFrames_Python(t *testing.T) {
+	log := `2026-03-29T10:00:00.1234567Z Traceback (most recent call last):
+2026-03-29T10:00:00.1234567Z   File "/app/tests/helpers.py", line 10, in setup
+2026-03-29T10:00:00.1234567Z   File "/app/tests/test_login.py", line 42, in test_login
+2026-03-29T10:00:00.1234567Z   File "/app/tests/shared.py", line 88, in assert_status
+2026-03-29T10:00:00.1234567Z AssertionError: assert 500 == 200`
+
+	sig := ExtractSignature(log)
+	require.Equal(t, "stack_trace", sig.Category)
+	require.NotEmpty(t, sig.TopFrames)
+	// TopFrames should contain distinct filenames (up to 3).
+	seen := map[string]bool{}
+	for _, f := range sig.TopFrames {
+		seen[f] = true
+	}
+	assert.Equal(t, len(sig.TopFrames), len(seen), "frames must be distinct")
+}
+
+func TestExtractSignature_TopFrames_EmptyForNonStackTrace(t *testing.T) {
+	log := `Process completed with exit code 2.`
+	sig := ExtractSignature(log)
+	assert.Empty(t, sig.TopFrames, "non-stack-trace signatures have no frames")
+}
+
 func TestExtractSignature_ExitCode(t *testing.T) {
 	log := `2026-03-29T10:00:00.1234567Z Running tests...
 2026-03-29T10:00:05.1234567Z FAIL

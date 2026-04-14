@@ -191,13 +191,13 @@ func TestFindSingletons(t *testing.T) {
 }
 
 func TestUnionFind(t *testing.T) {
-	uf := newUnionFind(5)
-	uf.union(0, 1)
-	uf.union(2, 3)
-	uf.union(1, 3)
+	uf := NewUnionFind(5)
+	uf.Union(0, 1)
+	uf.Union(2, 3)
+	uf.Union(1, 3)
 
-	assert.Equal(t, uf.find(0), uf.find(3), "0,1,2,3 should be in same set")
-	assert.NotEqual(t, uf.find(0), uf.find(4), "4 should be separate")
+	assert.Equal(t, uf.Find(0), uf.Find(3), "0,1,2,3 should be in same set")
+	assert.NotEqual(t, uf.Find(0), uf.Find(4), "4 should be separate")
 }
 
 // repeatWord returns a unique word for index i.

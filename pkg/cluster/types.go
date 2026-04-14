@@ -9,6 +9,7 @@ type ErrorSignature struct {
 	Normalized string   // normalized error string for comparison
 	RawExcerpt string   // original text excerpt (for LLM context)
 	Tokens     []string // tokenized form for Jaccard similarity
+	TopFrames  []string // up to 3 distinct stack frame locations (stack_trace only)
 }
 
 // FailureInfo holds extracted failure data for one job.
