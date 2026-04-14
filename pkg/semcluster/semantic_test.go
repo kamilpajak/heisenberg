@@ -11,6 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const diskFullExcerpt = "disk full"
+
 // fakeEmbedder returns canned vectors per input text. Thread-safe so the
 // parallel embedSingletons path can be exercised under -race.
 type fakeEmbedder struct {
@@ -55,7 +57,7 @@ func TestSemanticStage_MergesNearDuplicates(t *testing.T) {
 	// A and B are cosine-close; C is orthogonal.
 	aText := ComputeClusterEmbeddingText(singletonCluster(1, "a1", "auth failed").Signature)
 	bText := ComputeClusterEmbeddingText(singletonCluster(2, "a2", "auth error").Signature)
-	cText := ComputeClusterEmbeddingText(singletonCluster(3, "different", "disk full").Signature)
+	cText := ComputeClusterEmbeddingText(singletonCluster(3, "different", diskFullExcerpt).Signature)
 
 	embedder := &fakeEmbedder{byText: map[string][]float32{
 		aText: {1, 0, 0},
@@ -67,7 +69,7 @@ func TestSemanticStage_MergesNearDuplicates(t *testing.T) {
 	in := []pkgcluster.Cluster{
 		singletonCluster(1, "a1", "auth failed"),
 		singletonCluster(2, "a2", "auth error"),
-		singletonCluster(3, "different", "disk full"),
+		singletonCluster(3, "different", diskFullExcerpt),
 	}
 
 	out, err := stage.Refine(context.Background(), in)
@@ -120,7 +122,7 @@ func TestSemanticStage_SkipsMultiMemberClusters(t *testing.T) {
 			{JobID: 10}, {JobID: 11},
 		},
 	}
-	sing := singletonCluster(2, "other", "disk full")
+	sing := singletonCluster(2, "other", diskFullExcerpt)
 
 	embedder := &fakeEmbedder{byText: map[string][]float32{}}
 	stage := SemanticStage{Embedder: embedder, Threshold: 0.9}

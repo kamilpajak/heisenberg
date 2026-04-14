@@ -6,12 +6,14 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+const testFailedLiteral = "test failed"
+
 func TestAntonymGuardrail_BlocksOppositeOutcomes(t *testing.T) {
 	cases := []struct {
 		name string
 		a, b string
 	}{
-		{"pass vs fail", "test passed", "test failed"},
+		{"pass vs fail", "test passed", testFailedLiteral},
 		{"succeed vs fail", "build succeeded", "build failed"},
 		{"complete vs fail", "job completed", "job failed"},
 		{"ok vs error", "status: ok", "status: error"},
@@ -46,10 +48,10 @@ func TestAntonymGuardrail_AllowsSamePolarity(t *testing.T) {
 }
 
 func TestAntonymGuardrail_CaseInsensitive(t *testing.T) {
-	assert.True(t, antonymGuardrail("Test PASSED", "test failed"))
+	assert.True(t, antonymGuardrail("Test PASSED", testFailedLiteral))
 }
 
 func TestAntonymGuardrail_RequiresWordBoundary(t *testing.T) {
 	// "passed" in "compassed" should NOT trigger a false antonym match.
-	assert.False(t, antonymGuardrail("compassed value", "test failed"))
+	assert.False(t, antonymGuardrail("compassed value", testFailedLiteral))
 }

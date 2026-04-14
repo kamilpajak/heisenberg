@@ -99,20 +99,24 @@ func (s SemanticStage) mergeByCosine(uf *pkgcluster.UnionFind, clusters []pkgclu
 				return
 			}
 			comparisons++
-			ci, cj := singletons[i], singletons[j]
-			if uf.Find(ci) == uf.Find(cj) {
-				continue
+			if s.shouldMerge(uf, clusters, singletons[i], singletons[j], embeddings) {
+				uf.Union(singletons[i], singletons[j])
 			}
-			sim := cosineSimilarity(embeddings[ci], embeddings[cj])
-			if sim < s.Threshold {
-				continue
-			}
-			if antonymGuardrail(clusters[ci].Signature.RawExcerpt, clusters[cj].Signature.RawExcerpt) {
-				continue
-			}
-			uf.Union(ci, cj)
 		}
 	}
+}
+
+func (s SemanticStage) shouldMerge(uf *pkgcluster.UnionFind, clusters []pkgcluster.Cluster, ci, cj int, embeddings map[int][]float32) bool {
+	if uf.Find(ci) == uf.Find(cj) {
+		return false
+	}
+	if cosineSimilarity(embeddings[ci], embeddings[cj]) < s.Threshold {
+		return false
+	}
+	if antonymGuardrail(clusters[ci].Signature.RawExcerpt, clusters[cj].Signature.RawExcerpt) {
+		return false
+	}
+	return true
 }
 
 func rebuild(uf *pkgcluster.UnionFind, clusters []pkgcluster.Cluster) []pkgcluster.Cluster {
