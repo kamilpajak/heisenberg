@@ -1,0 +1,151 @@
+name: Eval Live A/B
+
+# Live Gemini-API eval comparing baseline vs experimental feature flags.
+# VCR replay can't measure input-change effects (frozen responses), so we
+# need live calls to quantify #58 (weighted log preprocessing) and #59
+# (semantic clustering). Gemini's 503 "high demand" can make interactive
+# runs unreliable, so this workflow runs asynchronously off the dev path.
+#
+# Required repo secret:
+#   GOOGLE_API_KEY — Gemini API key for live embed + LLM calls.
+# The built-in GITHUB_TOKEN is used for GitHub artifact fetches.
+#
+# Results land in a per-variant JSON summary uploaded as a workflow artifact.
+
+on:
+  schedule:
+    # Mondays 06:00 UTC — off-peak for Gemini, before working hours.
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+    inputs:
+      tier:
+        description: 'Ground truth subset'
+        type: choice
+        options: [smoke, full]
+        default: smoke
+      variants:
+        description: 'Comma-separated variants (baseline,weighted,semantic)'
+        type: string
+        default: 'baseline,weighted,semantic'
+
+jobs:
+  eval:
+    name: Eval ${{ matrix.variant }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      contents: read
+    if: ${{ github.event_name != 'workflow_dispatch' || contains(github.event.inputs.variants, matrix.variant) }}
+    strategy:
+      fail-fast: false
+      # Keep parallel=1 to stay under Gemini per-minute quotas.
+      max-parallel: 1
+      matrix:
+        variant: [baseline, weighted, semantic]
+
+    env:
+      GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      HEISENBERG_EVAL_VCR: '0'
+      HEISENBERG_EVAL_TIER: ${{ github.event.inputs.tier || 'smoke' }}
+
+    steps:
+      - name: Preflight — require GOOGLE_API_KEY
+        run: |
+          if [ -z "$GOOGLE_API_KEY" ]; then
+            echo "::error::GOOGLE_API_KEY secret not set; skipping live eval."
+            exit 1
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Set variant flags
+        id: flags
+        run: |
+          case "${{ matrix.variant }}" in
+            baseline)
+              echo "env_exports=" >> "$GITHUB_OUTPUT"
+              ;;
+            weighted)
+              echo "env_exports=HEISENBERG_LOG_WEIGHTED=1" >> "$GITHUB_OUTPUT"
+              ;;
+            semantic)
+              echo "env_exports=HEISENBERG_SEMANTIC_CLUSTERING=1" >> "$GITHUB_OUTPUT"
+              ;;
+          esac
+
+      - name: Run live eval
+        id: eval
+        run: |
+          mkdir -p eval-results
+          set -o pipefail
+          env ${{ steps.flags.outputs.env_exports }} \
+            go test ./pkg/analysis/ -tags eval \
+              -run TestEval_Suite -v -timeout 110m \
+            2>&1 | tee "eval-results/${{ matrix.variant }}.log"
+
+      - name: Extract metrics
+        if: always()
+        run: |
+          LOG="eval-results/${{ matrix.variant }}.log"
+          SUMMARY="eval-results/${{ matrix.variant }}.json"
+          MEAN=$(grep -oE 'Mean score: [0-9.]+%' "$LOG" | tail -1 | awk '{print $3}' || echo "null")
+          CAT=$(grep -oE 'Category accuracy: [0-9.]+%' "$LOG" | tail -1 | awk '{print $3}' || echo "null")
+          SCORED=$(grep -cE '^\s*eval_test\.go:.*score=' "$LOG" || true)
+          cat > "$SUMMARY" <<EOF
+          {
+            "variant": "${{ matrix.variant }}",
+            "tier": "${HEISENBERG_EVAL_TIER}",
+            "mean_score": "$MEAN",
+            "category_accuracy": "$CAT",
+            "cases_scored": $SCORED,
+            "run_id": "${{ github.run_id }}",
+            "commit_sha": "${{ github.sha }}"
+          }
+          EOF
+          cat "$SUMMARY"
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-${{ matrix.variant }}
+          path: eval-results/
+          retention-days: 90
+
+  summary:
+    name: Eval summary
+    needs: eval
+    runs-on: ubuntu-latest
+    if: always()
+    permissions:
+      contents: read
+    steps:
+      - name: Download all results
+        uses: actions/download-artifact@v4
+        with:
+          path: results/
+          pattern: eval-*
+          merge-multiple: true
+
+      - name: Write combined summary
+        run: |
+          echo "## Eval A/B results" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Variant | Mean score | Category accuracy | Cases |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---|---|---|" >> "$GITHUB_STEP_SUMMARY"
+          for f in results/*.json; do
+            [ -f "$f" ] || continue
+            V=$(jq -r '.variant' "$f")
+            M=$(jq -r '.mean_score' "$f")
+            C=$(jq -r '.category_accuracy' "$f")
+            N=$(jq -r '.cases_scored' "$f")
+            echo "| $V | $M | $C | $N |" >> "$GITHUB_STEP_SUMMARY"
+          done
