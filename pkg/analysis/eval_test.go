@@ -202,12 +202,13 @@ func TestScoreCase_AllMatch(t *testing.T) {
 }
 
 func TestScoreCase_CategoryOnly(t *testing.T) {
-	// failure_type wrong, bug_location wrong — but we only score these two axes
+	// failure_type unrelated (assertion vs timeout = 0), bug_location partial (test vs production = 0.3)
 	score := scoreCase(
 		expectedAnalysis{FailureType: "timeout", BugLocation: "test"},
 		llm.RootCauseAnalysis{FailureType: "assertion", BugLocation: llm.BugLocationProduction},
 	)
-	assert.InDelta(t, 0.0, score, 0.01)
+	// 0.3 * 0.0 + 0.5 * 0.3 = 0.15 / 0.8 ≈ 0.1875
+	assert.InDelta(t, 0.1875, score, 0.01)
 }
 
 func TestScoreCase_FailureTypeOnly(t *testing.T) {
@@ -215,8 +216,8 @@ func TestScoreCase_FailureTypeOnly(t *testing.T) {
 		expectedAnalysis{FailureType: "timeout", BugLocation: "test"},
 		llm.RootCauseAnalysis{FailureType: "timeout", BugLocation: llm.BugLocationProduction},
 	)
-	// failure_type matches (0.3/0.8), bug_location doesn't (0.0/0.8)
-	assert.InDelta(t, 0.375, score, 0.01)
+	// failure_type exact (0.3 * 1.0), bug_location partial (0.5 * 0.3) = 0.45 / 0.8 ≈ 0.5625
+	assert.InDelta(t, 0.5625, score, 0.01)
 }
 
 func TestScoreCase_BugLocationOnly(t *testing.T) {
@@ -265,6 +266,79 @@ func TestScoreSuite_AggregateReport(t *testing.T) {
 	assert.Equal(t, 3, report.totalCases)
 	assert.InDelta(t, 90.0, report.avgConfidenceCorrect(), 0.1)
 	assert.InDelta(t, 80.0, report.avgConfidenceWrong(), 0.1)
+}
+
+// --- Semantic similarity ---
+
+func TestFailureTypeSimilarity(t *testing.T) {
+	tests := []struct {
+		name    string
+		a, b    string
+		wantMin float64
+		wantMax float64
+	}{
+		{"exact match", "assertion", "assertion", 1.0, 1.0},
+		{"network≈infra", "network", "infra", 0.4, 0.7},
+		{"infra≈network", "infra", "network", 0.4, 0.7},
+		{"timeout≈infra", "timeout", "infra", 0.2, 0.4},
+		{"network≈timeout", "network", "timeout", 0.2, 0.4},
+		{"assertion vs network", "assertion", "network", 0.0, 0.1},
+		{"assertion vs timeout", "assertion", "timeout", 0.0, 0.1},
+		{"flake vs assertion", "flake", "assertion", 0.0, 0.1},
+		{"empty string", "", "assertion", 0.0, 0.0},
+		{"unknown type", "assertion", "unknown", 0.0, 0.0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sim := failureTypeSimilarity(tt.a, tt.b)
+			assert.GreaterOrEqual(t, sim, tt.wantMin, "similarity too low")
+			assert.LessOrEqual(t, sim, tt.wantMax, "similarity too high")
+		})
+	}
+}
+
+func TestBugLocationSimilarity(t *testing.T) {
+	tests := []struct {
+		name    string
+		a, b    string
+		wantMin float64
+		wantMax float64
+	}{
+		{"exact match", "production", "production", 1.0, 1.0},
+		{"production≈test", "production", "test", 0.2, 0.5},
+		{"test≈production", "test", "production", 0.2, 0.5},
+		{"infra vs production", "infrastructure", "production", 0.0, 0.2},
+		{"infra vs test", "infrastructure", "test", 0.0, 0.2},
+		{"empty string", "", "test", 0.0, 0.0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sim := bugLocationSimilarity(tt.a, tt.b)
+			assert.GreaterOrEqual(t, sim, tt.wantMin, "similarity too low")
+			assert.LessOrEqual(t, sim, tt.wantMax, "similarity too high")
+		})
+	}
+}
+
+func TestScoreCase_SemanticPartialCredit(t *testing.T) {
+	// network expected, model returns infra — should get partial credit, not zero
+	score := scoreCase(
+		expectedAnalysis{FailureType: "network", BugLocation: "infrastructure"},
+		llm.RootCauseAnalysis{FailureType: "infra", BugLocation: llm.BugLocationInfrastructure},
+	)
+	// bug_location exact match (full credit), failure_type partial (~0.5)
+	assert.Greater(t, score, 0.5, "network→infra should get partial credit")
+}
+
+func TestScoreCase_UnrelatedNoCredit(t *testing.T) {
+	// assertion expected, model returns timeout — no partial credit
+	score := scoreCase(
+		expectedAnalysis{FailureType: "assertion", BugLocation: "test"},
+		llm.RootCauseAnalysis{FailureType: "timeout", BugLocation: llm.BugLocationProduction},
+	)
+	// assertion→timeout = 0 similarity, production→test = 0.3 similarity
+	// 0.3 * 0.0 + 0.5 * 0.3 = 0.15 / 0.8 ≈ 0.1875
+	assert.Less(t, score, 0.2, "assertion→timeout should get minimal credit")
 }
 
 func TestScoreResult_PartialMatch(t *testing.T) {
@@ -345,23 +419,74 @@ const (
 	weightFilePath    = 0.2
 )
 
+// failureTypeSimilarity returns a similarity score (0.0-1.0) between two failure types.
+// Related categories (e.g., network≈infra) receive partial credit.
+func failureTypeSimilarity(a, b string) float64 {
+	if a == "" || b == "" {
+		return 0
+	}
+	if a == b {
+		return 1.0
+	}
+	// Symmetric lookup: normalize pair order.
+	pair := [2]string{a, b}
+	if pair[0] > pair[1] {
+		pair[0], pair[1] = pair[1], pair[0]
+	}
+	sim, ok := failureTypeSimilarityMatrix[pair]
+	if !ok {
+		return 0
+	}
+	return sim
+}
+
+// failureTypeSimilarityMatrix defines semantic similarity between failure types.
+// Keys are sorted alphabetically to ensure symmetric lookup.
+var failureTypeSimilarityMatrix = map[[2]string]float64{
+	{"infra", "network"}:   0.5, // both external/environment — high overlap
+	{"infra", "timeout"}:   0.3, // both resource/timing related
+	{"network", "timeout"}: 0.3, // network timeouts overlap
+	{"flake", "timeout"}:   0.2, // flakes can manifest as timeouts
+}
+
+// bugLocationSimilarity returns a similarity score (0.0-1.0) between two bug locations.
+func bugLocationSimilarity(a, b string) float64 {
+	if a == "" || b == "" {
+		return 0
+	}
+	if a == b {
+		return 1.0
+	}
+	pair := [2]string{a, b}
+	if pair[0] > pair[1] {
+		pair[0], pair[1] = pair[1], pair[0]
+	}
+	sim, ok := bugLocationSimilarityMatrix[pair]
+	if !ok {
+		return 0
+	}
+	return sim
+}
+
+// bugLocationSimilarityMatrix defines semantic similarity between bug locations.
+var bugLocationSimilarityMatrix = map[[2]string]float64{
+	{"production", "test"}: 0.3, // both are "code" (vs infrastructure)
+}
+
 // scoreCase returns a weighted score (0.0-1.0) for how well an RCA matches expected.
+// Uses semantic similarity for partial credit on related categories.
 func scoreCase(exp expectedAnalysis, rca llm.RootCauseAnalysis) float64 {
 	totalWeight := 0.0
 	earned := 0.0
 
 	if exp.FailureType != "" {
 		totalWeight += weightFailureType
-		if rca.FailureType == exp.FailureType {
-			earned += weightFailureType
-		}
+		earned += weightFailureType * failureTypeSimilarity(exp.FailureType, rca.FailureType)
 	}
 
 	if exp.BugLocation != "" {
 		totalWeight += weightBugLocation
-		if string(rca.BugLocation) == exp.BugLocation {
-			earned += weightBugLocation
-		}
+		earned += weightBugLocation * bugLocationSimilarity(exp.BugLocation, string(rca.BugLocation))
 	}
 
 	if exp.FilePathContains != "" {
