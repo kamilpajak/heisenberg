@@ -2,7 +2,9 @@
   "case_id": "gh-BrokkAi-brokk-23952164546",
   "repo": "BrokkAi/brokk",
   "run_id": 23952164546,
-  "tags": [],
+  "tags": [
+    "smoke"
+  ],
   "transition": {
     "failing_commit": "19bbafd4db6749b7eeac1266aa5fc4d88e675bb5",
     "fix_commit": "47db1738011304f3763ede09b379bf0c9e62202d",

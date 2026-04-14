@@ -1,0 +1,45 @@
+{
+  "case_id": "gh-apache-streampipes-24073266600",
+  "repo": "apache/streampipes",
+  "run_id": 24073266600,
+  "tags": [],
+  "transition": {
+    "failing_commit": "a1763fe790bdad831b351f207230b6390bf6dc43",
+    "fix_commit": "b73db0f33616d2400a863e9f353cfe27cbdb79af",
+    "pr_url": "https://github.com/apache/streampipes/pull/4355",
+    "pr_title": "fix: Fix connect e2e tests",
+    "files_changed": [
+      "ui/cypress/tests/connect/rules/schemaRules.smoke.spec.ts",
+      "ui/cypress/tests/connect/rules/valueRules.spec.ts"
+    ],
+    "fix_size_lines": 4
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix: Fix connect e2e tests",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "test"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "Vague PR title \u2014 actual_cause needs human review",
+    "llm_correlation": "YES\nThe test failure log shows a failure in `chart/addAssetToDashboard.smoke.spe.c.ts`, which is likely a connect e2e test. The diff modifies `ConnectUtils.setUpPreprocessingRuleTest` in the connect t"
+  }
+}

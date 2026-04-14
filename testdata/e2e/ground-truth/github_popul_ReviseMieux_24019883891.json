@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-popul-ReviseMieux-24019883891",
+  "repo": "popul/ReviseMieux",
+  "run_id": 24019883891,
+  "tags": [],
+  "transition": {
+    "failing_commit": "38a09af8c402262cd240f645011e1b5dff5f135f",
+    "fix_commit": "aa1d26092c830030ecd4d9cb6b1c1c5cc93194eb",
+    "pr_url": "https://github.com/popul/ReviseMieux/pull/77",
+    "pr_title": "fix(ci): integration test feedback loop (#74)",
+    "files_changed": [
+      ".github/workflows/integration.yml"
+    ],
+    "fix_size_lines": 9
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix(ci): integration test feedback loop (#74)",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "timeout",
+        "bug_location": "infrastructure"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES\nThe log shows the CI running docker commands to set up a postgres database, which is used by integration tests. The diff modifies the command used to run the integration tests (`go test -tags=inte"
+  }
+}

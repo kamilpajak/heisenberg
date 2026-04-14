@@ -8,6 +8,19 @@ pre-commit:
     lint:
       run: golangci-lint run --timeout=5m
 
+    secrets-blocklist:
+      run: |
+        if [ ! -f .secrets-blocklist ]; then exit 0; fi
+        pattern=$(grep -v '^$' .secrets-blocklist | paste -sd'|' -)
+        if [ -z "$pattern" ]; then exit 0; fi
+        matches=$(git diff --cached --diff-filter=d -U0 | grep -iE "^\+" | grep -v "^+++" | grep -iE "$pattern" || true)
+        if [ -n "$matches" ]; then
+          echo "Blocked: staged changes contain corporate/private names:"
+          echo "$matches"
+          echo "Edit .secrets-blocklist to manage the list."
+          exit 1
+        fi
+
 pre-push:
   parallel: true
   commands:

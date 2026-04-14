@@ -1,0 +1,45 @@
+{
+  "case_id": "gh-curdriceaurora-Local-File-Organizer-23989450684",
+  "repo": "curdriceaurora/Local-File-Organizer",
+  "run_id": 23989450684,
+  "tags": [],
+  "transition": {
+    "failing_commit": "d7cf9e9c2a4a406a7632197bbb7b6c958f9a5774",
+    "fix_commit": "f60dc7c2b014436b89ee57ff4e4f80897067a279",
+    "pr_url": "https://github.com/curdriceaurora/Local-File-Organizer/pull/1123",
+    "pr_title": "fix(shard5): resolve 4 failing tests on main (#1121)",
+    "files_changed": [
+      "src/file_organizer/config/manager.py",
+      "tests/config/test_config_manager_coverage.py"
+    ],
+    "fix_size_lines": 6
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix(shard5): resolve 4 failing tests on main (#1121)",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "timeout",
+        "bug_location": "production"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "",
+    "llm_correlation": "YES\nThe diff modifies the `ConfigManager` class, specifically the `save` method, to handle errors when loading existing config files. The test failure log shows errors related to reading and parsing Y"
+  }
+}

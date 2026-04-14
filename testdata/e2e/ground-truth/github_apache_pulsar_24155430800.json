@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-apache-pulsar-24155430800",
+  "repo": "apache/pulsar",
+  "run_id": 24155430800,
+  "tags": [],
+  "transition": {
+    "failing_commit": "bcf6cddd64b5f339f0b5a2b5b3df8932226b4ae2",
+    "fix_commit": "57e58c5007836803163075bd7e0dc2c002c08062",
+    "pr_url": "https://github.com/apache/pulsar/pull/25495",
+    "pr_title": "[fix][test] Fix flaky ManagedLedgerTest.testNoRetention and testInvalidateReadHandleWhenDeleteLedger",
+    "files_changed": [
+      "managed-ledger/src/test/java/org/apache/bookkeeper/mledger/impl/ManagedLedgerTest.java"
+    ],
+    "fix_size_lines": 4
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "[fix][test] Fix flaky ManagedLedgerTest.testNoRetention and testInvalidateReadHandleWhenDeleteLedger",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "production"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES\nThe PR title indicates that the change fixes flaky tests `ManagedLedgerTest.testNoRetention` and `testInvalidateReadHandleWhenDeleteLedger`. The diff removes the `invocationCount = 10` from these "
+  }
+}

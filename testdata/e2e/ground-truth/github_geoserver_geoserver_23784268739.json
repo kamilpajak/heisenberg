@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-geoserver-geoserver-23784268739",
+  "repo": "geoserver/geoserver",
+  "run_id": 23784268739,
+  "tags": [],
+  "transition": {
+    "failing_commit": "f1638411ebbe2e8829996249319eb658548e84b8",
+    "fix_commit": "99bfbb9b4c5304952d7df579de35bb81d3f3e0bb",
+    "pr_url": "https://github.com/geoserver/geoserver/pull/9237",
+    "pr_title": "[GEOS-12063] Fix form layout, broken icon in layer group table",
+    "files_changed": [
+      "src/web/core/src/main/java/org/geoserver/web/data/layergroup/LayerGroupEntryPanel.java"
+    ],
+    "fix_size_lines": 23
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "[GEOS-12063] Fix form layout, broken icon in layer group table",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "production"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "",
+    "llm_correlation": "YES\nThe PR title indicates a fix for a broken icon in the layer group table, and the diff modifies code related to displaying and removing items in the layer group table, including the icon used for t"
+  }
+}

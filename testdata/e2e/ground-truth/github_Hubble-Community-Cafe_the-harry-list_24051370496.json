@@ -1,0 +1,47 @@
+{
+  "case_id": "gh-Hubble-Community-Cafe-the-harry-list-24051370496",
+  "repo": "Hubble-Community-Cafe/the-harry-list",
+  "run_id": 24051370496,
+  "tags": [],
+  "transition": {
+    "failing_commit": "e001965512ce8595594e28dc7788108c3095c42a",
+    "fix_commit": "4b30b6dc8ce84939317ef9507d80574a46c52095",
+    "pr_url": "https://github.com/Hubble-Community-Cafe/the-harry-list/pull/142",
+    "pr_title": "truncate OWASP IDs to fix Github pipeline",
+    "files_changed": [
+      ".github/workflows/security.yml",
+      "the-harry-list-admin/package.json",
+      "the-harry-list-backend/pom.xml",
+      "the-harry-list-public/package.json"
+    ],
+    "fix_size_lines": 26
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "truncate OWASP IDs to fix Github pipeline",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "infrastructure"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "hard",
+    "notes": "",
+    "llm_correlation": "YES. The PR title and the diff content clearly indicate that the change is aimed at truncating long SARIF rule IDs, specifically OWASP IDs, to fix a GitHub pipeline issue. The diff includes a Python s"
+  }
+}

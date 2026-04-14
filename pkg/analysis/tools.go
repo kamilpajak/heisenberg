@@ -9,6 +9,7 @@ import (
 	"github.com/kamilpajak/heisenberg/pkg/ci"
 	gh "github.com/kamilpajak/heisenberg/pkg/github"
 	"github.com/kamilpajak/heisenberg/pkg/llm"
+	"github.com/kamilpajak/heisenberg/pkg/logclean"
 	"github.com/kamilpajak/heisenberg/pkg/trace"
 )
 
@@ -112,11 +113,7 @@ func (h *ToolHandler) getJobLogs(ctx context.Context, args map[string]any) (stri
 		return errorResult(err), false, nil
 	}
 
-	// Truncate large logs
-	const maxLen = 80000
-	if len(logs) > maxLen {
-		logs = logs[len(logs)-maxLen:]
-	}
+	logs, _ = logclean.Extract(logs, 80000)
 
 	return logs, false, nil
 }
@@ -218,7 +215,7 @@ func (h *ToolHandler) getRepoFile(ctx context.Context, args map[string]any) (str
 		return errorResult(fmt.Errorf("path is required")), false, nil
 	}
 
-	content, err := h.CI.GetRepoFile(ctx, path)
+	content, err := h.CI.GetRepoFile(ctx, path, h.HeadSHA)
 	if err != nil {
 		if strings.Contains(err.Error(), "404") {
 			// Try cross-repo lookup before falling back to smartNotFound
@@ -257,7 +254,7 @@ func (h *ToolHandler) tryOtherRepos(ctx context.Context, path string) (string, b
 	}
 
 	for _, repo := range h.otherRepos {
-		content, err := crp.GetFileFromRepo(ctx, repo, path)
+		content, err := crp.GetFileFromRepo(ctx, repo, path, "")
 		if err == nil {
 			emitInfo(h.Emitter, fmt.Sprintf("Found %s in %s/%s", path, repo.Project, repo.Repo))
 			return content, true

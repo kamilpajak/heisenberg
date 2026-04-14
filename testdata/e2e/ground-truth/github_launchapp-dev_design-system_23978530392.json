@@ -1,0 +1,45 @@
+{
+  "case_id": "gh-launchapp-dev-design-system-23978530392",
+  "repo": "launchapp-dev/design-system",
+  "run_id": 23978530392,
+  "tags": [],
+  "transition": {
+    "failing_commit": "3c898d6672a6b6df6b4bc1f950ccae9ac123bc08",
+    "fix_commit": "95a3a6f5c0e71e592288605f768c2e24554cfad2",
+    "pr_url": "https://github.com/launchapp-dev/design-system/pull/300",
+    "pr_title": "fix(design-system): fix build, migrate lint to Biome, fix all 11 failing tests",
+    "files_changed": [
+      "src/lib/ai-component-generator-api.test.ts",
+      "src/lib/figma-sync/import.ts"
+    ],
+    "fix_size_lines": 18
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix(design-system): fix build, migrate lint to Biome, fix all 11 failing tests",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "assertion",
+        "bug_location": "production"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-06",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "",
+    "llm_correlation": "YES\nThe PR title indicates that the changes fix failing tests. The diff includes changes to type definitions and data structures used in the tests, which suggests that the original tests were failing "
+  }
+}

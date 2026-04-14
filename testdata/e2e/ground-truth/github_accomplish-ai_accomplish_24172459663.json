@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-accomplish-ai-accomplish-24172459663",
+  "repo": "accomplish-ai/accomplish",
+  "run_id": 24172459663,
+  "tags": [],
+  "transition": {
+    "failing_commit": "1c9c703732d3a6d547fc6aea9f7e4ed951fb3a68",
+    "fix_commit": "7780d8a25be056116ba5ce372170623764180558",
+    "pr_url": "https://github.com/accomplish-ai/accomplish/pull/885",
+    "pr_title": "fix(desktop): update bundled-node test for win32-x64 path format",
+    "files_changed": [
+      "apps/desktop/__tests__/integration/main/utils/bundled-node.integration.test.ts"
+    ],
+    "fix_size_lines": 2
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix(desktop): update bundled-node test for win32-x64 path format",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "assertion",
+        "bug_location": "test"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES. The test failure log shows the test environment is Ubuntu 24.04, but the fix specifically addresses a path issue on Windows (win32-x64). While the log doesn't show the *specific* failure, the dif"
+  }
+}

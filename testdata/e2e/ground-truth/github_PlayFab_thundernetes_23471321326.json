@@ -1,0 +1,46 @@
+{
+  "case_id": "gh-PlayFab-thundernetes-23471321326",
+  "repo": "PlayFab/thundernetes",
+  "run_id": 23471321326,
+  "tags": [
+    "smoke"
+  ],
+  "transition": {
+    "failing_commit": "274fdc7bb046dcfedaa2cf9baf8a457f79925c82",
+    "fix_commit": "569f8cd96605b7ad6b0be40171de8be182f4ede7",
+    "pr_url": "https://github.com/PlayFab/thundernetes/pull/505",
+    "pr_title": "Add unit tests to increase coverage and fix race condition in GameServersQueue",
+    "files_changed": [
+      "pkg/operator/controllers/gameserverqueue.go"
+    ],
+    "fix_size_lines": 11
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "Add unit tests to increase coverage and fix race condition in GameServersQueue",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "timeout",
+        "bug_location": "production"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES\nThe log indicates that GameServers are not found in the cache, leading to their repeated creation. The provided diff addresses a race condition in the `GameServersQueue` which is responsible for m"
+  }
+}

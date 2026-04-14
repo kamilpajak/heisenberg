@@ -1,0 +1,45 @@
+{
+  "case_id": "gh-orime-org-breatic_ai-24169456557",
+  "repo": "orime-org/breatic_ai",
+  "run_id": 24169456557,
+  "tags": [],
+  "transition": {
+    "failing_commit": "a2e6fed02ccddaf6d3a0a8ea70e9aad01ff4286d",
+    "fix_commit": "7e494789ed1b0871e8ff83c674058527a3378ece",
+    "pr_url": "https://github.com/orime-org/breatic_ai/pull/12",
+    "pr_title": "fix: API testing \u2014 dotenv, LLM routing, credit recording",
+    "files_changed": [
+      "packages/server/src/__tests__/agent/spawn.test.ts",
+      "packages/server/src/__tests__/modules/credit.test.ts"
+    ],
+    "fix_size_lines": 8
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix: API testing \u2014 dotenv, LLM routing, credit recording",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "production"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "",
+    "llm_correlation": "YES.\n\nThe diff modifies the credit recording functionality to include `tokensUsed`, `model`, and `provider` information. The PR title also mentions \"credit recording\". While the provided log doesn't e"
+  }
+}

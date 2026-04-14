@@ -404,3 +404,52 @@ func TestApplyConfidenceCaps_InfrastructureBugLocationNotCapped(t *testing.T) {
 	applyConfidenceCaps(result, signals)
 	assert.Equal(t, 95, result.Confidence, "should not cap when LLM correctly identified infra")
 }
+
+func TestApplyConfidenceCaps_LowIterationCap(t *testing.T) {
+	result := &llm.AnalysisResult{Confidence: 100, Category: llm.CategoryDiagnosis}
+	signals := CalibrationSignals{
+		LowIterations: true,
+	}
+
+	applyConfidenceCaps(result, signals)
+	assert.Equal(t, capAmbiguous, result.Confidence, "should cap at 49 when model used very few iterations")
+	assert.Contains(t, result.CalibrationReason, "low_iteration")
+}
+
+func TestApplyConfidenceCaps_LowIterationNotCappedWhenAlreadyBelow(t *testing.T) {
+	result := &llm.AnalysisResult{Confidence: 30, Category: llm.CategoryDiagnosis}
+	signals := CalibrationSignals{
+		LowIterations: true,
+	}
+
+	applyConfidenceCaps(result, signals)
+	assert.Equal(t, 30, result.Confidence, "should not change when already below cap")
+}
+
+func TestComputeSignals_LowIterations(t *testing.T) {
+	result := &llm.AnalysisResult{
+		Category: llm.CategoryDiagnosis,
+		Eval:     &llm.EvalMeta{Iterations: 3},
+		RCAs: []llm.RootCauseAnalysis{{
+			FailureType: llm.FailureTypeAssertion,
+			BugLocation: llm.BugLocationProduction,
+		}},
+	}
+
+	signals := computeSignals(context.Background(), result, nil, nil, &ci.Run{})
+	assert.True(t, signals.LowIterations, "iterations=3 should flag as low")
+}
+
+func TestComputeSignals_NormalIterations(t *testing.T) {
+	result := &llm.AnalysisResult{
+		Category: llm.CategoryDiagnosis,
+		Eval:     &llm.EvalMeta{Iterations: 5},
+		RCAs: []llm.RootCauseAnalysis{{
+			FailureType: llm.FailureTypeAssertion,
+			BugLocation: llm.BugLocationProduction,
+		}},
+	}
+
+	signals := computeSignals(context.Background(), result, nil, nil, &ci.Run{})
+	assert.False(t, signals.LowIterations, "iterations=5 should not flag as low")
+}

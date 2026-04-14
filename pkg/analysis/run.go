@@ -10,6 +10,7 @@ import (
 	"github.com/kamilpajak/heisenberg/pkg/ci"
 	"github.com/kamilpajak/heisenberg/pkg/cluster"
 	"github.com/kamilpajak/heisenberg/pkg/llm"
+	"github.com/kamilpajak/heisenberg/pkg/logclean"
 	"github.com/kamilpajak/heisenberg/pkg/patterns"
 )
 
@@ -25,6 +26,7 @@ type Params struct {
 	CI             ci.Provider
 	GoogleAPIKey   string                  // Google API key override (empty = env var)
 	PatternMatcher patterns.PatternMatcher // nil = no pattern matching
+	LLMOptions     []llm.ClientOption      // Optional LLM client settings (e.g., VCR HTTP client)
 }
 
 // Run executes the full analysis pipeline: resolve run ID, fetch metadata, and
@@ -98,7 +100,7 @@ func Run(ctx context.Context, p Params) (*llm.AnalysisResult, error) {
 	}
 
 	stampRunMeta(result, p, ciRun)
-	calibrateResult(ctx, result, p.CI, jobs, ciRun)
+	result.Calibration = calibrateResult(ctx, result, p.CI, jobs, ciRun)
 	matchPatterns(ctx, p.PatternMatcher, result)
 	return result, err
 }
@@ -134,7 +136,7 @@ func runSingle(ctx context.Context, p Params,
 		artifacts:    artifacts,
 	}
 
-	llmClient, err := llm.NewClient(p.Model, p.GoogleAPIKey)
+	llmClient, err := llm.NewClient(p.Model, p.GoogleAPIKey, p.LLMOptions...)
 	if err != nil {
 		return nil, err
 	}
@@ -164,7 +166,7 @@ func runClustered(ctx context.Context, p Params,
 
 	// Run LLM agent loop per cluster
 	var results []clusterAnalysis
-	llmClient, err := llm.NewClient(p.Model, p.GoogleAPIKey)
+	llmClient, err := llm.NewClient(p.Model, p.GoogleAPIKey, p.LLMOptions...)
 	if err != nil {
 		return nil, err
 	}
@@ -251,11 +253,7 @@ func fetchFailureLogs(ctx context.Context, p Params, failedJobs []ci.Job) []clus
 
 			sig := cluster.ExtractSignature(logText)
 
-			// Keep last 10KB for LLM context
-			logTail := logText
-			if len(logTail) > 10000 {
-				logTail = logTail[len(logTail)-10000:]
-			}
+			logTail, _ := logclean.Extract(logText, 30000)
 
 			// Each goroutine writes to its own pre-allocated index — no mutex needed
 			failures[idx] = cluster.FailureInfo{

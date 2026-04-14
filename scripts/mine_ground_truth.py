@@ -42,8 +42,14 @@ def github_get(url, token, params=None):
     if "/search/" in url:
         time.sleep(2.1)
 
-    for _ in range(MAX_RETRIES):
-        resp = requests.get(url, headers=headers, params=params)
+    for attempt in range(MAX_RETRIES):
+        try:
+            resp = requests.get(url, headers=headers, params=params, timeout=30)
+        except (requests.ConnectionError, requests.Timeout) as e:
+            wait = min(2 ** attempt, 30)
+            print(f"  ⏳ Network error ({type(e).__name__}), retrying in {wait}s...")
+            time.sleep(wait)
+            continue
 
         if resp.status_code == 429:
             wait = int(resp.headers.get("Retry-After", 60)) + 1
@@ -62,20 +68,28 @@ def github_get(url, token, params=None):
         return resp
 
     # Exhausted retries
-    resp.raise_for_status()
-    return resp
+    raise requests.ConnectionError(f"Failed after {MAX_RETRIES} retries: {url}")
 SEARCH_QUERIES = [
-    # PR title searches
+    # PR title searches — original
     'in:title "fix CI" is:merged',
     'in:title "fix test" is:merged',
     'in:title "fix flaky" is:merged',
     'in:title "fix e2e" is:merged',
-    # Go/build-specific (Perplexity: Go ecosystem uses "fix build"/"fix lint")
     'in:title "fix build" is:merged',
     'in:title "fix lint" is:merged',
-    # Broader: commit message search for repos that don't use descriptive PR titles
     'in:title "resolve test failure" is:merged',
     'in:title "fix failing" is:merged',
+    # Expanded queries for larger corpus
+    'in:title "fix timeout" is:merged',
+    'in:title "fix pipeline" is:merged',
+    'in:title "fix workflow" is:merged',
+    'in:title "fix integration" is:merged',
+    'in:title "fix unit test" is:merged',
+    'in:title "ci: fix" is:merged',
+    'in:title "fix: test" is:merged',
+    'in:title "fix broken" is:merged',
+    'in:title "fix regression" is:merged',
+    'in:title "fix assertion" is:merged',
 ]
 
 
@@ -87,7 +101,7 @@ def search_fix_prs(language, date_from, token):
         resp = github_get(
             f"{GITHUB_API}/search/issues",
             token=token,
-            params={"q": q, "per_page": 30, "sort": "created", "order": "desc"},
+            params={"q": q, "per_page": 100, "sort": "created", "order": "desc"},
         )
         for item in resp.json().get("items", []):
             if item.get("pull_request"):

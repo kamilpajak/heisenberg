@@ -1,0 +1,45 @@
+{
+  "case_id": "gh-apache-pulsar-24156316350",
+  "repo": "apache/pulsar",
+  "run_id": 24156316350,
+  "tags": [],
+  "transition": {
+    "failing_commit": "b9a7714b55e43c3ad59d4cec975bdb4fd5c9f691",
+    "fix_commit": "b7aa01a771e1743e66c6dc1a8214aecaaa286f7e",
+    "pr_url": "https://github.com/apache/pulsar/pull/25498",
+    "pr_title": "[fix][test] Fix flaky LeaderElectionServiceTest and PersistentDispatcherFailoverConsumerTest",
+    "files_changed": [
+      "pulsar-broker/src/test/java/org/apache/pulsar/broker/loadbalance/LeaderElectionServiceTest.java",
+      "pulsar-broker/src/test/java/org/apache/pulsar/broker/service/PersistentDispatcherFailoverConsumerTest.java"
+    ],
+    "fix_size_lines": 4
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "[fix][test] Fix flaky LeaderElectionServiceTest and PersistentDispatcherFailoverConsumerTest",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "production"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "",
+    "llm_correlation": "YES\nThe PR title indicates that the changes are intended to fix flaky tests in `LeaderElectionServiceTest` and `PersistentDispatcherFailoverConsumerTest`. The diff removes the `invocationCount = 10` f"
+  }
+}

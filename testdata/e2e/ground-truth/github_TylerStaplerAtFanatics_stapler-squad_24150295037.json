@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-TylerStaplerAtFanatics-stapler-squad-24150295037",
+  "repo": "TylerStaplerAtFanatics/stapler-squad",
+  "run_id": 24150295037,
+  "tags": [],
+  "transition": {
+    "failing_commit": "6f26ad34212d86c8ff39bc02c4218bcdf238a0ed",
+    "fix_commit": "9ecd819317da57bd4e2c1d15958275a0e6783170",
+    "pr_url": "https://github.com/TylerStaplerAtFanatics/stapler-squad/pull/29",
+    "pr_title": "fix(ci): inline prepare steps in release workflow to fix silent skip",
+    "files_changed": [
+      ".github/workflows/label-check.yml"
+    ],
+    "fix_size_lines": 7
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix(ci): inline prepare steps in release workflow to fix silent skip",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "infrastructure"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES.\n\nThe PR title indicates the fix addresses a \"silent skip\" in the release workflow. The diff modifies the GitHub Actions script used in the workflow, specifically how it retrieves pull request lab"
+  }
+}

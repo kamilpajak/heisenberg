@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-eclipse-ee4j-jaxb-ri-23163237910",
+  "repo": "eclipse-ee4j/jaxb-ri",
+  "run_id": 23163237910,
+  "tags": [],
+  "transition": {
+    "failing_commit": "37bc415d7b8a98b6745e8569702b4992ae61281e",
+    "fix_commit": "996eb7c326cbc1400d56170281a52a202244d8e8",
+    "pr_url": "https://github.com/eclipse-ee4j/jaxb-ri/pull/1926",
+    "pr_title": "Fix regression in handling tab, newline characters",
+    "files_changed": [
+      "jaxb-ri/runtime/impl/src/test/java/org/glassfish/jaxb/runtime/util/StringBuilderWriterTest.java"
+    ],
+    "fix_size_lines": 15
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "Fix regression in handling tab, newline characters",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "assertion",
+        "bug_location": "production"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "",
+    "llm_correlation": "YES. The test failure log doesn't show a specific failure, but the PR title and the diff indicate a regression in handling tab and newline characters. The diff modifies the `StringBuilderWriterTest` c"
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "case_id": "gh-nathapp-io-nax-24171216416",
+  "repo": "nathapp-io/nax",
+  "run_id": 24171216416,
+  "tags": [],
+  "transition": {
+    "failing_commit": "8ba40e2075650ca05482c9d3d6ae69d292e3cb0d",
+    "fix_commit": "dfe28d3c1f26e0c4652e1cfb95c10b5bf655b1c0",
+    "pr_url": "https://github.com/nathapp-io/nax/pull/318",
+    "pr_title": "fix: bench-03/04/05 bug sweep \u2014 JSON parse SSOT, test output parser SSOT, rectification false-positive",
+    "files_changed": [
+      "src/verification/parser.ts",
+      "test/integration/tdd/tdd-orchestrator-core.test.ts",
+      "test/integration/tdd/tdd-orchestrator-failureCategory.test.ts"
+    ],
+    "fix_size_lines": 38
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix: bench-03/04/05 bug sweep \u2014 JSON parse SSOT, test output parser SSOT, rectification false-positive",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "timeout",
+        "bug_location": "production"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "",
+    "llm_correlation": "YES\nThe test failure log shows errors related to writing a status file, specifically \"ENOENT: no such file or directory\". While the diff doesn't directly address file system operations, the PR title m"
+  }
+}

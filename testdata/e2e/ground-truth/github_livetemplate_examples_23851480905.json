@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-livetemplate-examples-23851480905",
+  "repo": "livetemplate/examples",
+  "run_id": 23851480905,
+  "tags": [],
+  "transition": {
+    "failing_commit": "41ecf03afadcce460a0a29ebe313bae5707e4894",
+    "fix_commit": "f00ebf16a3a779879337da4e89ac6d330390f5cb",
+    "pr_url": "https://github.com/livetemplate/examples/pull/45",
+    "pr_title": "fix: un-skip avatar-upload E2E tests and fix broken selectors",
+    "files_changed": [
+      "live-preview/live_preview_test.go"
+    ],
+    "fix_size_lines": 5
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix: un-skip avatar-upload E2E tests and fix broken selectors",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "timeout",
+        "bug_location": "test"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES\nThe diff increases the timeout for `WaitForText` in the `TestLivePreviewE2E` test. The PR title also mentions fixing broken selectors, which could contribute to test failures. The increased timeou"
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-rpjvanaert-Hackathon-ChessEngine-24171695490",
+  "repo": "rpjvanaert/Hackathon-ChessEngine",
+  "run_id": 24171695490,
+  "tags": [],
+  "transition": {
+    "failing_commit": "68ebcb3cb6fa5a27f817da9d905023dc59693505",
+    "fix_commit": "892ab4efa81316cacb3225bac9ce250fb5aa38fc",
+    "pr_url": "https://github.com/rpjvanaert/Hackathon-ChessEngine/pull/6",
+    "pr_title": "fix: disable unreliable UCI start procedure test in pipeline",
+    "files_changed": [
+      "src/test/java/sopra/steria/search/SearchSanityTest.java"
+    ],
+    "fix_size_lines": 3
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix: disable unreliable UCI start procedure test in pipeline",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "timeout",
+        "bug_location": "production"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES\nThe provided diff disables two tests, `testSearchReturnsValidMove` and `testSearchFindsMateInOne`, and the PR title indicates these tests are unreliable in the pipeline. While the log doesn't expl"
+  }
+}

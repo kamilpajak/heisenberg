@@ -1,0 +1,46 @@
+{
+  "case_id": "gh-TheColonyCC-colony-sdk-python-24141619527",
+  "repo": "TheColonyCC/colony-sdk-python",
+  "run_id": 24141619527,
+  "tags": [
+    "smoke"
+  ],
+  "transition": {
+    "failing_commit": "7b16623172379b0176378208e21decd9d546d4a2",
+    "fix_commit": "a43ed7769a32dc5a98c667e3ffab93f80e4758c3",
+    "pr_url": "https://github.com/TheColonyCC/colony-sdk-python/pull/14",
+    "pr_title": "Fix unfollow to use DELETE and add follow integration tests",
+    "files_changed": [
+      "tests/test_integration_follow.py"
+    ],
+    "fix_size_lines": 9
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "Fix unfollow to use DELETE and add follow integration tests",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "test"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES\nThe diff modifies the `unfollow` functionality in the `ColonyClient` and adds integration tests for the `follow` and `unfollow` methods. The original code used a try-except block to handle potenti"
+  }
+}

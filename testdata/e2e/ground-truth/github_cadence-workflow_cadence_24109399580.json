@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-cadence-workflow-cadence-24109399580",
+  "repo": "cadence-workflow/cadence",
+  "run_id": 24109399580,
+  "tags": [],
+  "transition": {
+    "failing_commit": "7e68842c64bb0d47a7c1ac59c325237c468927eb",
+    "fix_commit": "8516330720506f4e8ada6cce5c9666f53c405591",
+    "pr_url": "https://github.com/cadence-workflow/cadence/pull/7916",
+    "pr_title": "fix: the scope unit test which was using stale metrics name",
+    "files_changed": [
+      "common/metrics/scope_test.go"
+    ],
+    "fix_size_lines": 4
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix: the scope unit test which was using stale metrics name",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "test"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES. The test failure log shows that the `golint.sh` script is being run, which suggests a linting or code style issue. The provided diff modifies a unit test, specifically addressing potentially stal"
+  }
+}

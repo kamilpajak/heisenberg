@@ -1,0 +1,47 @@
+{
+  "case_id": "gh-Dark-Athena-halo-23542718900",
+  "repo": "Dark-Athena/halo",
+  "run_id": 23542718900,
+  "tags": [
+    "smoke"
+  ],
+  "transition": {
+    "failing_commit": "ce9a00eea29d29009658f6fc31c3d90a34037f82",
+    "fix_commit": "c831179588a7626c0f870a6464540a7c70228469",
+    "pr_url": "https://github.com/Dark-Athena/halo/pull/2",
+    "pr_title": "Fix CI failures: recover test race condition and fork e2e-test artifact dependency",
+    "files_changed": [
+      ".github/workflows/halo.yaml",
+      "e2e/testsuite.yaml"
+    ],
+    "fix_size_lines": 8
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "Fix CI failures: recover test race condition and fork e2e-test artifact dependency",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "infrastructure"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "",
+    "llm_correlation": "YES.\n\nThe diff addresses two issues. First, it adds `github.repository == 'halo-dev/halo'` to the `if` condition of the `e2e-test` job. This suggests the test was running in contexts where it shouldn'"
+  }
+}

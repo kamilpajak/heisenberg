@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-aclater-ragpipe-24064214129",
+  "repo": "aclater/ragpipe",
+  "run_id": 24064214129,
+  "tags": [],
+  "transition": {
+    "failing_commit": "8d87aabafa0fd4aedb3d7fe4f05120e048456e11",
+    "fix_commit": "b75b190a3aaab638ec6f1de1df22cedcba4ee197",
+    "pr_url": "https://github.com/aclater/ragpipe/pull/68",
+    "pr_title": "Add CRAG metadata integration tests and fix container CI (fixes #62)",
+    "files_changed": [
+      "tests/test_integration_crag.py"
+    ],
+    "fix_size_lines": 34
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "Add CRAG metadata integration tests and fix container CI (fixes #62)",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "assertion",
+        "bug_location": "test"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "",
+    "llm_correlation": "YES\nThe PR title mentions fixing container CI and the diff includes changes to integration tests related to CRAG metadata. The test failure log shows the tests are running, so it's not an infrastructu"
+  }
+}

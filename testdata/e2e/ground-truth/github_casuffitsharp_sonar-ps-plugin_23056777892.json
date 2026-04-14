@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-casuffitsharp-sonar-ps-plugin-23056777892",
+  "repo": "casuffitsharp/sonar-ps-plugin",
+  "run_id": 23056777892,
+  "tags": [],
+  "transition": {
+    "failing_commit": "8718631b07dba5da0df1fbe406ac6a115602288d",
+    "fix_commit": "82306063568cdae5f913345acbf525c2ea6aa723",
+    "pr_url": "https://github.com/casuffitsharp/sonar-ps-plugin/pull/49",
+    "pr_title": "fix: Resolve suppressed test failures and empty rule names in PowerShell analysis (#49)",
+    "files_changed": [
+      "sonar-ps-plugin/src/test/java/org/sonar/plugins/powershell/fillers/IssuesFillerTest.java"
+    ],
+    "fix_size_lines": 11
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix: Resolve suppressed test failures and empty rule names in PowerShell analysis (#49)",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "production"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES\nThe provided diff adds a test case `shouldSkipIssuesWithBlankRuleId` that specifically addresses the scenario where issues have blank rule IDs. The PR title also mentions \"empty rule names in Powe"
+  }
+}

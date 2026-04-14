@@ -1,0 +1,47 @@
+{
+  "case_id": "gh-Consensys-teku-23567638322",
+  "repo": "Consensys/teku",
+  "run_id": 23567638322,
+  "tags": [
+    "smoke"
+  ],
+  "transition": {
+    "failing_commit": "bbc37c3642ae3f26cf8a675f008b92afae411649",
+    "fix_commit": "f9cef2ffca2909f42525fb444ccdffb7eb35a110",
+    "pr_url": "https://github.com/Consensys/teku/pull/10532",
+    "pr_title": "Fix OkHttp readTimeout not being overridden for per-request Engine API timeouts",
+    "files_changed": [
+      "ethereum/executionclient/src/main/java/tech/pegasys/teku/ethereum/executionclient/OkHttpHttpExecutionEngineClient.java",
+      "ethereum/executionclient/src/test/java/tech/pegasys/teku/ethereum/executionclient/OkHttpHttpExecutionEngineClientTest.java"
+    ],
+    "fix_size_lines": 14
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "Fix OkHttp readTimeout not being overridden for per-request Engine API timeouts",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "timeout",
+        "bug_location": "production"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "",
+    "llm_correlation": "YES. The PR title and the code diff indicate that the fix addresses an issue where the `readTimeout` of the OkHttp client was not being properly overridden for per-request timeouts. The diff introduce"
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-Irundaa-OpenBanking-23384168423",
+  "repo": "Irundaa/OpenBanking",
+  "run_id": 23384168423,
+  "tags": [],
+  "transition": {
+    "failing_commit": "ece5b7ba73b435d3348952cca201928d28b45dab",
+    "fix_commit": "c9413d19682a5822348596693a0842b2eadf07d3",
+    "pr_url": "https://github.com/Irundaa/OpenBanking/pull/3",
+    "pr_title": "feat: add GitHub Actions CI workflow, unit tests and minor fixes",
+    "files_changed": [
+      ".github/workflows/ci.yml"
+    ],
+    "fix_size_lines": 4
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "feat: add GitHub Actions CI workflow, unit tests and minor fixes",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "infrastructure"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES\nThe diff changes the Java distribution from 'amazon' to 'corretto' in the GitHub Actions workflow. This could directly address a test failure if the 'amazon' distribution was causing issues during"
+  }
+}

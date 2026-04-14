@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-scylladb-scylla-cqlsh-24184897707",
+  "repo": "scylladb/scylla-cqlsh",
+  "run_id": 24184897707,
+  "tags": [],
+  "transition": {
+    "failing_commit": "dc838776281ba5ddec67f14ede4ff05e1d734967",
+    "fix_commit": "93dab9893acd75ed8c1d64c0cd129fe87fcd36ba",
+    "pr_url": "https://github.com/scylladb/scylla-cqlsh/pull/166",
+    "pr_title": "Fix completion tests to handle Scylla's audit keyspace",
+    "files_changed": [
+      "pylib/cqlshlib/test/test_cqlsh_completion.py"
+    ],
+    "fix_size_lines": 11
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "Fix completion tests to handle Scylla's audit keyspace",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "assertion",
+        "bug_location": "production"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES\nThe PR title and the code changes in the diff indicate that the fix addresses completion tests specifically for Scylla, which is mentioned in the job name \"Integration Tests (Scylla)\". The code mo"
+  }
+}

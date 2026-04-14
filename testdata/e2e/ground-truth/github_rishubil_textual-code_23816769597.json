@@ -1,0 +1,48 @@
+{
+  "case_id": "gh-rishubil-textual-code-23816769597",
+  "repo": "rishubil/textual-code",
+  "run_id": 23816769597,
+  "tags": [
+    "smoke"
+  ],
+  "transition": {
+    "failing_commit": "fe1108f00054f76e60d5adf13dc1f15137f97aaa",
+    "fix_commit": "3d49e133df1be51b79c39cf37a12da429bcc5dcc",
+    "pr_url": "https://github.com/rishubil/textual-code/pull/187",
+    "pr_title": "fix: resolve Windows test failures (#180)",
+    "files_changed": [
+      ".github/workflows/check.yml",
+      "pyproject.toml",
+      "uv.lock"
+    ],
+    "fix_size_lines": 20
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix: resolve Windows test failures (#180)",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "assertion",
+        "bug_location": "infrastructure"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "",
+    "llm_correlation": "YES\nThe diff adds `pytest-rerunfailures` and configures pytest to retry tests that fail due to `NoMatches`, `AssertionError`, or `WorkerFailed`. While the log doesn't show the specific error, the PR t"
+  }
+}

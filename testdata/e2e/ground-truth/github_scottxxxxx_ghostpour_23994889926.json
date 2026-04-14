@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-scottxxxxx-ghostpour-23994889926",
+  "repo": "scottxxxxx/ghostpour",
+  "run_id": 23994889926,
+  "tags": [],
+  "transition": {
+    "failing_commit": "eea1443fd829f968c679c11b0f2b5c75714bfe32",
+    "fix_commit": "a1deef31aec250d1ebca3ea724e1a40031d8794b",
+    "pr_url": "https://github.com/scottxxxxx/ghostpour/pull/2",
+    "pr_title": "Fix CI test failures and streaming usage logging",
+    "files_changed": [
+      "tests/test_quilt_graph.py"
+    ],
+    "fix_size_lines": 4
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "Fix CI test failures and streaming usage logging",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "timeout",
+        "bug_location": "test"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-06",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES\nThe diff changes the import path for `get_settings` from `app.routers.chat` to `app.routers.cq_proxy` in two tests. This suggests that the tests were mocking the settings from the wrong module, po"
+  }
+}

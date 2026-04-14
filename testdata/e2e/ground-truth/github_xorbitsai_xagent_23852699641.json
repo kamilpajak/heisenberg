@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-xorbitsai-xagent-23852699641",
+  "repo": "xorbitsai/xagent",
+  "run_id": 23852699641,
+  "tags": [],
+  "transition": {
+    "failing_commit": "2b4ed7dfffccc713a43be41d0341b3264909f633",
+    "fix_commit": "68406b0d787d60fe168a7188bbd6aaf0dc7e308a",
+    "pr_url": "https://github.com/xorbitsai/xagent/pull/233",
+    "pr_title": "fix: resolve migration test failures for PostgreSQL and SQLite",
+    "files_changed": [
+      "src/xagent/migrations/versions/b9d890ed31b5_change_model_id_to_model_config_json_in_.py"
+    ],
+    "fix_size_lines": 15
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix: resolve migration test failures for PostgreSQL and SQLite",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "production"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "",
+    "llm_correlation": "YES\nThe log shows package installation, which is not directly related to the code change. However, the PR title indicates that the fix addresses migration test failures for PostgreSQL and SQLite. The "
+  }
+}

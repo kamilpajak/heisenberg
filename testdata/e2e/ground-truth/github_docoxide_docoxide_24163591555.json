@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-docoxide-docoxide-24163591555",
+  "repo": "docoxide/docoxide",
+  "run_id": 24163591555,
+  "tags": [],
+  "transition": {
+    "failing_commit": "e7ee37f1ec7b5d72e5ba5801be0aeb6563ae236f",
+    "fix_commit": "c0a8789f324d61da7209afbd2bddc95f68e217d3",
+    "pr_url": "https://github.com/docoxide/docoxide/pull/9",
+    "pr_title": "fix(ci): repair npm publish pipeline for wasm bindings",
+    "files_changed": [
+      ".github/workflows/publish-npm.yml"
+    ],
+    "fix_size_lines": 2
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix(ci): repair npm publish pipeline for wasm bindings",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "timeout",
+        "bug_location": "infrastructure"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES. The log shows the CI environment setup, and the diff modifies the `npm publish` command in the wasm bindings workflow. The PR title also indicates that the fix is for the npm publish pipeline. Th"
+  }
+}

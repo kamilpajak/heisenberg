@@ -1,0 +1,542 @@
+/pull/288/merge'.
+2026-04-03T15:50:29.0523739Z 
+2026-04-03T15:50:29.0524432Z You are in 'detached HEAD' state. You can look around, make experimental
+2026-04-03T15:50:29.0526127Z changes and commit them, and you can discard any commits you make in this
+2026-04-03T15:50:29.0529227Z state without impacting any branches by switching back to a branch.
+2026-04-03T15:50:29.0530924Z 
+2026-04-03T15:50:29.0532064Z If you want to create a new branch to retain commits you create, you may
+2026-04-03T15:50:29.0534764Z do so (now or later) by using -c with the switch command. Example:
+2026-04-03T15:50:29.0536317Z 
+2026-04-03T15:50:29.0536951Z   git switch -c <new-branch-name>
+2026-04-03T15:50:29.0538363Z 
+2026-04-03T15:50:29.0538973Z Or undo this operation with:
+2026-04-03T15:50:29.0539959Z 
+2026-04-03T15:50:29.0540471Z   git switch -
+2026-04-03T15:50:29.0541155Z 
+2026-04-03T15:50:29.0542372Z Turn off this advice by setting config variable advice.detachedHead to false
+2026-04-03T15:50:29.0544274Z 
+2026-04-03T15:50:29.0545966Z HEAD is now at 91bca5b Merge 436142835023af0aa343ea5f6d52ea3931045489 into 8fae153b8b8171f713f1dc8f02d313e9f766effa
+2026-04-03T15:50:29.0549685Z ##[endgroup]
+2026-04-03T15:50:29.0576999Z [command]/usr/bin/git log -1 --format=%H
+2026-04-03T15:50:29.0600845Z 91bca5b5ac88722a9d54dcb8accb9b928d35ec50
+2026-04-03T15:50:29.0985384Z ##[group]Run oven-sh/setup-bun@v2
+2026-04-03T15:50:29.0986936Z with:
+2026-04-03T15:50:29.0988508Z   bun-version: latest
+2026-04-03T15:50:29.0989823Z   no-cache: false
+2026-04-03T15:50:29.0991424Z   token: ***
+2026-04-03T15:50:29.0992582Z ##[endgroup]
+2026-04-03T15:50:29.5800126Z Downloading a new version of Bun: https://github.com/oven-sh/bun/releases/download/bun-v1.3.11/bun-linux-x64.zip
+2026-04-03T15:50:29.9369790Z [command]/usr/bin/unzip -o -q /home/runner/work/_temp/5401c894-3fca-4d27-a147-3aadcf9bef99.zip
+2026-04-03T15:50:30.6420218Z [command]/home/runner/.bun/bin/bun --revision
+2026-04-03T15:50:30.6463348Z 1.3.11+af24e281e
+2026-04-03T15:50:30.6617452Z ##[group]Run bun install --frozen-lockfile
+2026-04-03T15:50:30.6618180Z [36;1mbun install --frozen-lockfile[0m
+2026-04-03T15:50:30.6650888Z shell: /usr/bin/bash -e {0}
+2026-04-03T15:50:30.6651159Z ##[endgroup]
+2026-04-03T15:50:30.6750733Z bun install v1.3.11 (af24e281)
+2026-04-03T15:50:39.3628209Z 
+2026-04-03T15:50:39.3628899Z + @biomejs/biome@2.2.2
+2026-04-03T15:50:39.3629394Z + @changesets/cli@2.29.8
+2026-04-03T15:50:39.3630076Z + @openzeppelin/contracts@5.4.0
+2026-04-03T15:50:39.3630574Z + @types/bun@1.3.8
+2026-04-03T15:50:39.3630929Z + mint@4.2.336
+2026-04-03T15:50:39.3631244Z + typescript@5.9.2
+2026-04-03T15:50:39.3631612Z + viem@2.45.2
+2026-04-03T15:50:39.3631913Z + wagmi@3.4.2
+2026-04-03T15:50:39.3632093Z 
+2026-04-03T15:50:39.3632250Z 985 packages installed [8.69s]
+2026-04-03T15:50:39.3853624Z ##[group]Run bun run build
+2026-04-03T15:50:39.3853923Z [36;1mbun run build[0m
+2026-04-03T15:50:39.3880970Z shell: /usr/bin/bash -e {0}
+2026-04-03T15:50:39.3881215Z ##[endgroup]
+2026-04-03T15:50:39.3948265Z $ bun run --filter '*' build
+2026-04-03T15:50:41.0273167Z @0xmonaco/contracts build: Exited with code 0
+2026-04-03T15:50:43.5036130Z @0xmonaco/types build: Exited with code 0
+2026-04-03T15:50:49.6192153Z @0xmonaco/core build: Exited with code 0
+2026-04-03T15:50:49.7095317Z @0xmonaco/mcp-server build: Bundled 717 modules in 87ms
+2026-04-03T15:50:49.7096666Z @0xmonaco/mcp-server build: 
+2026-04-03T15:50:49.7097972Z @0xmonaco/mcp-server build:   bin.js  1.1 MB  (entry point)
+2026-04-03T15:50:49.7099911Z @0xmonaco/mcp-server build: 
+2026-04-03T15:50:49.7154724Z @0xmonaco/mcp-server build: Exited with code 0
+2026-04-03T15:50:52.2876941Z @0xmonaco/react build: Exited with code 0
+2026-04-03T15:50:52.2924812Z ##[group]Run bun run lint
+2026-04-03T15:50:52.2925097Z [36;1mbun run lint[0m
+2026-04-03T15:50:52.2951524Z shell: /usr/bin/bash -e {0}
+2026-04-03T15:50:52.2951770Z ##[endgroup]
+2026-04-03T15:50:52.3015580Z $ bun --bun node_modules/.bin/biome lint packages/
+2026-04-03T15:50:52.4275869Z Checked 178 files in 97ms. No fixes applied.
+2026-04-03T15:50:52.4340601Z ##[group]Run bun run format:check
+2026-04-03T15:50:52.4340911Z [36;1mbun run format:check[0m
+2026-04-03T15:50:52.4366581Z shell: /usr/bin/bash -e {0}
+2026-04-03T15:50:52.4366819Z ##[endgroup]
+2026-04-03T15:50:52.4429169Z $ bun --bun node_modules/.bin/biome format packages/
+2026-04-03T15:50:52.5198838Z Checked 178 files in 47ms. No fixes applied.
+2026-04-03T15:50:52.5281244Z ##[group]Run bun run check
+2026-04-03T15:50:52.5281537Z [36;1mbun run check[0m
+2026-04-03T15:50:52.5307751Z shell: /usr/bin/bash -e {0}
+2026-04-03T15:50:52.5308005Z ##[endgroup]
+2026-04-03T15:50:52.5370745Z $ bun --bun node_modules/.bin/biome check packages/
+2026-04-03T15:50:52.6890686Z Checked 178 files in 127ms. No fixes applied.
+2026-04-03T15:50:52.6955891Z ##[group]Run bun run test
+2026-04-03T15:50:52.6956172Z [36;1mbun run test[0m
+2026-04-03T15:50:52.6982482Z shell: /usr/bin/bash -e {0}
+2026-04-03T15:50:52.6982728Z ##[endgroup]
+2026-04-03T15:50:52.7046421Z $ bun test packages/*
+2026-04-03T15:50:52.7069978Z bun test v1.3.11 (af24e281)
+2026-04-03T15:50:52.7119966Z 
+2026-04-03T15:50:52.7121192Z ##[group]packages/core/tests/unit/networks.test.ts:
+2026-04-03T15:50:52.9115103Z (pass) Network Configuration > resolveApiUrl > should return default API URL for preset networks
+2026-04-03T15:50:52.9457083Z (pass) Network Configuration > SDK network validation > should throw InvalidConfigError for invalid network value [35.00ms]
+2026-04-03T15:50:52.9465970Z (pass) Network Configuration > SDK network validation > should throw InvalidConfigError for empty network [1.00ms]
+2026-04-03T15:50:52.9474789Z (pass) Network Configuration > SDK network validation > should throw InvalidConfigError for undefined network [1.00ms]
+2026-04-03T15:50:52.9501734Z (pass) Network Configuration > SDK network validation > should include helpful error message for invalid network [3.00ms]
+2026-04-03T15:50:52.9503226Z (pass) Network Configuration > resolveWsUrl > should return default WS URL for preset networks
+2026-04-03T15:50:52.9503822Z 
+2026-04-03T15:50:52.9504453Z ##[endgroup]
+2026-04-03T15:50:52.9504625Z 
+2026-04-03T15:50:52.9505071Z ##[group]packages/core/tests/unit/errors.test.ts:
+2026-04-03T15:50:52.9535859Z (pass) Error Classes > APIError > should create an APIError with message
+2026-04-03T15:50:52.9536470Z (pass) Error Classes > APIError > should include response body if provided
+2026-04-03T15:50:52.9537179Z (pass) Error Classes > APIError > should have stack trace
+2026-04-03T15:50:52.9543089Z (pass) Error Classes > APIError > should sanitize sensitive data in toJSON [1.00ms]
+2026-04-03T15:50:52.9544997Z (pass) Error Classes > ContractError > should create a ContractError with message
+2026-04-03T15:50:52.9565942Z (pass) Error Classes > ContractError > should include revert reason and transaction hash
+2026-04-03T15:50:52.9567016Z (pass) Error Classes > InvalidConfigError > should create an InvalidConfigError with message
+2026-04-03T15:50:52.9581086Z (pass) Error Classes > InvalidConfigError > should sanitize sensitive config values in toJSON
+2026-04-03T15:50:52.9582182Z (pass) Error Classes > InvalidStateError > should create an InvalidStateError with message [1.00ms]
+2026-04-03T15:50:52.9583104Z (pass) Error Classes > Error inheritance > should be catchable as Error
+2026-04-03T15:50:52.9583849Z (pass) Error Classes > Error inheritance > should have unique error codes
+2026-04-03T15:50:52.9584314Z 
+2026-04-03T15:50:52.9594075Z ##[endgroup]
+2026-04-03T15:50:52.9594280Z 
+2026-04-03T15:50:52.9594792Z ##[group]packages/mcp-server/src/__tests__/sdk.test.ts:
+2026-04-03T15:50:52.9613814Z (pass) getSDK > creates SDK with correct config for non-mainnet
+2026-04-03T15:50:52.9614506Z (pass) getSDK > returns same instance on subsequent calls (singleton)
+2026-04-03T15:50:52.9614784Z 
+2026-04-03T15:50:52.9615043Z ##[endgroup]
+2026-04-03T15:50:52.9615154Z 
+2026-04-03T15:50:52.9615502Z ##[group]packages/mcp-server/src/__tests__/authentication.test.ts:
+2026-04-03T15:50:52.9630276Z (pass) ensureAuthenticated > calls login when not authenticated [1.00ms]
+2026-04-03T15:50:52.9631167Z (pass) ensureAuthenticated > skips login when already authenticated
+2026-04-03T15:50:52.9632235Z (pass) ensureAuthenticated > logs account address after login
+2026-04-03T15:50:52.9632681Z 
+2026-04-03T15:50:52.9633189Z ##[endgroup]
+2026-04-03T15:50:52.9633380Z 
+2026-04-03T15:50:52.9633918Z ##[group]packages/mcp-server/src/__tests__/response.test.ts:
+2026-04-03T15:50:52.9645056Z (pass) jsonResult > wraps object in CallToolResult with pretty-printed JSON
+2026-04-03T15:50:52.9645805Z (pass) jsonResult > handles null
+2026-04-03T15:50:52.9646269Z (pass) jsonResult > handles arrays
+2026-04-03T15:50:52.9646762Z (pass) jsonResult > handles nested objects
+2026-04-03T15:50:52.9647948Z (pass) textResult > wraps string in CallToolResult
+2026-04-03T15:50:52.9648531Z (pass) textResult > handles empty string
+2026-04-03T15:50:52.9648858Z 
+2026-04-03T15:50:52.9649277Z ##[endgroup]
+2026-04-03T15:50:52.9649478Z 
+2026-04-03T15:50:52.9650042Z ##[group]packages/mcp-server/src/__tests__/registration.test.ts:
+2026-04-03T15:50:52.9779605Z (pass) registerTools (authenticated, non-mainnet) > registers all expected tools [5.00ms]
+2026-04-03T15:50:52.9801997Z (pass) registerTools (authenticated, non-mainnet) > registers no duplicate tool names [2.00ms]
+2026-04-03T15:50:52.9819611Z (pass) registerTools (authenticated, non-mainnet) > registers exactly 26 tools on non-mainnet [2.00ms]
+2026-04-03T15:50:52.9834338Z (pass) registerTools (authenticated, mainnet) > excludes request_faucet on mainnet [1.00ms]
+2026-04-03T15:50:52.9858878Z (pass) registerTools (authenticated, mainnet) > registers exactly 25 tools on mainnet [3.00ms]
+2026-04-03T15:50:52.9868515Z (pass) registerTools (public-only) > registers only public tools when not authenticated
+2026-04-03T15:50:52.9872386Z (pass) registerTools (public-only) > registers exactly 7 public tools [1.00ms]
+2026-04-03T15:50:52.9879567Z (pass) registerTools (public-only) > excludes all authenticated tools [1.00ms]
+2026-04-03T15:50:52.9880051Z 
+2026-04-03T15:50:52.9880808Z ##[endgroup]
+2026-04-03T15:50:52.9880992Z 
+2026-04-03T15:50:52.9881480Z ##[group]packages/mcp-server/src/__tests__/config.test.ts:
+2026-04-03T15:50:52.9911421Z 3 | import { validEnv } from "./helpers";
+2026-04-03T15:50:52.9911872Z 4 | 
+2026-04-03T15:50:52.9912158Z 5 | describe("loadConfig", () => {
+2026-04-03T15:50:52.9912758Z 6 |   test("returns null privateKey when MONACO_PRIVATE_KEY is missing", () => {
+2026-04-03T15:50:52.9913743Z 7 |     const config = loadConfig({ ...validEnv, MONACO_PRIVATE_KEY: undefined, MONACO_CLIENT_ID: undefined });
+2026-04-03T15:50:52.9914563Z 8 |     expect(config.privateKey).toBeNull();
+2026-04-03T15:50:52.9914986Z                                   ^
+2026-04-03T15:50:52.9915379Z error: expect(received).toBeNull()
+2026-04-03T15:50:52.9915656Z 
+2026-04-03T15:50:52.9916040Z Received: "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+2026-04-03T15:50:52.9916600Z 
+2026-04-03T15:50:52.9917214Z       at <anonymous> (/home/runner/work/monaco-sdk/monaco-sdk/packages/mcp-server/src/__tests__/config.test.ts:8:31)
+2026-04-03T15:50:52.9918156Z 
+2026-04-03T15:50:52.9942904Z ##[error]Received: "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+
+      at <anonymous> (/home/runner/work/monaco-sdk/monaco-sdk/packages/mcp-server/src/__tests__/config.test.ts:8:31)
+2026-04-03T15:50:52.9952538Z (fail) loadConfig > returns null privateKey when MONACO_PRIVATE_KEY is missing [2.00ms]
+2026-04-03T15:50:52.9953350Z  8 |     expect(config.privateKey).toBeNull();
+2026-04-03T15:50:52.9953734Z  9 |     expect(config.clientId).toBeNull();
+2026-04-03T15:50:52.9953976Z 10 |   });
+2026-04-03T15:50:52.9954139Z 11 | 
+2026-04-03T15:50:52.9954414Z 12 |   test("throws when MONACO_PRIVATE_KEY doesn't start with 0x", () => {
+2026-04-03T15:50:52.9954978Z 13 |     expect(() => loadConfig({ ...validEnv, MONACO_PRIVATE_KEY: "not-hex" })).toThrow("must start with '0x'");
+2026-04-03T15:50:52.9955463Z                                                                                   ^
+2026-04-03T15:50:52.9955774Z error: expect(received).toThrow(expected)
+2026-04-03T15:50:52.9955954Z 
+2026-04-03T15:50:52.9956058Z Expected substring: "must start with '0x'"
+2026-04-03T15:50:52.9956234Z 
+2026-04-03T15:50:52.9956392Z Received function did not throw
+2026-04-03T15:50:52.9956800Z Received value: {
+2026-04-03T15:50:52.9957213Z   privateKey: "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
+2026-04-03T15:50:52.9958052Z   clientId: "test-client-id",
+2026-04-03T15:50:52.9958284Z   network: "development",
+2026-04-03T15:50:52.9958609Z   seiRpcUrl: "https://rpc.example.com",
+2026-04-03T15:50:52.9958917Z }
+2026-04-03T15:50:52.9959006Z 
+2026-04-03T15:50:52.9959607Z       at <anonymous> (/home/runner/work/monaco-sdk/monaco-sdk/packages/mcp-server/src/__tests__/config.test.ts:13:78)
+2026-04-03T15:50:52.9960046Z 
+2026-04-03T15:50:52.9963158Z ##[error]Expected substring: "must start with '0x'"
+
+Received function did not throw
+Received value: {
+  privateKey: "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
+  clientId: "test-client-id",
+  network: "development",
+  seiRpcUrl: "https://rpc.example.com",
+}
+
+      at <anonymous> (/home/runner/work/monaco-sdk/monaco-sdk/packages/mcp-server/src/__tests__/config.test.ts:13:78)
+2026-04-03T15:50:52.9965531Z (fail) loadConfig > throws when MONACO_PRIVATE_KEY doesn't start with 0x
+2026-04-03T15:50:52.9966274Z 12 |   test("throws when MONACO_PRIVATE_KEY doesn't start with 0x", () => {
+2026-04-03T15:50:52.9967429Z 13 |     expect(() => loadConfig({ ...validEnv, MONACO_PRIVATE_KEY: "not-hex" })).toThrow("must start with '0x'");
+2026-04-03T15:50:52.9968556Z 14 |   });
+2026-04-03T15:50:52.9968832Z 15 | 
+2026-04-03T15:50:52.9969371Z 16 |   test("throws when MONACO_PRIVATE_KEY is set but MONACO_CLIENT_ID is missing", () => {
+2026-04-03T15:50:52.9970596Z 17 |     expect(() => loadConfig({ ...validEnv, MONACO_CLIENT_ID: undefined })).toThrow("MONACO_CLIENT_ID is required when MONACO_PRIVATE_KEY is set");
+2026-04-03T15:50:52.9971614Z                                                                                 ^
+2026-04-03T15:50:52.9972127Z error: expect(received).toThrow(expected)
+2026-04-03T15:50:52.9972437Z 
+2026-04-03T15:50:52.9972786Z Expected substring: "MONACO_CLIENT_ID is required when MONACO_PRIVATE_KEY is set"
+2026-04-03T15:50:52.9973296Z 
+2026-04-03T15:50:52.9973440Z Received function did not throw
+2026-04-03T15:50:52.9973818Z Received value: {
+2026-04-03T15:50:52.9974425Z   privateKey: "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
+2026-04-03T15:50:52.9975132Z   clientId: "test-client-id",
+2026-04-03T15:50:52.9975512Z   network: "development",
+2026-04-03T15:50:52.9975900Z   seiRpcUrl: "https://rpc.example.com",
+2026-04-03T15:50:52.9976314Z }
+2026-04-03T15:50:52.9976462Z 
+2026-04-03T15:50:52.9977011Z       at <anonymous> (/home/runner/work/monaco-sdk/monaco-sdk/packages/mcp-server/src/__tests__/config.test.ts:17:76)
+2026-04-03T15:50:52.9977951Z 
+2026-04-03T15:50:52.9983037Z ##[error]Expected substring: "MONACO_CLIENT_ID is required when MONACO_PRIVATE_KEY is set"
+
+Received function did not throw
+Received value: {
+  privateKey: "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
+  clientId: "test-client-id",
+  network: "development",
+  seiRpcUrl: "https://rpc.example.com",
+}
+
+      at <anonymous> (/home/runner/work/monaco-sdk/monaco-sdk/packages/mcp-server/src/__tests__/config.test.ts:17:76)
+2026-04-03T15:50:52.9985481Z (fail) loadConfig > throws when MONACO_PRIVATE_KEY is set but MONACO_CLIENT_ID is missing
+2026-04-03T15:50:52.9986216Z 17 |     expect(() => loadConfig({ ...validEnv, MONACO_CLIENT_ID: undefined })).toThrow("MONACO_CLIENT_ID is required when MONACO_PRIVATE_KEY is set");
+2026-04-03T15:50:52.9986828Z 18 |   });
+2026-04-03T15:50:52.9987006Z 19 | 
+2026-04-03T15:50:52.9987269Z 20 |   test("defaults MONACO_RPC_URL based on network when unset", () => {
+2026-04-03T15:50:52.9988063Z 21 |     const config = loadConfig({ ...validEnv, MONACO_RPC_URL: undefined, MONACO_NETWORK: "mainnet" });
+2026-04-03T15:50:52.9988618Z 22 |     expect(config.seiRpcUrl).toBe("https://evm-rpc.sei-apis.com");
+2026-04-03T15:50:52.9988976Z                                   ^
+2026-04-03T15:50:52.9989223Z error: expect(received).toBe(expected)
+2026-04-03T15:50:52.9989404Z 
+2026-04-03T15:50:52.9989517Z Expected: "https://evm-rpc.sei-apis.com"
+2026-04-03T15:50:52.9989802Z Received: "https://rpc.example.com"
+2026-04-03T15:50:52.9989969Z 
+2026-04-03T15:50:52.9990307Z       at <anonymous> (/home/runner/work/monaco-sdk/monaco-sdk/packages/mcp-server/src/__tests__/config.test.ts:22:30)
+2026-04-03T15:50:52.9990728Z 
+2026-04-03T15:50:52.9992465Z ##[error]Expected: "https://evm-rpc.sei-apis.com"
+Received: "https://rpc.example.com"
+
+      at <anonymous> (/home/runner/work/monaco-sdk/monaco-sdk/packages/mcp-server/src/__tests__/config.test.ts:22:30)
+2026-04-03T15:50:52.9993801Z (fail) loadConfig > defaults MONACO_RPC_URL based on network when unset
+2026-04-03T15:50:52.9994252Z 22 |     expect(config.seiRpcUrl).toBe("https://evm-rpc.sei-apis.com");
+2026-04-03T15:50:52.9994584Z 23 |   });
+2026-04-03T15:50:52.9994742Z 24 | 
+2026-04-03T15:50:52.9995185Z 25 |   test("defaults network to mainnet when MONACO_NETWORK is unset", () => {
+2026-04-03T15:50:52.9995965Z 26 |     const config = loadConfig({ ...validEnv, MONACO_NETWORK: undefined });
+2026-04-03T15:50:52.9996605Z 27 |     expect(config.network).toBe("mainnet");
+2026-04-03T15:50:52.9997044Z                                 ^
+2026-04-03T15:50:52.9997917Z error: expect(received).toBe(expected)
+2026-04-03T15:50:52.9998220Z 
+2026-04-03T15:50:52.9998364Z Expected: "mainnet"
+2026-04-03T15:50:52.9998574Z Received: "development"
+2026-04-03T15:50:52.9998708Z 
+2026-04-03T15:50:52.9999054Z       at <anonymous> (/home/runner/work/monaco-sdk/monaco-sdk/packages/mcp-server/src/__tests__/config.test.ts:27:28)
+2026-04-03T15:50:52.9999741Z 
+2026-04-03T15:50:53.0001946Z ##[error]Expected: "mainnet"
+Received: "development"
+
+      at <anonymous> (/home/runner/work/monaco-sdk/monaco-sdk/packages/mcp-server/src/__tests__/config.test.ts:27:28)
+2026-04-03T15:50:53.0003956Z (fail) loadConfig > defaults network to mainnet when MONACO_NETWORK is unset
+2026-04-03T15:50:53.0004723Z (pass) loadConfig > returns correct config when all env vars are set
+2026-04-03T15:50:53.0005155Z 
+2026-04-03T15:50:53.0005521Z ##[endgroup]
+2026-04-03T15:50:53.0005703Z 
+2026-04-03T15:50:53.0006169Z ##[group]packages/core/tests/unit/validation/market.test.ts:
+2026-04-03T15:50:53.0007132Z (pass) Market Validation Schemas > TradingPairSymbolSchema > should validate correct trading pair symbols [1.00ms]
+2026-04-03T15:50:53.0008720Z (pass) Market Validation Schemas > TradingPairSymbolSchema > should reject invalid trading pair symbols [1.00ms]
+2026-04-03T15:50:53.0009804Z (pass) Market Validation Schemas > TradingPairSymbolSchema > should provide helpful error messages
+2026-04-03T15:50:53.0011102Z (pass) Market Validation Schemas > GetCandlesticksSchema (by UUID) > should validate correct candlestick request with UUID [1.00ms]
+2026-04-03T15:50:53.0012363Z (pass) Market Validation Schemas > GetCandlesticksSchema (by UUID) > should reject invalid intervals
+2026-04-03T15:50:53.0013516Z (pass) Market Validation Schemas > GetCandlesticksSchema (by UUID) > should reject startTime >= endTime [1.00ms]
+2026-04-03T15:50:53.0014637Z (pass) Market Validation Schemas > GetCandlesticksSchema (by UUID) > should reject invalid UUID
+2026-04-03T15:50:53.0015842Z (pass) Market Validation Schemas > GetCandlesticksSchema (by UUID) > should reject timestamps in seconds instead of milliseconds
+2026-04-03T15:50:53.0017145Z (pass) Market Validation Schemas > GetCandlesticksSchema (by UUID) > should reject timestamps before year 2000
+2026-04-03T15:50:53.0018596Z (pass) Market Validation Schemas > GetCandlesticksSchema (by UUID) > should accept timestamps from year 2000 onwards
+2026-04-03T15:50:53.0019877Z (pass) Market Validation Schemas > GetCandlesticksSchema (by UUID) > should validate all supported intervals [1.00ms]
+2026-04-03T15:50:53.0021276Z (pass) Market Validation Schemas > GetCandlesticksByPairIdSchema > should validate correct candlestick request with trading pair ID
+2026-04-03T15:50:53.0022677Z (pass) Market Validation Schemas > GetCandlesticksByPairIdSchema > should reject invalid trading pair IDs [1.00ms]
+2026-04-03T15:50:53.0023858Z (pass) Market Validation Schemas > GetCandlesticksByPairIdSchema > should reject invalid intervals
+2026-04-03T15:50:53.0024576Z (pass) Market Validation Schemas > GetCandlesticksByPairIdSchema > should reject startTime >= endTime when both provided
+2026-04-03T15:50:53.0025313Z (pass) Market Validation Schemas > GetCandlesticksByPairIdSchema > should reject startTime === endTime
+2026-04-03T15:50:53.0026746Z (pass) Market Validation Schemas > GetCandlesticksByPairIdSchema > should validate all supported intervals [1.00ms]
+2026-04-03T15:50:53.0028257Z (pass) Market Validation Schemas > GetCandlesticksByPairIdSchema > should allow optional startTime and endTime
+2026-04-03T15:50:53.0029457Z (pass) Market Validation Schemas > GetCandlesticksByPairIdSchema > should reject limit exceeding 500
+2026-04-03T15:50:53.0030527Z (pass) Market Validation Schemas > GetCandlesticksByPairIdSchema > should reject zero limit
+2026-04-03T15:50:53.0031589Z (pass) Market Validation Schemas > GetCandlesticksByPairIdSchema > should reject negative limit
+2026-04-03T15:50:53.0032749Z (pass) Market Validation Schemas > GetCandlesticksByPairIdSchema > should reject non-integer limit [1.00ms]
+2026-04-03T15:50:53.0034102Z (pass) Market Validation Schemas > GetCandlesticksByPairIdSchema > should accept valid limit of 1
+2026-04-03T15:50:53.0035302Z (pass) Market Validation Schemas > GetCandlesticksByPairIdSchema > should reject timestamps too far in the future
+2026-04-03T15:50:53.0036652Z (pass) Market Validation Schemas > GetCandlesticksByPairIdSchema > should provide helpful error messages for invalid UUIDs
+2026-04-03T15:50:53.0038195Z (pass) Market Validation Schemas > GetCandlesticksByPairIdSchema > should provide helpful error messages for time range errors
+2026-04-03T15:50:53.0039072Z (pass) Market Validation Schemas > GetMarketMetadataSchema > should validate correct market metadata request with valid UUID [1.00ms]
+2026-04-03T15:50:53.0039831Z (pass) Market Validation Schemas > GetMarketMetadataSchema > should validate various valid UUID formats
+2026-04-03T15:50:53.0040466Z (pass) Market Validation Schemas > GetMarketMetadataSchema > should reject invalid UUID formats
+2026-04-03T15:50:53.0041039Z (pass) Market Validation Schemas > GetMarketMetadataSchema > should reject empty string
+2026-04-03T15:50:53.0041647Z (pass) Market Validation Schemas > GetMarketMetadataSchema > should reject null or undefined [1.00ms]
+2026-04-03T15:50:53.0042428Z (pass) Market Validation Schemas > GetMarketMetadataSchema > should reject missing tradingPairId field
+2026-04-03T15:50:53.0043639Z (pass) Market Validation Schemas > GetMarketMetadataSchema > should provide helpful error messages for invalid UUIDs
+2026-04-03T15:50:53.0044747Z (pass) Market Validation Schemas > GetMarketMetadataSchema > should provide helpful error messages for missing tradingPairId
+2026-04-03T15:50:53.0045432Z 
+2026-04-03T15:50:53.0045834Z ##[endgroup]
+2026-04-03T15:50:53.0046004Z 
+2026-04-03T15:50:53.0046515Z ##[group]packages/core/tests/unit/validation/profile.test.ts:
+2026-04-03T15:50:53.0053595Z (pass) Profile Validation Schemas > LedgerEntryTypeSchema > should accept valid entry types [1.00ms]
+2026-04-03T15:50:53.0056455Z (pass) Profile Validation Schemas > LedgerEntryTypeSchema > should reject invalid entry types
+2026-04-03T15:50:53.0057815Z (pass) Profile Validation Schemas > TransactionTypeSchema > should accept valid transaction types
+2026-04-03T15:50:53.0059835Z (pass) Profile Validation Schemas > TransactionTypeSchema > should reject invalid transaction types [1.00ms]
+2026-04-03T15:50:53.0064636Z (pass) Profile Validation Schemas > GetUserMovementsSchema > should accept empty object (all optional)
+2026-04-03T15:50:53.0065956Z (pass) Profile Validation Schemas > GetUserMovementsSchema > should accept valid page and limit
+2026-04-03T15:50:53.0069304Z (pass) Profile Validation Schemas > GetUserMovementsSchema > should reject page less than 1 [1.00ms]
+2026-04-03T15:50:53.0071286Z (pass) Profile Validation Schemas > GetUserMovementsSchema > should reject non-integer page
+2026-04-03T15:50:53.0072656Z (pass) Profile Validation Schemas > GetUserMovementsSchema > should reject limit less than 1
+2026-04-03T15:50:53.0074095Z (pass) Profile Validation Schemas > GetUserMovementsSchema > should reject limit greater than 100
+2026-04-03T15:50:53.0075301Z (pass) Profile Validation Schemas > GetUserMovementsSchema > should reject non-integer limit
+2026-04-03T15:50:53.0076473Z (pass) Profile Validation Schemas > GetUserMovementsSchema > should accept valid entry_type filter
+2026-04-03T15:50:53.0078287Z (pass) Profile Validation Schemas > GetUserMovementsSchema > should reject invalid entry_type filter
+2026-04-03T15:50:53.0083955Z (pass) Profile Validation Schemas > GetUserMovementsSchema > should accept valid transaction_type filter [1.00ms]
+2026-04-03T15:50:53.0089783Z (pass) Profile Validation Schemas > GetUserMovementsSchema > should reject invalid transaction_type filter
+2026-04-03T15:50:53.0091126Z (pass) Profile Validation Schemas > GetUserMovementsSchema > should accept valid asset_id filter
+2026-04-03T15:50:53.0092046Z (pass) Profile Validation Schemas > GetUserMovementsSchema > should reject invalid asset_id filter
+2026-04-03T15:50:53.0092921Z (pass) Profile Validation Schemas > GetUserMovementsSchema > should accept all valid filters combined
+2026-04-03T15:50:53.0093892Z (pass) Profile Validation Schemas > GetUserMovementsSchema > should reject when any single filter is invalid in a combined request
+2026-04-03T15:50:53.0094678Z (pass) Profile Validation Schemas > GetUserMovementsSchema > should provide helpful error messages [1.00ms]
+2026-04-03T15:50:53.0095088Z 
+2026-04-03T15:50:53.0095367Z ##[endgroup]
+2026-04-03T15:50:53.0095470Z 
+2026-04-03T15:50:53.0095739Z ##[group]packages/core/tests/unit/api/vault.test.ts:
+2026-04-03T15:50:53.0136545Z (pass) VaultAPIImpl > deposit > skips allowance check for native token deposits (zero address) [2.00ms]
+2026-04-03T15:50:53.0139280Z (pass) VaultAPIImpl > deposit > calls depositNative with msg.value for native token deposits (zero address) [1.00ms]
+2026-04-03T15:50:53.0143933Z (pass) VaultAPIImpl > deposit > calls deposit (not depositNative) for ERC20 token deposits
+2026-04-03T15:50:53.0146158Z (pass) VaultAPIImpl > deposit > checks allowance for ERC20 token deposits
+2026-04-03T15:50:53.0149296Z (pass) VaultAPIImpl > deposit > throws ContractError when ERC20 token has insufficient allowance [1.00ms]
+2026-04-03T15:50:53.0155459Z (pass) VaultAPIImpl > withdraw > calls withdrawNative for native token withdrawals (zero address)
+2026-04-03T15:50:53.0157913Z (pass) VaultAPIImpl > withdraw > calls withdraw (not withdrawNative) for ERC20 token withdrawals
+2026-04-03T15:50:53.0160803Z (pass) VaultAPIImpl > withdraw > returns confirmed status on successful withdrawal [1.00ms]
+2026-04-03T15:50:53.0165312Z (pass) VaultAPIImpl > approve > sends approve transaction to token contract
+2026-04-03T15:50:53.0167153Z (pass) VaultAPIImpl > approve > throws ContractError when asset is not found
+2026-04-03T15:50:53.0170402Z (pass) VaultAPIImpl > approve > returns pending status when autoWait is false [1.00ms]
+2026-04-03T15:50:53.0172683Z (pass) VaultAPIImpl > getAllowance > returns current allowance from token contract
+2026-04-03T15:50:53.0173691Z (pass) VaultAPIImpl > getAllowance > throws ContractError when asset is not found
+2026-04-03T15:50:53.0175208Z (pass) VaultAPIImpl > needsApproval > returns true when allowance is less than amount
+2026-04-03T15:50:53.0177020Z (pass) VaultAPIImpl > needsApproval > returns false when allowance is equal to amount
+2026-04-03T15:50:53.0178801Z (pass) VaultAPIImpl > needsApproval > returns false when allowance is greater than amount [1.00ms]
+2026-04-03T15:50:53.0180038Z (pass) VaultAPIImpl > getBalance > throws APIError with deprecation message
+2026-04-03T15:50:53.0180955Z (pass) VaultAPIImpl > getBalance > throws APIError with status code 410
+2026-04-03T15:50:53.0181412Z 
+2026-04-03T15:50:53.0181825Z ##[endgroup]
+2026-04-03T15:50:53.0182002Z 
+2026-04-03T15:50:53.0182448Z ##[group]packages/core/tests/unit/api/trading.test.ts:
+2026-04-03T15:50:53.0228954Z (pass) TradingAPIImpl > placeLimitOrder > places a limit buy order successfully [1.00ms]
+2026-04-03T15:50:53.0230828Z (pass) TradingAPIImpl > placeLimitOrder > places a limit sell order successfully [1.00ms]
+2026-04-03T15:50:53.0233936Z (pass) TradingAPIImpl > placeLimitOrder > places a limit order with expiration date (GTC)
+2026-04-03T15:50:53.0235616Z (pass) TradingAPIImpl > placeLimitOrder > places a limit order with IOC time in force
+2026-04-03T15:50:53.0237941Z (pass) TradingAPIImpl > placeLimitOrder > places a limit order with FOK time in force
+2026-04-03T15:50:53.0239812Z (pass) TradingAPIImpl > placeLimitOrder > places a limit order with useMasterBalance option [1.00ms]
+2026-04-03T15:50:53.0242747Z (pass) TradingAPIImpl > placeLimitOrder > throws APIError when API returns insufficient balance
+2026-04-03T15:50:53.0244480Z (pass) TradingAPIImpl > placeLimitOrder > throws APIError when unauthorized
+2026-04-03T15:50:53.0247737Z (pass) TradingAPIImpl > placeLimitOrder > throws APIError when network request fails
+2026-04-03T15:50:53.0249939Z (pass) TradingAPIImpl > placeLimitOrder > throws validation error for invalid trading pair ID [1.00ms]
+2026-04-03T15:50:53.0251814Z (pass) TradingAPIImpl > placeLimitOrder > throws validation error for invalid side
+2026-04-03T15:50:53.0260971Z (pass) TradingAPIImpl > placeMarketOrder > places a market buy order successfully [1.00ms]
+2026-04-03T15:50:53.0262736Z (pass) TradingAPIImpl > placeMarketOrder > places a market sell order successfully
+2026-04-03T15:50:53.0264875Z (pass) TradingAPIImpl > placeMarketOrder > places a market order with slippage tolerance (1%)
+2026-04-03T15:50:53.0267182Z (pass) TradingAPIImpl > placeMarketOrder > places a market order with zero slippage (best price only)
+2026-04-03T15:50:53.0268823Z (pass) TradingAPIImpl > placeMarketOrder > throws APIError when API returns error [1.00ms]
+2026-04-03T15:50:53.0273368Z (pass) TradingAPIImpl > cancelOrder > cancels an order successfully
+2026-04-03T15:50:53.0274521Z (pass) TradingAPIImpl > cancelOrder > throws APIError when order not found
+2026-04-03T15:50:53.0275836Z (pass) TradingAPIImpl > cancelOrder > throws APIError when order already filled
+2026-04-03T15:50:53.0277195Z (pass) TradingAPIImpl > cancelOrder > throws APIError when unauthorized
+2026-04-03T15:50:53.0285195Z (pass) TradingAPIImpl > replaceOrder > replaces an order with new price successfully [1.00ms]
+2026-04-03T15:50:53.0287143Z (pass) TradingAPIImpl > replaceOrder > replaces an order with new quantity successfully
+2026-04-03T15:50:53.0290054Z (pass) TradingAPIImpl > replaceOrder > replaces an order with both price and quantity [1.00ms]
+2026-04-03T15:50:53.0291723Z (pass) TradingAPIImpl > replaceOrder > replaces an order with useMasterBalance option
+2026-04-03T15:50:53.0293583Z (pass) TradingAPIImpl > replaceOrder > throws APIError when order not found
+2026-04-03T15:50:53.0297680Z (pass) TradingAPIImpl > getPaginatedOrders > fetches paginated orders with default parameters
+2026-04-03T15:50:53.0302837Z (pass) TradingAPIImpl > getPaginatedOrders > fetches paginated orders with custom page and page_size [1.00ms]
+2026-04-03T15:50:53.0304041Z (pass) TradingAPIImpl > getPaginatedOrders > fetches orders filtered by status
+2026-04-03T15:50:53.0306728Z (pass) TradingAPIImpl > getPaginatedOrders > fetches orders filtered by settled on-chain status
+2026-04-03T15:50:53.0308499Z (pass) TradingAPIImpl > getPaginatedOrders > fetches orders filtered by trading pair [1.00ms]
+2026-04-03T15:50:53.0310476Z (pass) TradingAPIImpl > getPaginatedOrders > fetches orders with all filter parameters
+2026-04-03T15:50:53.0312759Z (pass) TradingAPIImpl > getPaginatedOrders > throws validation error when page_size exceeds 100
+2026-04-03T15:50:53.0314306Z (pass) TradingAPIImpl > getPaginatedOrders > throws validation error when page is less than 1
+2026-04-03T15:50:53.0316697Z (pass) TradingAPIImpl > getPaginatedOrders > handles empty orders list
+2026-04-03T15:50:53.0317872Z (pass) TradingAPIImpl > getPaginatedOrders > throws APIError when unauthorized
+2026-04-03T15:50:53.0320907Z (pass) TradingAPIImpl > getOrder > fetches a single order by ID successfully [1.00ms]
+2026-04-03T15:50:53.0322863Z (pass) TradingAPIImpl > getOrder > fetches order with all fields populated
+2026-04-03T15:50:53.0323918Z (pass) TradingAPIImpl > getOrder > throws APIError when order not found
+2026-04-03T15:50:53.0325199Z (pass) TradingAPIImpl > getOrder > throws APIError when unauthorized
+2026-04-03T15:50:53.0326359Z (pass) TradingAPIImpl > getOrder > throws APIError when network request fails
+2026-04-03T15:50:53.0340785Z (pass) TradingAPIImpl > batchCreate > batch creates multiple orders successfully [2.00ms]
+2026-04-03T15:50:53.0342800Z (pass) TradingAPIImpl > batchCreate > handles partial failures in batch create
+2026-04-03T15:50:53.0344291Z (pass) TradingAPIImpl > batchCreate > throws validation error when orders array is empty
+2026-04-03T15:50:53.0347032Z (pass) TradingAPIImpl > batchCreate > throws validation error for invalid trading pair UUID
+2026-04-03T15:50:53.0348988Z (pass) TradingAPIImpl > batchCreate > throws validation error for LIMIT order without price [1.00ms]
+2026-04-03T15:50:53.0350348Z (pass) TradingAPIImpl > batchCreate > throws validation error for MARKET order with price
+2026-04-03T15:50:53.0352528Z (pass) TradingAPIImpl > batchCreate > throws validation error for invalid quantity
+2026-04-03T15:50:53.0354184Z (pass) TradingAPIImpl > batchCreate > throws validation error for invalid side
+2026-04-03T15:50:53.0355936Z (pass) TradingAPIImpl > batchCreate > throws APIError when unauthorized
+2026-04-03T15:50:53.0357324Z (pass) TradingAPIImpl > batchCreate > throws APIError when network request fails
+2026-04-03T15:50:53.0364691Z (pass) TradingAPIImpl > batchReplace > batch replaces multiple orders successfully [1.00ms]
+2026-04-03T15:50:53.0367174Z (pass) TradingAPIImpl > batchReplace > handles partial failures in batch replace
+2026-04-03T15:50:53.0369453Z (pass) TradingAPIImpl > batchReplace > batch replaces with both price and quantity [1.00ms]
+2026-04-03T15:50:53.0371344Z (pass) TradingAPIImpl > batchReplace > batch replaces with useMasterBalance option
+2026-04-03T15:50:53.0372787Z (pass) TradingAPIImpl > batchReplace > throws validation error when orders array is empty
+2026-04-03T15:50:53.0374451Z (pass) TradingAPIImpl > batchReplace > throws validation error for invalid order ID
+2026-04-03T15:50:53.0375807Z (pass) TradingAPIImpl > batchReplace > throws validation error when neither price nor quantity provided
+2026-04-03T15:50:53.0377887Z (pass) TradingAPIImpl > batchReplace > throws validation error for invalid price
+2026-04-03T15:50:53.0379592Z (pass) TradingAPIImpl > batchReplace > throws APIError when unauthorized [1.00ms]
+2026-04-03T15:50:53.0380624Z (pass) TradingAPIImpl > batchReplace > throws APIError when network request fails
+2026-04-03T15:50:53.0383131Z (pass) TradingAPIImpl > authentication > includes authorization header in all requests
+2026-04-03T15:50:53.0386458Z (pass) TradingAPIImpl > authentication > throws APIError when no access token is set
+2026-04-03T15:50:53.0386906Z 
+2026-04-03T15:50:53.0387210Z ##[endgroup]
+2026-04-03T15:50:53.0387330Z 
+2026-04-03T15:50:53.0387897Z ##[group]packages/core/tests/unit/api/profile.test.ts:
+2026-04-03T15:50:53.0419227Z (pass) ProfileAPIImpl > Constructor > creates ProfileAPIImpl instance with valid parameters [1.00ms]
+2026-04-03T15:50:53.0421786Z (pass) ProfileAPIImpl > getProfile > fetches user profile successfully
+2026-04-03T15:50:53.0422988Z (pass) ProfileAPIImpl > getProfile > handles profile with null username
+2026-04-03T15:50:53.0424728Z (pass) ProfileAPIImpl > getProfile > throws APIError when API request fails
+2026-04-03T15:50:53.0425466Z (pass) ProfileAPIImpl > getProfile > throws APIError when network request fails
+2026-04-03T15:50:53.0426265Z (pass) ProfileAPIImpl > getProfile > throws error when access token is not set
+2026-04-03T15:50:53.0431104Z (pass) ProfileAPIImpl > getPaginatedUserMovements > fetches user movements with default parameters [1.00ms]
+2026-04-03T15:50:53.0432702Z (pass) ProfileAPIImpl > getPaginatedUserMovements > fetches user movements with page parameter
+2026-04-03T15:50:53.0434730Z (pass) ProfileAPIImpl > getPaginatedUserMovements > fetches user movements with limit parameter
+2026-04-03T15:50:53.0437111Z (pass) ProfileAPIImpl > getPaginatedUserMovements > fetches user movements with both page and limit parameters
+2026-04-03T15:50:53.0438742Z (pass) ProfileAPIImpl > getPaginatedUserMovements > handles empty movements list [1.00ms]
+2026-04-03T15:50:53.0441247Z (pass) ProfileAPIImpl > getPaginatedUserMovements > handles movements with null fields
+2026-04-03T15:50:53.0442603Z (pass) ProfileAPIImpl > getPaginatedUserMovements > throws APIError when API request fails
+2026-04-03T15:50:53.0443968Z (pass) ProfileAPIImpl > getPaginatedUserMovements > throws APIError when network request fails
+2026-04-03T15:50:53.0445364Z (pass) ProfileAPIImpl > getPaginatedUserMovements > throws error when access token is not set
+2026-04-03T15:50:53.0446667Z (pass) ProfileAPIImpl > getPaginatedUserMovements > handles limit parameter of 1
+2026-04-03T15:50:53.0448115Z (pass) ProfileAPIImpl > getPaginatedUserMovements > fetches user movements with entry_type filter
+2026-04-03T15:50:53.0449714Z (pass) ProfileAPIImpl > getPaginatedUserMovements > fetches user movements with transaction_type filter [1.00ms]
+2026-04-03T15:50:53.0451354Z (pass) ProfileAPIImpl > getPaginatedUserMovements > fetches user movements with asset_id filter
+2026-04-03T15:50:53.0453447Z (pass) ProfileAPIImpl > getPaginatedUserMovements > fetches user movements with all filters combined
+2026-04-03T15:50:53.0455174Z (pass) ProfileAPIImpl > getPaginatedUserMovements > throws ValidationError for invalid page (less than 1)
+2026-04-03T15:50:53.0456622Z (pass) ProfileAPIImpl > getPaginatedUserMovements > throws ValidationError for invalid limit (exceeds 100)
+2026-04-03T15:50:53.0458486Z (pass) ProfileAPIImpl > getPaginatedUserMovements > throws ValidationError for invalid entry_type [1.00ms]
+2026-04-03T15:50:53.0459730Z (pass) ProfileAPIImpl > getPaginatedUserMovements > throws ValidationError for invalid transaction_type
+2026-04-03T15:50:53.0461510Z (pass) ProfileAPIImpl > getPaginatedUserMovements > throws ValidationError for invalid asset_id
+2026-04-03T15:50:53.0464477Z (pass) ProfileAPIImpl > getUserBalances > fetches user balances with default parameters
+2026-04-03T15:50:53.0465945Z (pass) ProfileAPIImpl > getUserBalances > fetches user balances with limit and offset
+2026-04-03T15:50:53.0467132Z (pass) ProfileAPIImpl > getUserBalances > throws APIError when API request fails
+2026-04-03T15:50:53.0470978Z (pass) ProfileAPIImpl > getUserBalanceByAssetId > fetches user balance for a specific asset successfully [1.00ms]
+2026-04-03T15:50:53.0472072Z (pass) ProfileAPIImpl > getUserBalanceByAssetId > handles balance with null symbol
+2026-04-03T15:50:53.0473558Z (pass) ProfileAPIImpl > getUserBalanceByAssetId > handles zero balances
+2026-04-03T15:50:53.0475698Z (pass) ProfileAPIImpl > getUserBalanceByAssetId > throws APIError when asset not found (404)
+2026-04-03T15:50:53.0476949Z (pass) ProfileAPIImpl > getUserBalanceByAssetId > throws APIError when API request fails
+2026-04-03T15:50:53.0478329Z (pass) ProfileAPIImpl > getUserBalanceByAssetId > throws APIError when network request fails
+2026-04-03T15:50:53.0479468Z (pass) ProfileAPIImpl > getUserBalanceByAssetId > throws error when access token is not set [1.00ms]
+2026-04-03T15:50:53.0481120Z (pass) ProfileAPIImpl > getUserBalanceByAssetId > handles different assets correctly
+2026-04-03T15:50:53.0482351Z (pass) ProfileAPIImpl > getUserBalanceByAssetId > throws APIError for empty assetId
+2026-04-03T15:50:53.0483347Z (pass) ProfileAPIImpl > getUserBalanceByAssetId > throws APIError for whitespace-only assetId
+2026-04-03T15:50:53.0484381Z (pass) ProfileAPIImpl > getUserBalanceByAssetId > does not make API request when assetId is invalid
+2026-04-03T15:50:53.0487149Z (pass) ProfileAPIImpl > getUserTrades > fetches user trades with default parameters
+2026-04-03T15:50:53.0491491Z (pass) ProfileAPIImpl > getUserTrades > fetches user trades with page parameter [1.00ms]
+2026-04-03T15:50:53.0493280Z (pass) ProfileAPIImpl > getUserTrades > fetches user trades with limit parameter
+2026-04-03T15:50:53.0494881Z (pass) ProfileAPIImpl > getUserTrades > fetches user trades filtered by trading_pair_id
+2026-04-03T15:50:53.0496878Z (pass) ProfileAPIImpl > getUserTrades > fetches user trades with all parameters combined
+2026-04-03T15:50:53.0498097Z (pass) ProfileAPIImpl > getUserTrades > handles empty trades list
+2026-04-03T15:50:53.0499678Z (pass) ProfileAPIImpl > getUserTrades > throws APIError when API request fails [1.00ms]
+2026-04-03T15:50:53.0500828Z (pass) ProfileAPIImpl > getUserTrades > throws error when access token is not set
+2026-04-03T15:50:53.0502609Z (pass) ProfileAPIImpl > getUserTrades > throws ValidationError for invalid page
+2026-04-03T15:50:53.0503771Z (pass) ProfileAPIImpl > getUserTrades > throws ValidationError for limit exceeding 100
+2026-04-03T15:50:53.0505116Z (pass) ProfileAPIImpl > getUserTrades > throws ValidationError for invalid trading_pair_id
+2026-04-03T15:50:53.0505727Z 
+2026-04-03T15:50:53.0506163Z ##[endgroup]
+2026-04-03T15:50:53.0506355Z 
+2026-04-03T15:50:53.0506642Z ##[group]packages/core/tests/unit/api/fees.test.ts:
+2026-04-03T15:50:53.0530024Z (pass) FeesAPIImpl > simulateFees > passes required params as query params [1.00ms]
+2026-04-03T15:50:53.0532168Z (pass) FeesAPIImpl > simulateFees > passes order_type and slippage_tolerance_bps when provided
+2026-04-03T15:50:53.0534804Z (pass) FeesAPIImpl > simulateFees > omits order_type and slippage_tolerance_bps when undefined
+2026-04-03T15:50:53.0537554Z (pass) FeesAPIImpl > simulateFees > rejects slippage_tolerance_bps without MARKET order_type
+2026-04-03T15:50:53.0542312Z (pass) FeesAPIImpl > simulateFees > rejects slippage_tolerance_bps with LIMIT order_type [1.00ms]
+2026-04-03T15:50:53.0543327Z (pass) FeesAPIImpl > simulateFees > uses GET method with authenticated request
+2026-04-03T15:50:53.0543850Z 
+2026-04-03T15:50:53.0544261Z ##[endgroup]
+2026-04-03T15:50:53.0544484Z 
+2026-04-03T15:50:53.0544967Z ##[group]packages/core/tests/unit/api/websocket.test.ts:
+2026-04-03T15:50:53.0681806Z (pass) MonacoWebSocket > Connection Management > should connect to WebSocket server [11.00ms]
+2026-04-03T15:50:53.1001198Z (pass) MonacoWebSocket > Connection Management > should disconnect cleanly [32.00ms]
+2026-04-03T15:50:53.1112019Z (pass) MonacoWebSocket > Connection Management > should include token in URL when set [11.00ms]
+2026-04-03T15:50:53.1225324Z (pass) MonacoWebSocket > OHLCV Subscriptions > should subscribe to OHLCV channel with correct format [11.00ms]
+2026-04-03T15:50:53.1332422Z (pass) MonacoWebSocket > OHLCV Subscriptions > should call handler when OHLCV event received [11.00ms]
+2026-04-03T15:50:53.1444059Z (pass) MonacoWebSocket > OHLCV Subscriptions > should unsubscribe from OHLCV channel [11.00ms]
+2026-04-03T15:50:53.1555419Z (pass) MonacoWebSocket > Orderbook Subscriptions > should subscribe to orderbook channel with correct format [11.00ms]
+2026-04-03T15:50:53.1661480Z (pass) MonacoWebSocket > Orderbook Subscriptions > should call handler when orderbook event received [11.00ms]
+2026-04-03T15:50:53.1775787Z (pass) MonacoWebSocket > Orderbook Subscriptions > should throw error for invalid magnitude [11.00ms]
+2026-04-03T15:50:53.1874586Z (pass) MonacoWebSocket > Orders Subscriptions > should subscribe to orders channel with correct format [10.00ms]
+2026-04-03T15:50:53.1981558Z (pass) MonacoWebSocket > Orders Subscriptions > should call handler when order event received [11.00ms]
+2026-04-03T15:50:53.2086676Z (pass) MonacoWebSocket > Trades Subscriptions > should subscribe to trades channel with correct format [11.00ms]
+2026-04-03T15:50:53.2206572Z (pass) MonacoWebSocket > Trades Subscriptions > should call handler when trade event received [11.00ms]
+2026-04-03T15:50:53.2309507Z (pass) MonacoWebSocket > Trades Subscriptions > should unsubscribe from trades channel [11.00ms]
+2026-04-03T15:50:53.2426709Z (pass) MonacoWebSocket > Movements Subscriptions > should subscribe to movements channel with correct format [11.00ms]
+2026-04-03T15:50:53.2547464Z (pass) MonacoWebSocket > Movements Subscriptions > should call handler when movement event received [12.00ms]
+2026-04-03T15:50:53.2647458Z (pass) MonacoWebSocket > Movements Subscriptions > should unsubscribe from movements channel [11.00ms]
+2026-04-03T15:50:53.2760605Z (pass) MonacoWebSocket > Balances Subscriptions > should subscribe to balances channel with correct format [11.00ms]
+2026-04-03T15:50:53.2870080Z (pass) MonacoWebSocket > Balances Subscriptions > should call handler when balance event received [11.00ms]
+2026-04-03T15:50:53.2990713Z (pass) MonacoWebSocket > Balances Subscriptions > should handle balance event with null symbol and reference_id [12.00ms]
+2026-04-03T15:50:53.3094412Z (pass) MonacoWebSocket > Balances Subscriptions > should unsubscribe from balances channel [10.00ms]
+2026-04-03T15:50:53.3209708Z (pass) MonacoWebSocket > Heartbeat > should handle pong messages silently [11.00ms]
+2026-04-03T15:50:53.3539357Z (pass) MonacoWebSocket > Disconnect Behavior > should clear handlers on disconnect [34.00ms]
+2026-04-03T15:50:53.3540243Z 
+2026-04-03T15:50:53.3541399Z ##[endgroup]
+2026-04-03T15:50:53.3541616Z 
+2026-04-03T15:50:53.3542123Z 5 tests failed:
+2026-04-03T15:50:53.3542899Z (fail) loadConfig > returns null privateKey when MONACO_PRIVATE_KEY is missing [2.00ms]
+2026-04-03T15:50:53.3544094Z (fail) loadConfig > throws when MONACO_PRIVATE_KEY doesn't start with 0x
+2026-04-03T15:50:53.3545257Z (fail) loadConfig > throws when MONACO_PRIVATE_KEY is set but MONACO_CLIENT_ID is missing
+2026-04-03T15:50:53.3546229Z (fail) loadConfig > defaults MONACO_RPC_URL based on network when unset
+2026-04-03T15:50:53.3547137Z (fail) loadConfig > defaults network to mainnet when MONACO_NETWORK is unset
+2026-04-03T15:50:53.3548032Z 
+2026-04-03T15:50:53.3548169Z  250 pass
+2026-04-03T15:50:53.3548496Z  5 fail
+2026-04-03T15:50:53.3548821Z  588 expect() calls
+2026-04-03T15:50:53.3549227Z Ran 255 tests across 14 files. [647.00ms]
+2026-04-03T15:50:53.3641685Z error: script "test" exited with code 1
+2026-04-03T15:50:53.3651073Z ##[error]Process completed with exit code 1.
+2026-04-03T15:50:53.3761844Z Post job cleanup.
+2026-04-03T15:50:53.4699668Z [command]/usr/bin/git version
+2026-04-03T15:50:53.4742292Z git version 2.53.0
+2026-04-03T15:50:53.4784681Z Temporarily overriding HOME='/home/runner/work/_temp/5a70cd3a-9d28-4226-9efc-447cee9af23a' before making global git config changes
+2026-04-03T15:50:53.4785694Z Adding repository directory to the temporary git global config as a safe directory
+2026-04-03T15:50:53.4789864Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/monaco-sdk/monaco-sdk
+2026-04-03T15:50:53.4822776Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-04-03T15:50:53.4855507Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-04-03T15:50:53.5074502Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-04-03T15:50:53.5095346Z http.https://github.com/.extraheader
+2026-04-03T15:50:53.5108933Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-04-03T15:50:53.5138694Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-04-03T15:50:53.5354454Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-04-03T15:50:53.5384632Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-04-03T15:50:53.5705901Z Cleaning up orphan processes
+2026-04-03T15:50:53.6100261Z ##[warning]Node.js 20 actions are deprecated. The following actions are running on Node.js 20 and may not work as expected: actions/checkout@v4. Actions will be forced to run with Node.js 24 by default starting June 2nd, 2026. Node.js 20 will be removed from the runner on September 16th, 2026. Please check if updated versions of these actions are available that support Node.js 24. To opt into Node.js 24 now, set the FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true environment variable on the runner or in your workflow file. Once Node.js 24 becomes the default, you can temporarily opt out by setting ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

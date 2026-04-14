@@ -1,0 +1,47 @@
+{
+  "case_id": "gh-Herd-OS-herd-23853571655",
+  "repo": "Herd-OS/herd",
+  "run_id": 23853571655,
+  "tags": [
+    "smoke"
+  ],
+  "transition": {
+    "failing_commit": "005ffcc80141e2854abc040e767ed1481d008a2e",
+    "fix_commit": "d02dd7a24c957a1a0adafeee5a3b1c40d0a391a4",
+    "pr_url": "https://github.com/Herd-OS/herd/pull/417",
+    "pr_title": "[herd] Fix stale conflict resolution issues blocking integrator pipeline (4 tasks)",
+    "files_changed": [
+      ".herd/progress/413.md",
+      "internal/worker/worker_test.go"
+    ],
+    "fix_size_lines": 21
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "[herd] Fix stale conflict resolution issues blocking integrator pipeline (4 tasks)",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "assertion",
+        "bug_location": "production"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "",
+    "llm_correlation": "YES. The diff modifies test cases related to batch branch handling and conflict resolution, specifically `TestWorkerNoOpPath_PostsReport`, `TestWorkerNoOpPath_PostsBatchPRComment`, and `TestExec_Resum"
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "case_id": "gh-bsr-0-march-madness-forecaster-24016174686",
+  "repo": "bsr-0/march-madness-forecaster",
+  "run_id": 24016174686,
+  "tags": [
+    "smoke"
+  ],
+  "transition": {
+    "failing_commit": "69722dcb05b28eeb249cfbb6151b9b4f4f636af5",
+    "fix_commit": "10eb87d5d1e1780b305518f86457a82ae0e08181",
+    "pr_url": "https://github.com/bsr-0/march-madness-forecaster/pull/359",
+    "pr_title": "fix: mock tournament date guard in CI-failing scraper tests",
+    "files_changed": [
+      "tests/test_torvik_refactor.py",
+      "tests/test_torvik_scraper.py"
+    ],
+    "fix_size_lines": 33
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix: mock tournament date guard in CI-failing scraper tests",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "timeout",
+        "bug_location": "test"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "",
+    "llm_correlation": "YES. The PR title indicates that the fix addresses CI-failing scraper tests by mocking the `_check_tournament_date_guard` method. The diff shows that this method is now being mocked in the `test_ranki"
+  }
+}

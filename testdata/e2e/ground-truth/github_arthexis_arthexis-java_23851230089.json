@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-arthexis-arthexis-java-23851230089",
+  "repo": "arthexis/arthexis-java",
+  "run_id": 23851230089,
+  "tags": [],
+  "transition": {
+    "failing_commit": "01fac964ffcc1e23faadec4119d71eda95d6fc4e",
+    "fix_commit": "2479f81e9b233713ff97ed385ac9c3c125dfcb5d",
+    "pr_url": "https://github.com/arthexis/arthexis-java/pull/47",
+    "pr_title": "Fix failing tests and migration compatibility",
+    "files_changed": [
+      ".github/workflows/ci.yml"
+    ],
+    "fix_size_lines": 6
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "Fix failing tests and migration compatibility",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "infrastructure"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES\nThe diff installs a specific version of Playwright and Chromium, and updates the `npx` commands to use the installed Playwright directly. This suggests the test failure was related to Playwright o"
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-vultisig-vultisig-sdk-24169840915",
+  "repo": "vultisig/vultisig-sdk",
+  "run_id": 24169840915,
+  "tags": [],
+  "transition": {
+    "failing_commit": "159cb6c70acff2964e7023290e837735220a0eec",
+    "fix_commit": "52a8e982293e0ce36964e8ed60da2c612b1ed247",
+    "pr_url": "https://github.com/vultisig/vultisig-sdk/pull/205",
+    "pr_title": "fix(sdk): vault import error codes and edge-case unit tests",
+    "files_changed": [
+      "packages/sdk/tests/unit/vault/VaultManager.test.ts"
+    ],
+    "fix_size_lines": 12
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix(sdk): vault import error codes and edge-case unit tests",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "test"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES\n\nThe PR title mentions \"vault import error codes\" and the diff includes changes to error handling during vault import, specifically adding a test case for an \"UNSUPPORTED_FORMAT\" error when import"
+  }
+}

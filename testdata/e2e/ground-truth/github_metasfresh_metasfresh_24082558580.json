@@ -1,0 +1,45 @@
+{
+  "case_id": "gh-metasfresh-metasfresh-24082558580",
+  "repo": "metasfresh/metasfresh",
+  "run_id": 24082558580,
+  "tags": [],
+  "transition": {
+    "failing_commit": "18c6d183219928f53f9cac8b54daaccc61572de1",
+    "fix_commit": "f5b39982119ff1ac699c8221ba8fe6875ee22110",
+    "pr_url": "https://github.com/metasfresh/metasfresh/pull/23355",
+    "pr_title": "Fix: Prevent a single failing schedule with qtyPickedZero from aborting the entire shipment batch",
+    "files_changed": [
+      "backend/de.metas.handlingunits.base/src/main/java/de/metas/handlingunits/shipmentschedule/api/ShipmentScheduleWithHUService.java",
+      "backend/de.metas.handlingunits.base/src/test/java/de/metas/handlingunits/shipmentschedule/api/ShipmentScheduleWithHUServiceTest.java"
+    ],
+    "fix_size_lines": 4
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "Fix: Prevent a single failing schedule with qtyPickedZero from aborting the entire shipment batch",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "production"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "",
+    "llm_correlation": "YES.\n\nThe PR title and the code diff both indicate that the fix addresses a scenario where a single failing shipment schedule (specifically, one with `qtyPickedZero`) was causing the entire batch to a"
+  }
+}

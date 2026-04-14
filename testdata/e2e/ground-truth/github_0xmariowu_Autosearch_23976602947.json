@@ -2,7 +2,9 @@
   "case_id": "gh-0xmariowu-Autosearch-23976602947",
   "repo": "0xmariowu/Autosearch",
   "run_id": 23976602947,
-  "tags": [],
+  "tags": [
+    "smoke"
+  ],
   "transition": {
     "failing_commit": "a3f90ab77266270a3d11ecd7e378451490def6d5",
     "fix_commit": "102a49d12fd63964e64a72833583fb4a3c493be4",

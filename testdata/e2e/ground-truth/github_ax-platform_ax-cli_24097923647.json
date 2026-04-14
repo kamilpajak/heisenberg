@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-ax-platform-ax-cli-24097923647",
+  "repo": "ax-platform/ax-cli",
+  "run_id": 24097923647,
+  "tags": [],
+  "transition": {
+    "failing_commit": "6a9ab4f34a0c30ed4f597bf282ff54dc468e1373",
+    "fix_commit": "236a886fe9b30817962dfb227cc880d0e3f94a6c",
+    "pr_url": "https://github.com/ax-platform/ax-cli/pull/22",
+    "pr_title": "chore(lint): ruff format ax_cli/ + pre-commit hooks (fix CI baseline)",
+    "files_changed": [
+      ".github/workflows/ci.yml"
+    ],
+    "fix_size_lines": 7
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "chore(lint): ruff format ax_cli/ + pre-commit hooks (fix CI baseline)",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "infrastructure"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES\nThe diff modifies the coverage threshold in the pytest command. The PR title also indicates that the change is intended to fix the CI baseline, suggesting that the previous coverage check was fail"
+  }
+}

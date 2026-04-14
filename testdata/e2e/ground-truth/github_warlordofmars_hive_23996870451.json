@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-warlordofmars-hive-23996870451",
+  "repo": "warlordofmars/hive",
+  "run_id": 23996870451,
+  "tags": [],
+  "transition": {
+    "failing_commit": "776eaca0e617a220b905d2e096e35edcc47bd784",
+    "fix_commit": "21626f3643c65b8aa72c40f5629827252b206520",
+    "pr_url": "https://github.com/warlordofmars/hive/pull/108",
+    "pr_title": "fix(ci): skip UI e2e tests in prod pipeline",
+    "files_changed": [
+      ".github/workflows/ci.yml"
+    ],
+    "fix_size_lines": 7
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix(ci): skip UI e2e tests in prod pipeline",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "timeout",
+        "bug_location": "infrastructure"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-06",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES\nThe diff removes the UI e2e tests from the production pipeline, and the PR title indicates this is intentional. The comment added explains why these tests are being skipped in the production envir"
+  }
+}

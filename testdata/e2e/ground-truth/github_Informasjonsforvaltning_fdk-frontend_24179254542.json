@@ -1,0 +1,47 @@
+{
+  "case_id": "gh-Informasjonsforvaltning-fdk-frontend-24179254542",
+  "repo": "Informasjonsforvaltning/fdk-frontend",
+  "run_id": 24179254542,
+  "tags": [
+    "smoke"
+  ],
+  "transition": {
+    "failing_commit": "2e46174d0c43c87d95bb695689c0d4951e7b5e53",
+    "fix_commit": "e03b8ea19ff70ef07e1a4af163cd628fc17d5c55",
+    "pr_url": "https://github.com/Informasjonsforvaltning/fdk-frontend/pull/833",
+    "pr_title": "fix: re-enable e2e tests in CI pipeline",
+    "files_changed": [
+      "libs/data-norge-e2e/src/page-object-model/formPage.ts",
+      "libs/ui/src/lib/label-with-tag/index.tsx"
+    ],
+    "fix_size_lines": 13
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix: re-enable e2e tests in CI pipeline",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "assertion",
+        "bug_location": "production"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "",
+    "llm_correlation": "YES\nThe test failure log indicates accessibility violations related to missing labels on form elements. The code diff modifies the test to check for the presence of labels on input and textarea elemen"
+  }
+}

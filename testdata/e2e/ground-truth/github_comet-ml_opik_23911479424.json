@@ -1,0 +1,46 @@
+{
+  "case_id": "gh-comet-ml-opik-23911479424",
+  "repo": "comet-ml/opik",
+  "run_id": 23911479424,
+  "tags": [],
+  "transition": {
+    "failing_commit": "18d132baa6312c4a1e789b435083aef4dfb94de4",
+    "fix_commit": "2d39b5b72883ff3aef8aaff9d2cea33fef6b6963",
+    "pr_url": "https://github.com/comet-ml/opik/pull/6064",
+    "pr_title": "[OPIK-5624] [BE/FE] fix: restore assertion_results in experiment items after evaluation suite deletion",
+    "files_changed": [
+      "apps/opik-backend/src/main/java/com/comet/opik/api/resources/v1/priv/DatasetsResource.java",
+      "apps/opik-backend/src/main/java/com/comet/opik/domain/DatasetService.java",
+      "apps/opik-frontend/src/v2/pages/CompareExperimentsPage/ExperimentItemsTab/ExperimentItemsTab.tsx"
+    ],
+    "fix_size_lines": 17
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "[OPIK-5624] [BE/FE] fix: restore assertion_results in experiment items after evaluation suite deletion",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "production"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "",
+    "llm_correlation": "YES\nThe PR title indicates that the fix is related to restoring assertion results in experiment items after evaluation suite deletion. The code changes in the diff seem to be related to handling datas"
+  }
+}

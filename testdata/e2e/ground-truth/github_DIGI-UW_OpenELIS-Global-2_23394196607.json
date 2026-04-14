@@ -1,0 +1,46 @@
+{
+  "case_id": "gh-DIGI-UW-OpenELIS-Global-2-23394196607",
+  "repo": "DIGI-UW/OpenELIS-Global-2",
+  "run_id": 23394196607,
+  "tags": [
+    "smoke"
+  ],
+  "transition": {
+    "failing_commit": "dd5f74112ab3f6ab99b9a7c736f66b51a7bac795",
+    "fix_commit": "02bd484467c8f266909f4824efa79936ebd19e2f",
+    "pr_url": "https://github.com/DIGI-UW/OpenELIS-Global-2/pull/3125",
+    "pr_title": "fix(ci): enable E2E tests for fork PRs via workflow_run fallback",
+    "files_changed": [
+      ".github/workflows/e2e-fork-pr.yml"
+    ],
+    "fix_size_lines": 15
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix(ci): enable E2E tests for fork PRs via workflow_run fallback",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "infrastructure"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "",
+    "llm_correlation": "YES\nThe diff focuses on enabling and improving the reliability of E2E tests for fork PRs. The changes include updating the commit status SHA, handling Docker push errors, and adjusting image repositor"
+  }
+}

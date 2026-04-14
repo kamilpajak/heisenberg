@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-JetBrains-youtrackdb-23081491421",
+  "repo": "JetBrains/youtrackdb",
+  "run_id": 23081491421,
+  "tags": [],
+  "transition": {
+    "failing_commit": "3c5fae69abb318716d05629fb6e67d4b6ac1c680",
+    "fix_commit": "d46f12d8a9fbb9f9d17a810d4db73f10aeacc437",
+    "pr_url": "https://github.com/JetBrains/youtrackdb/pull/794",
+    "pr_title": "YTDB-556: Fix flaky YTDBQueryMetricsStrategyTest monotonicity assertion",
+    "files_changed": [
+      "core/src/test/java/com/jetbrains/youtrackdb/internal/core/gremlin/gremlintest/scenarios/YTDBQueryMetricsStrategyTest.java"
+    ],
+    "fix_size_lines": 13
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "YTDB-556: Fix flaky YTDBQueryMetricsStrategyTest monotonicity assertion",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "production"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES\nThe PR title and the code diff both indicate that the change is intended to address flakiness in the `YTDBQueryMetricsStrategyTest` due to timing issues. The diff introduces a constant `ALLOWED_TI"
+  }
+}

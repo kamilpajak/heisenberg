@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-naorpeled-aitutor-23270144214",
+  "repo": "naorpeled/aitutor",
+  "run_id": 23270144214,
+  "tags": [],
+  "transition": {
+    "failing_commit": "9decd9f4568f72d01eb0e0924355e41f93e59d9a",
+    "fix_commit": "6a8d5fa5adabcc6b11f43f8ea549fd2c2b269405",
+    "pr_url": "https://github.com/naorpeled/aitutor/pull/3",
+    "pr_title": "fix: resolve smoke test CI failures on all platforms",
+    "files_changed": [
+      ".github/workflows/smoke.yml"
+    ],
+    "fix_size_lines": 6
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix: resolve smoke test CI failures on all platforms",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "infrastructure"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES\n\nThe diff modifies the perl command used to clean the output of the smoke tests. The original command only removed ANSI escape codes related to color and formatting. The updated command also remov"
+  }
+}

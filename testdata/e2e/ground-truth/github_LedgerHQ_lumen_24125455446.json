@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-LedgerHQ-lumen-24125455446",
+  "repo": "LedgerHQ/lumen",
+  "run_id": 24125455446,
+  "tags": [],
+  "transition": {
+    "failing_commit": "4d64bda4479c0a35ad4ea1715be04cab29f577e3",
+    "fix_commit": "a8470fa444c7430c114de37a9694c900e2bdd2bc",
+    "pr_url": "https://github.com/LedgerHQ/lumen/pull/615",
+    "pr_title": "[NTTVS-87] Prevent lcov path fix step from failing when no coverage files exist",
+    "files_changed": [
+      ".github/workflows/scan-sonar-called.yml"
+    ],
+    "fix_size_lines": 1
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "[NTTVS-87] Prevent lcov path fix step from failing when no coverage files exist",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "infrastructure"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES\nThe PR title indicates the fix addresses a potential failure related to coverage files not existing. The diff adds `continue-on-error: true` to the download-artifact action, which would prevent th"
+  }
+}

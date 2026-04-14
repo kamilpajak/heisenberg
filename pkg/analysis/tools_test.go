@@ -1619,7 +1619,7 @@ type mockCrossRepoProvider struct {
 
 func (m *mockCrossRepoProvider) Name() string          { return "mock-cross" }
 func (m *mockCrossRepoProvider) AnalysisHints() string { return "" }
-func (m *mockCrossRepoProvider) GetRepoFile(_ context.Context, path string) (string, error) {
+func (m *mockCrossRepoProvider) GetRepoFile(_ context.Context, path, ref string) (string, error) {
 	return "", fmt.Errorf("file not found: 404 %s", path)
 }
 func (m *mockCrossRepoProvider) ListDirectory(_ context.Context, _ string) ([]string, error) {
@@ -1628,7 +1628,7 @@ func (m *mockCrossRepoProvider) ListDirectory(_ context.Context, _ string) ([]st
 func (m *mockCrossRepoProvider) DiscoverRepos(_ context.Context, _ int64) ([]ci.RepoRef, error) {
 	return m.repos, m.repoErr
 }
-func (m *mockCrossRepoProvider) GetFileFromRepo(_ context.Context, repo ci.RepoRef, path string) (string, error) {
+func (m *mockCrossRepoProvider) GetFileFromRepo(_ context.Context, repo ci.RepoRef, path, ref string) (string, error) {
 	key := repo.Project + "/" + repo.Repo + ":" + path
 	if content, ok := m.files[key]; ok {
 		return content, nil

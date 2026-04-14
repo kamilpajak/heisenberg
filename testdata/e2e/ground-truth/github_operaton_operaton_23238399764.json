@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-operaton-operaton-23238399764",
+  "repo": "operaton/operaton",
+  "run_id": 23238399764,
+  "tags": [],
+  "transition": {
+    "failing_commit": "c2cbb42cc3fa83e4e2da943827087bc50543ba4c",
+    "fix_commit": "470c4d5a77100b2cdba907adefb1a52d4089ddce",
+    "pr_url": "https://github.com/operaton/operaton/pull/2604",
+    "pr_title": "test(engine): fix assertions for uncaught BPMN error tests",
+    "files_changed": [
+      "engine/src/test/java/org/operaton/bpm/engine/test/bpmn/event/error/BoundaryErrorEventTest.java"
+    ],
+    "fix_size_lines": 12
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "test(engine): fix assertions for uncaught BPMN error tests",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "assertion",
+        "bug_location": "production"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES\nThe log indicates that the projects are being skipped due to previous failures. While the log doesn't show the root cause of the original failures, the diff modifies test assertions related to unc"
+  }
+}

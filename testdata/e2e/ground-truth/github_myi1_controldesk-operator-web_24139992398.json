@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-myi1-controldesk-operator-web-24139992398",
+  "repo": "myi1/controldesk-operator-web",
+  "run_id": 24139992398,
+  "tags": [],
+  "transition": {
+    "failing_commit": "d64bf8327883c054f471e64b852541b0c177ac18",
+    "fix_commit": "7ca0bedabe7cb9281458e1e3de87bbda662cfb77",
+    "pr_url": "https://github.com/myi1/controldesk-operator-web/pull/81",
+    "pr_title": "fix(phase-3): queue table column quality + CI pipeline",
+    "files_changed": [
+      ".github/workflows/ci.yml"
+    ],
+    "fix_size_lines": 7
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix(phase-3): queue table column quality + CI pipeline",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "infrastructure"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES\nThe diff replaces `npm ci` with `npm install` and includes a comment explaining that `npm ci` fails due to differences in lock file generation between Windows and Linux, specifically related to op"
+  }
+}

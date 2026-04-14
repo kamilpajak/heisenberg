@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-posit-dev-positron-23914419092",
+  "repo": "posit-dev/positron",
+  "run_id": 23914419092,
+  "tags": [],
+  "transition": {
+    "failing_commit": "d64bd58bf4ec497e12a5c0397200fdf2d4093142",
+    "fix_commit": "672e8af4a00abb47bdf0b02611063c8c66d832ef",
+    "pr_url": "https://github.com/posit-dev/positron/pull/12811",
+    "pr_title": "Fix unit tests by stubbing IPositronConsoleService in runtime session tests",
+    "files_changed": [
+      "src/vs/workbench/test/browser/positronWorkbenchTestServices.ts"
+    ],
+    "fix_size_lines": 4
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "Fix unit tests by stubbing IPositronConsoleService in runtime session tests",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "assertion",
+        "bug_location": "production"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES\nThe PR title indicates that the change is intended to fix unit tests by stubbing `IPositronConsoleService`. The diff replaces the concrete `PositronConsoleService` with `TestPositronConsoleService"
+  }
+}

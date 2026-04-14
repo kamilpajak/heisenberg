@@ -1,0 +1,48 @@
+{
+  "case_id": "gh-nextxm-paisa-23390312501",
+  "repo": "nextxm/paisa",
+  "run_id": 23390312501,
+  "tags": [],
+  "transition": {
+    "failing_commit": "03333ce12b678c628266a986a9d2a1f2ca212370",
+    "fix_commit": "37d33f2f04e1d44ed804e3decc8ab13e50427ebd",
+    "pr_url": "https://github.com/nextxm/paisa/pull/199",
+    "pr_title": "Fix regression test failures: sync config.json fixtures with updated schema.json",
+    "files_changed": [
+      "tests/fixture/eur-hledger/config.json",
+      "tests/fixture/eur/config.json",
+      "tests/fixture/inr-beancount/config.json",
+      "tests/fixture/inr-hledger/config.json",
+      "tests/fixture/inr/config.json"
+    ],
+    "fix_size_lines": 35
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "Fix regression test failures: sync config.json fixtures with updated schema.json",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "assertion",
+        "bug_location": "test"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "hard",
+    "notes": "",
+    "llm_correlation": "YES\nThe PR title indicates that the change is intended to fix regression test failures by synchronizing configuration files with an updated schema. The diff removes `ui:open` properties from the JSON "
+  }
+}

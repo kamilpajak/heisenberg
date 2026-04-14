@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-performlikemj-nbhd-united-23950737313",
+  "repo": "performlikemj/nbhd-united",
+  "run_id": 23950737313,
+  "tags": [],
+  "transition": {
+    "failing_commit": "de1781466867b2f32f08a1a14cf7152b949cd446",
+    "fix_commit": "e2615dc696f7731fdb5fc096c73b0eb2a23d760d",
+    "pr_url": "https://github.com/performlikemj/nbhd-united/pull/235",
+    "pr_title": "fix(tests): update seed job payload kind assertion for main sessions",
+    "files_changed": [
+      "apps/orchestrator/test_services.py"
+    ],
+    "fix_size_lines": 11
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix(tests): update seed job payload kind assertion for main sessions",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "timeout",
+        "bug_location": "test"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES\nThe test failure log shows \"QStash not configured - executing task synchronously\" and \"TELEGRAM_WEBHOOK_SECRET is not configured\" along with \"Rate limited chat_id 4242\". While the QStash and Teleg"
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-cacheplane-stream-resource-24056833615",
+  "repo": "cacheplane/stream-resource",
+  "run_id": 24056833615,
+  "tags": [],
+  "transition": {
+    "failing_commit": "3e2d62cd1d01e63a734bce9ce14dec0dce0b3f59",
+    "fix_commit": "16d12d27311815279c61a0069886c52eb7837141",
+    "pr_url": "https://github.com/cacheplane/stream-resource/pull/38",
+    "pr_title": "fix(website): fix flaky e2e test blocking production deploys",
+    "files_changed": [
+      "apps/website/e2e/website.spec.ts"
+    ],
+    "fix_size_lines": 2
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix(website): fix flaky e2e test blocking production deploys",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "timeout",
+        "bug_location": "test"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES. The test failure log doesn't show the specific error, but the PR title indicates a flaky e2e test was blocking production deploys. The diff modifies an e2e test related to form validation on the "
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-ManimCommunity-manim-24038070807",
+  "repo": "ManimCommunity/manim",
+  "run_id": 24038070807,
+  "tags": [],
+  "transition": {
+    "failing_commit": "95b67e121177985e11150d148916fc1ed55d0e73",
+    "fix_commit": "5cd97091590bc808d6756d123b652dcff5c4e558",
+    "pr_url": "https://github.com/ManimCommunity/manim/pull/4679",
+    "pr_title": "Update TinyTeX Windows/macOS installation in `ci.yml` to fix failing pipelines",
+    "files_changed": [
+      ".github/workflows/ci.yml"
+    ],
+    "fix_size_lines": 2
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "Update TinyTeX Windows/macOS installation in `ci.yml` to fix failing pipelines",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "infrastructure"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES\nThe diff modifies the installation of TinyTeX on Windows, and the PR title indicates that this change is intended to fix failing pipelines. While the provided log doesn't explicitly show the TinyT"
+  }
+}

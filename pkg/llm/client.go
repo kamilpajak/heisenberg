@@ -70,8 +70,8 @@ func previewExcerpt(s string, maxLen int) string {
 }
 
 const (
-	apiRetries        = 3
-	apiRetryBaseDelay = 2 * time.Second
+	apiRetries        = 5
+	apiRetryBaseDelay = 5 * time.Second
 )
 
 // Client handles Gemini API calls with function calling support.
@@ -122,10 +122,23 @@ func describeEmptyResponse(c *Candidate) string {
 // DefaultModel is the Gemini model used when no override is specified.
 const DefaultModel = "gemini-2.5-pro"
 
+// ClientOption configures optional Client settings.
+type ClientOption func(*Client)
+
+// WithHTTPClient sets a custom HTTP client (e.g., for VCR recording/replay).
+// Also disables rate limiting and retry backoff since VCR replays don't hit real APIs.
+func WithHTTPClient(hc *http.Client) ClientOption {
+	return func(c *Client) {
+		c.httpClient = hc
+		c.limiter = rate.NewLimiter(rate.Inf, 1) // no rate limiting for VCR
+		c.retryBaseDelay = time.Millisecond      // near-instant retry for VCR
+	}
+}
+
 // NewClient creates a new LLM client (Google Gemini).
 // If model is empty, DefaultModel is used.
 // If apiKey is empty, falls back to the GOOGLE_API_KEY environment variable.
-func NewClient(model, apiKey string) (*Client, error) {
+func NewClient(model, apiKey string, opts ...ClientOption) (*Client, error) {
 	if apiKey == "" {
 		apiKey = os.Getenv("GOOGLE_API_KEY")
 	}
@@ -137,13 +150,17 @@ func NewClient(model, apiKey string) (*Client, error) {
 		model = DefaultModel
 	}
 
-	return &Client{
+	c := &Client{
 		apiKey:     apiKey,
 		baseURL:    "https://generativelanguage.googleapis.com/v1beta",
 		model:      model,
 		httpClient: &http.Client{Timeout: 120 * time.Second},
 		limiter:    rate.NewLimiter(rate.Every(6*time.Second), 1), // ~10 RPM
-	}, nil
+	}
+	for _, opt := range opts {
+		opt(c)
+	}
+	return c, nil
 }
 
 func systemPrompt(providerHints string) *Content {

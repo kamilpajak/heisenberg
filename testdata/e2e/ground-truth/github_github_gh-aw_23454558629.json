@@ -1,0 +1,49 @@
+{
+  "case_id": "gh-github-gh-aw-23454558629",
+  "repo": "github/gh-aw",
+  "run_id": 23454558629,
+  "tags": [],
+  "transition": {
+    "failing_commit": "f1aa5fe05078931776838ef334975bdee87819e6",
+    "fix_commit": "82f70953af2971ca385d1f476d2c344b8940140f",
+    "pr_url": "https://github.com/github/gh-aw/pull/22472",
+    "pr_title": "perf(parser): fix ParseWorkflow regression \u2014 eliminate redundant file read and YAML parse",
+    "files_changed": [
+      "pkg/workflow/compiler.go",
+      "pkg/workflow/compiler_performance_benchmark_test.go",
+      "pkg/workflow/schema_validation.go",
+      "pkg/workflow/testdata/wasm_golden/TestWasmGolden_CompileFixtures/basic-copilot.golden",
+      "pkg/workflow/testdata/wasm_golden/TestWasmGolden_CompileFixtures/smoke-copilot.golden",
+      "pkg/workflow/testdata/wasm_golden/TestWasmGolden_CompileFixtures/with-imports.golden"
+    ],
+    "fix_size_lines": 41
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "perf(parser): fix ParseWorkflow regression \u2014 eliminate redundant file read and YAML parse",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "timeout",
+        "bug_location": "production"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "hard",
+    "notes": "",
+    "llm_correlation": "YES\n\nThe test failure log shows an error during the execution of the GitHub Copilot CLI, which likely involves parsing and processing workflow files. The provided diff focuses on improving the perform"
+  }
+}

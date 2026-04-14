@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-napieraj-washreminder-24036285710",
+  "repo": "napieraj/washreminder",
+  "run_id": 24036285710,
+  "tags": [],
+  "transition": {
+    "failing_commit": "cfe7ca4b648f6185fa7b7470112e42d28a869531",
+    "fix_commit": "3c9a08ec23b37a7c1fdb19ef31c8f99e08186950",
+    "pr_url": "https://github.com/napieraj/washreminder/pull/2",
+    "pr_title": "Fix hassfest failing",
+    "files_changed": [
+      "custom_components/washreminder/manifest.json"
+    ],
+    "fix_size_lines": 12
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "Fix hassfest failing",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "production"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "Vague PR title \u2014 actual_cause needs human review",
+    "llm_correlation": "YES\nThe PR title indicates the fix is for a hassfest failure, and the diff modifies the `manifest.json` file, which is commonly validated by hassfest. Therefore, the code change directly addresses the"
+  }
+}

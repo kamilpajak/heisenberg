@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-tailor-platform-app-shell-24149121584",
+  "repo": "tailor-platform/app-shell",
+  "run_id": 24149121584,
+  "tags": [],
+  "transition": {
+    "failing_commit": "363bbe62324c17b4ac74f8f388056972d99a38d3",
+    "fix_commit": "e6ad1ea72e0bbabc42af8b4ba2ff8668cce2bc24",
+    "pr_url": "https://github.com/tailor-platform/app-shell/pull/172",
+    "pr_title": "ci: add dead link checker and fix broken docs links",
+    "files_changed": [
+      ".github/workflows/link-check.yaml"
+    ],
+    "fix_size_lines": 2
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "ci: add dead link checker and fix broken docs links",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "infrastructure"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES. The diff modifies the arguments passed to a dead link checker, specifically changing `--exclude-mail` to `--exclude 'mailto:'`. This suggests the test failure is related to broken links in the do"
+  }
+}

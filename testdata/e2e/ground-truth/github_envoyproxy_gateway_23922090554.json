@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-envoyproxy-gateway-23922090554",
+  "repo": "envoyproxy/gateway",
+  "run_id": 23922090554,
+  "tags": [],
+  "transition": {
+    "failing_commit": "73a14485f53f525f7dae988b9269cb7040afa3e2",
+    "fix_commit": "f460105f301e0ea55d6d65bdb4a45aae2e1616c1",
+    "pr_url": "https://github.com/envoyproxy/gateway/pull/8663",
+    "pr_title": "ci: fix broken go-benchmark-test",
+    "files_changed": [
+      ".github/workflows/build_and_test.yaml"
+    ],
+    "fix_size_lines": 1
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "ci: fix broken go-benchmark-test",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "timeout",
+        "bug_location": "infrastructure"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES\nThe diff adds `continue-on-error: true` to the \"Run Benchmark Comparison\" step in the `go-benchmark-test` job. The PR title also indicates that this change is intended to fix the broken `go-benchm"
+  }
+}

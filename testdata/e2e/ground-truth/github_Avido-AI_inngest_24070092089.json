@@ -1,0 +1,46 @@
+{
+  "case_id": "gh-Avido-AI-inngest-24070092089",
+  "repo": "Avido-AI/inngest",
+  "run_id": 24070092089,
+  "tags": [
+    "smoke"
+  ],
+  "transition": {
+    "failing_commit": "ed671b16f5be0ea2b3fb05edbdcee143adb0feb3",
+    "fix_commit": "e6a9fd2d00f20710309e25db38c0320aaba7a528",
+    "pr_url": "https://github.com/Avido-AI/inngest/pull/133",
+    "pr_title": "fix: resolve flaky tests in CI",
+    "files_changed": [
+      "pkg/execution/state/redis_state/queue_item_process_test.go"
+    ],
+    "fix_size_lines": 18
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix: resolve flaky tests in CI",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "timeout",
+        "bug_location": "production"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "",
+    "llm_correlation": "YES\nThe test failure log doesn't show a specific failure, but the PR title indicates the change is meant to address flaky tests. The diff modifies a test (`TestPartitionProcessRequeueAfterLimitedWithC"
+  }
+}

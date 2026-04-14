@@ -7,12 +7,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/kamilpajak/heisenberg/internal/vcr"
 	"github.com/kamilpajak/heisenberg/pkg/analysis"
 	"github.com/kamilpajak/heisenberg/pkg/azure"
 	"github.com/kamilpajak/heisenberg/pkg/ci"
@@ -26,6 +28,10 @@ import (
 const (
 	labelFmt = "  %-25s"
 	valueFmt = "  %-20s"
+
+	// vcrReplayPlaceholder is used as a stand-in credential value when tests run
+	// in VCR replay mode — cassettes provide responses, so real tokens aren't needed.
+	vcrReplayPlaceholder = "vcr-replay"
 )
 
 // groundTruth defines expected results for an eval test case.
@@ -92,24 +98,75 @@ type evalEntry struct {
 	RCAs             []llm.RootCauseAnalysis `json:"rca_details"`
 }
 
-// buildEvalProvider creates the appropriate CI provider from ground truth config.
-func buildEvalProvider(t *testing.T, gt groundTruth) ci.Provider {
+// setupVCR creates a VCR recorder for the given test case. In record mode
+// (HEISENBERG_EVAL_RECORD=1), real API calls are made and saved. In replay
+// mode (default), cached responses are used without network calls.
+func setupVCR(t *testing.T, caseName string) *http.Client {
 	t.Helper()
+
+	cassettePath := filepath.Join("..", "..", "testdata", "e2e", "cassettes", caseName)
+
+	mode := vcr.ModeReplay
+	if os.Getenv("HEISENBERG_EVAL_RECORD") == "1" {
+		mode = vcr.ModeRecord
+	}
+
+	scrub := vcr.WithScrub(func(ix *vcr.Interaction) {
+		ix.Request.Header.Del("Authorization")
+		ix.Request.Header.Del("X-Goog-Api-Key")
+		if u := ix.Request.URL; strings.Contains(u, "key=") {
+			parts := strings.SplitN(u, "key=", 2)
+			if len(parts) == 2 {
+				end := strings.IndexByte(parts[1], '&')
+				if end == -1 {
+					ix.Request.URL = parts[0] + "key=REDACTED"
+				} else {
+					ix.Request.URL = parts[0] + "key=REDACTED" + parts[1][end:]
+				}
+			}
+		}
+	})
+
+	r, err := vcr.New(cassettePath, mode, scrub)
+	if err != nil && mode == vcr.ModeReplay {
+		t.Logf("VCR: cassette not found, falling back to record: %v", err)
+		r, err = vcr.New(cassettePath, vcr.ModeRecord, scrub)
+	}
+	require.NoError(t, err)
+	t.Logf("VCR: mode=%d cassette=%s", mode, cassettePath)
+
+	t.Cleanup(func() {
+		if err := r.Stop(); err != nil {
+			t.Logf("VCR: stop error: %v", err)
+		}
+	})
+	return r.HTTPClient()
+}
+
+func buildEvalProvider(t *testing.T, gt groundTruth, httpClient *http.Client) ci.Provider {
+	t.Helper()
+	isReplay := httpClient != nil && os.Getenv("HEISENBERG_EVAL_RECORD") != "1"
 	switch gt.Provider {
 	case "azure":
 		pat := os.Getenv("AZURE_DEVOPS_PAT")
-		if pat == "" {
+		if pat == "" && !isReplay {
 			t.Skip("AZURE_DEVOPS_PAT not set")
 		}
-		return azure.NewClient(gt.AzureOrg, gt.AzureProject, pat)
+		if pat == "" {
+			pat = vcrReplayPlaceholder
+		}
+		return azure.NewClient(gt.AzureOrg, gt.AzureProject, pat, httpClient)
 	default: // "github" or empty
 		token := os.Getenv("GITHUB_TOKEN")
-		if token == "" {
+		if token == "" && !isReplay {
 			t.Skip("GITHUB_TOKEN not set")
+		}
+		if token == "" {
+			token = vcrReplayPlaceholder
 		}
 		parts := strings.SplitN(gt.Repo, "/", 2)
 		require.Len(t, parts, 2, "repo must be owner/name")
-		return github.NewClient(parts[0], parts[1], token)
+		return github.NewClient(parts[0], parts[1], token, httpClient)
 	}
 }
 
@@ -149,12 +206,13 @@ func TestScoreCase_AllMatch(t *testing.T) {
 }
 
 func TestScoreCase_CategoryOnly(t *testing.T) {
-	// failure_type wrong, bug_location wrong — but we only score these two axes
+	// failure_type unrelated (assertion vs timeout = 0), bug_location partial (test vs production = 0.3)
 	score := scoreCase(
 		expectedAnalysis{FailureType: "timeout", BugLocation: "test"},
 		llm.RootCauseAnalysis{FailureType: "assertion", BugLocation: llm.BugLocationProduction},
 	)
-	assert.InDelta(t, 0.0, score, 0.01)
+	// 0.3 * 0.0 + 0.5 * 0.3 = 0.15 / 0.8 ≈ 0.1875
+	assert.InDelta(t, 0.1875, score, 0.01)
 }
 
 func TestScoreCase_FailureTypeOnly(t *testing.T) {
@@ -162,8 +220,8 @@ func TestScoreCase_FailureTypeOnly(t *testing.T) {
 		expectedAnalysis{FailureType: "timeout", BugLocation: "test"},
 		llm.RootCauseAnalysis{FailureType: "timeout", BugLocation: llm.BugLocationProduction},
 	)
-	// failure_type matches (0.3/0.8), bug_location doesn't (0.0/0.8)
-	assert.InDelta(t, 0.375, score, 0.01)
+	// failure_type exact (0.3 * 1.0), bug_location partial (0.5 * 0.3) = 0.45 / 0.8 ≈ 0.5625
+	assert.InDelta(t, 0.5625, score, 0.01)
 }
 
 func TestScoreCase_BugLocationOnly(t *testing.T) {
@@ -214,6 +272,114 @@ func TestScoreSuite_AggregateReport(t *testing.T) {
 	assert.InDelta(t, 80.0, report.avgConfidenceWrong(), 0.1)
 }
 
+// --- Semantic similarity ---
+
+func TestFailureTypeSimilarity(t *testing.T) {
+	tests := []struct {
+		name    string
+		a, b    string
+		wantMin float64
+		wantMax float64
+	}{
+		{"exact match", "assertion", "assertion", 1.0, 1.0},
+		{"network≡infra (merged)", "network", "infra", 1.0, 1.0},
+		{"infra≡network (merged)", "infra", "network", 1.0, 1.0},
+		{"timeout≈infra", "timeout", "infra", 0.2, 0.4},
+		{"network≈timeout", "network", "timeout", 0.2, 0.4},
+		{"assertion vs network", "assertion", "network", 0.0, 0.1},
+		{"assertion vs timeout", "assertion", "timeout", 0.0, 0.1},
+		{"flake vs assertion", "flake", "assertion", 0.0, 0.1},
+		{"empty string", "", "assertion", 0.0, 0.0},
+		{"unknown type", "assertion", "unknown", 0.0, 0.0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sim := failureTypeSimilarity(tt.a, tt.b)
+			assert.GreaterOrEqual(t, sim, tt.wantMin, "similarity too low")
+			assert.LessOrEqual(t, sim, tt.wantMax, "similarity too high")
+		})
+	}
+}
+
+func TestBugLocationSimilarity(t *testing.T) {
+	tests := []struct {
+		name    string
+		a, b    string
+		wantMin float64
+		wantMax float64
+	}{
+		{"exact match", "production", "production", 1.0, 1.0},
+		{"production≈test", "production", "test", 0.2, 0.5},
+		{"test≈production", "test", "production", 0.2, 0.5},
+		{"infra vs production", "infrastructure", "production", 0.0, 0.2},
+		{"infra vs test", "infrastructure", "test", 0.0, 0.2},
+		{"empty string", "", "test", 0.0, 0.0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sim := bugLocationSimilarity(tt.a, tt.b)
+			assert.GreaterOrEqual(t, sim, tt.wantMin, "similarity too low")
+			assert.LessOrEqual(t, sim, tt.wantMax, "similarity too high")
+		})
+	}
+}
+
+func TestScoreCase_SemanticPartialCredit(t *testing.T) {
+	// network expected, model returns infra — should get partial credit, not zero
+	score := scoreCase(
+		expectedAnalysis{FailureType: "network", BugLocation: "infrastructure"},
+		llm.RootCauseAnalysis{FailureType: "infra", BugLocation: llm.BugLocationInfrastructure},
+	)
+	// bug_location exact match (full credit), failure_type partial (~0.5)
+	assert.Greater(t, score, 0.5, "network→infra should get partial credit")
+}
+
+func TestScoreCase_UnrelatedNoCredit(t *testing.T) {
+	// assertion expected, model returns timeout — no partial credit
+	score := scoreCase(
+		expectedAnalysis{FailureType: "assertion", BugLocation: "test"},
+		llm.RootCauseAnalysis{FailureType: "timeout", BugLocation: llm.BugLocationProduction},
+	)
+	// assertion→timeout = 0 similarity, production→test = 0.3 similarity
+	// 0.3 * 0.0 + 0.5 * 0.3 = 0.15 / 0.8 ≈ 0.1875
+	assert.Less(t, score, 0.2, "assertion→timeout should get minimal credit")
+}
+
+func TestNormalizeFailureType(t *testing.T) {
+	tests := []struct {
+		input, want string
+	}{
+		{"network", "infra"},
+		{"infra", "infra"},
+		{"assertion", "assertion"},
+		{"timeout", "timeout"},
+		{"flake", "flake"},
+		{"unknown", "unknown"},
+		{"", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			assert.Equal(t, tt.want, normalizeFailureType(tt.input))
+		})
+	}
+}
+
+func TestScoreCase_NetworkInfraMerge(t *testing.T) {
+	score := scoreCase(
+		expectedAnalysis{FailureType: "network", BugLocation: "infrastructure"},
+		llm.RootCauseAnalysis{FailureType: "infra", BugLocation: llm.BugLocationInfrastructure},
+	)
+	assert.InDelta(t, 1.0, score, 0.01, "network≡infra should be full match")
+}
+
+func TestScoreCase_NetworkNetworkStillMatches(t *testing.T) {
+	score := scoreCase(
+		expectedAnalysis{FailureType: "network", BugLocation: "infrastructure"},
+		llm.RootCauseAnalysis{FailureType: "network", BugLocation: llm.BugLocationInfrastructure},
+	)
+	assert.InDelta(t, 1.0, score, 0.01)
+}
+
 func TestScoreResult_PartialMatch(t *testing.T) {
 	gt := groundTruth{
 		Expected: expectedOutput{
@@ -257,10 +423,13 @@ func TestScoreResult_NoDuplicateCounting(t *testing.T) {
 
 func requireEnv(t *testing.T) {
 	t.Helper()
-	if os.Getenv("GOOGLE_API_KEY") == "" {
-		t.Skip("GOOGLE_API_KEY not set")
+	// In VCR replay mode, API keys are not required.
+	if os.Getenv("HEISENBERG_EVAL_RECORD") == "1" || os.Getenv("HEISENBERG_EVAL_VCR") == "0" {
+		if os.Getenv("GOOGLE_API_KEY") == "" {
+			t.Skip("GOOGLE_API_KEY not set (required for live/record mode)")
+		}
 	}
-	// Provider-specific tokens are checked per-case in buildEvalProvider.
+	// In replay mode (default), no env check needed — cassettes provide responses.
 }
 
 func loadGroundTruth(t *testing.T) []groundTruth {
@@ -289,23 +458,86 @@ const (
 	weightFilePath    = 0.2
 )
 
+// normalizeFailureType maps equivalent failure types to a canonical form.
+// "network" and "infra" are merged — the model rarely distinguishes them.
+func normalizeFailureType(ft string) string {
+	if ft == "network" {
+		return "infra"
+	}
+	return ft
+}
+
+// failureTypeSimilarity returns a similarity score (0.0-1.0) between two failure types.
+// Categories are normalized before comparison (network→infra merge).
+// Remaining related pairs receive partial credit.
+func failureTypeSimilarity(a, b string) float64 {
+	if a == "" || b == "" {
+		return 0
+	}
+	a = normalizeFailureType(a)
+	b = normalizeFailureType(b)
+	if a == b {
+		return 1.0
+	}
+	// Symmetric lookup: normalize pair order.
+	pair := [2]string{a, b}
+	if pair[0] > pair[1] {
+		pair[0], pair[1] = pair[1], pair[0]
+	}
+	sim, ok := failureTypeSimilarityMatrix[pair]
+	if !ok {
+		return 0
+	}
+	return sim
+}
+
+// failureTypeSimilarityMatrix defines semantic similarity between failure types.
+// Keys are sorted alphabetically to ensure symmetric lookup.
+var failureTypeSimilarityMatrix = map[[2]string]float64{
+	{"infra", "network"}:   0.5, // both external/environment — high overlap
+	{"infra", "timeout"}:   0.3, // both resource/timing related
+	{"network", "timeout"}: 0.3, // network timeouts overlap
+	{"flake", "timeout"}:   0.2, // flakes can manifest as timeouts
+}
+
+// bugLocationSimilarity returns a similarity score (0.0-1.0) between two bug locations.
+func bugLocationSimilarity(a, b string) float64 {
+	if a == "" || b == "" {
+		return 0
+	}
+	if a == b {
+		return 1.0
+	}
+	pair := [2]string{a, b}
+	if pair[0] > pair[1] {
+		pair[0], pair[1] = pair[1], pair[0]
+	}
+	sim, ok := bugLocationSimilarityMatrix[pair]
+	if !ok {
+		return 0
+	}
+	return sim
+}
+
+// bugLocationSimilarityMatrix defines semantic similarity between bug locations.
+var bugLocationSimilarityMatrix = map[[2]string]float64{
+	{"production", "test"}: 0.3, // both are "code" (vs infrastructure)
+}
+
 // scoreCase returns a weighted score (0.0-1.0) for how well an RCA matches expected.
+// Uses semantic similarity for partial credit on related categories.
 func scoreCase(exp expectedAnalysis, rca llm.RootCauseAnalysis) float64 {
 	totalWeight := 0.0
 	earned := 0.0
 
 	if exp.FailureType != "" {
 		totalWeight += weightFailureType
-		if rca.FailureType == exp.FailureType {
-			earned += weightFailureType
-		}
+		earned += weightFailureType * failureTypeSimilarity(exp.FailureType, rca.FailureType)
 	}
 
 	if exp.BugLocation != "" {
 		totalWeight += weightBugLocation
-		if string(rca.BugLocation) == exp.BugLocation {
-			earned += weightBugLocation
-		}
+		earned += weightBugLocation * bugLocationSimilarity(exp.BugLocation, string(rca.BugLocation))
 	}
 
 	if exp.FilePathContains != "" {
@@ -437,59 +669,131 @@ func matchesExpected(exp expectedAnalysis, rca llm.RootCauseAnalysis) bool {
 func TestEval_Suite(t *testing.T) {
 	requireEnv(t)
 
-	model := os.Getenv("HEISENBERG_MODEL")
-	if model == "" {
-		model = llm.DefaultModel
-	}
+	model := evalModel()
+	cases := filterCasesByTier(t, loadGroundTruth(t))
 
-	cases := loadGroundTruth(t)
 	logPath := filepath.Join("..", "..", "testdata", "e2e", "eval.jsonl")
 	report := evalReport{}
 
+	useVCR := os.Getenv("HEISENBERG_EVAL_RECORD") == "1" || os.Getenv("HEISENBERG_EVAL_VCR") != "0"
+	googleAPIKey := resolveGoogleAPIKey(useVCR)
+
 	for _, gt := range cases {
 		gt := gt
-		name := fmt.Sprintf("%s/%d", gt.Repo, gt.RunID)
-
-		t.Run(name, func(t *testing.T) {
-			provider := buildEvalProvider(t, gt)
-
-			parts := strings.SplitN(gt.Repo, "/", 2)
-			require.Len(t, parts, 2)
-
-			emitter := llm.NewTextEmitter(os.Stderr, false)
-			result, err := analysis.Run(context.Background(), analysis.Params{
-				Owner:        parts[0],
-				Repo:         parts[1],
-				RunID:        gt.RunID,
-				Verbose:      false,
-				Emitter:      emitter,
-				SnapshotHTML: trace.SnapshotHTML,
-				Model:        model,
-				CI:           provider,
-			})
-			emitter.Close()
-			if err != nil {
-				t.Logf("ERROR: %v", err)
-				report.addCategoryResult(false)
-				report.addCaseScore(0)
-				return
-			}
-
-			scoreAndLog(t, gt, result, model, logPath, &report)
+		t.Run(fmt.Sprintf("%s/%d", gt.Repo, gt.RunID), func(t *testing.T) {
+			runEvalCase(t, gt, model, googleAPIKey, logPath, useVCR, &report)
 		})
 	}
 
-	// Aggregate report
+	logAggregateReport(t, &report)
+	assert.GreaterOrEqual(t, report.meanScore(), 0.3,
+		"aggregate score below minimum threshold — possible regression")
+}
+
+// evalModel returns the model to use for eval, falling back to DefaultModel.
+func evalModel() string {
+	if m := os.Getenv("HEISENBERG_MODEL"); m != "" {
+		return m
+	}
+	return llm.DefaultModel
+}
+
+// filterCasesByTier applies HEISENBERG_EVAL_TIER=smoke filter when set.
+func filterCasesByTier(t *testing.T, allCases []groundTruth) []groundTruth {
+	t.Helper()
+	if os.Getenv("HEISENBERG_EVAL_TIER") != "smoke" {
+		return allCases
+	}
+	var cases []groundTruth
+	for _, gt := range allCases {
+		for _, tag := range gt.Tags {
+			if tag == "smoke" {
+				cases = append(cases, gt)
+				break
+			}
+		}
+	}
+	t.Logf("Smoke tier: %d/%d cases", len(cases), len(allCases))
+	return cases
+}
+
+// resolveGoogleAPIKey returns the API key, using a placeholder when in VCR replay mode.
+func resolveGoogleAPIKey(useVCR bool) string {
+	key := os.Getenv("GOOGLE_API_KEY")
+	isReplay := useVCR && os.Getenv("HEISENBERG_EVAL_RECORD") != "1"
+	if key == "" && isReplay {
+		return vcrReplayPlaceholder
+	}
+	return key
+}
+
+// runEvalCase executes a single eval case under the given environment.
+func runEvalCase(t *testing.T, gt groundTruth, model, googleAPIKey, logPath string,
+	useVCR bool, report *evalReport) {
+	cassetteName := strings.ReplaceAll(gt.Repo, "/", "_") + "_" + fmt.Sprint(gt.RunID)
+
+	if skipIfCassetteExists(t, cassetteName) {
+		return
+	}
+
+	var vcrClient *http.Client
+	var llmOpts []llm.ClientOption
+	if useVCR {
+		vcrClient = setupVCR(t, cassetteName)
+		llmOpts = append(llmOpts, llm.WithHTTPClient(vcrClient))
+	}
+
+	provider := buildEvalProvider(t, gt, vcrClient)
+
+	parts := strings.SplitN(gt.Repo, "/", 2)
+	require.Len(t, parts, 2)
+
+	emitter := llm.NewTextEmitter(os.Stderr, false)
+	result, err := analysis.Run(context.Background(), analysis.Params{
+		Owner:        parts[0],
+		Repo:         parts[1],
+		RunID:        gt.RunID,
+		Verbose:      false,
+		Emitter:      emitter,
+		SnapshotHTML: trace.SnapshotHTML,
+		Model:        model,
+		CI:           provider,
+		GoogleAPIKey: googleAPIKey,
+		LLMOptions:   llmOpts,
+	})
+	emitter.Close()
+	if err != nil {
+		t.Logf("ERROR: %v", err)
+		report.addCategoryResult(false)
+		report.addCaseScore(0)
+		return
+	}
+
+	scoreAndLog(t, gt, result, model, logPath, report)
+}
+
+// skipIfCassetteExists skips the test in record mode if a cassette already exists.
+// Returns true when the test was skipped.
+func skipIfCassetteExists(t *testing.T, cassetteName string) bool {
+	if os.Getenv("HEISENBERG_EVAL_RECORD") != "1" {
+		return false
+	}
+	cassettePath := filepath.Join("..", "..", "testdata", "e2e", "cassettes", cassetteName+".json.gz")
+	if _, err := os.Stat(cassettePath); err == nil {
+		t.Skipf("cassette exists, skipping re-record")
+		return true
+	}
+	return false
+}
+
+// logAggregateReport prints end-of-suite metrics.
+func logAggregateReport(t *testing.T, report *evalReport) {
 	t.Logf("\n=== EVALUATION REPORT ===")
 	t.Logf("Total cases: %d", report.totalCases)
 	t.Logf("Mean score: %.1f%% (%0.1f/%d)", report.meanScore()*100, report.scoreSum, report.totalCases)
 	t.Logf("Category accuracy: %.1f%%", report.categoryAccuracy()*100)
 	t.Logf("Confidence (correct): %.0f avg", report.avgConfidenceCorrect())
 	t.Logf("Confidence (wrong):   %.0f avg", report.avgConfidenceWrong())
-
-	// Aggregate threshold assertion — catches regressions
-	assert.GreaterOrEqual(t, report.meanScore(), 0.3,
-		"aggregate score below minimum threshold — possible regression")
 }
 
 // scoreAndLog scores one eval case, logs per-case results, and appends to eval.jsonl.

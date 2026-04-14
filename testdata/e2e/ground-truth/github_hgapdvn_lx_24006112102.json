@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-hgapdvn-lx-24006112102",
+  "repo": "hgapdvn/lx",
+  "run_id": 24006112102,
+  "tags": [],
+  "transition": {
+    "failing_commit": "d5906f7c682b5d7c1f2035d8df3cf4b73c1c0e3a",
+    "fix_commit": "865f68a4f4a90f310892c4b181b8fdeb72f3aa7c",
+    "pr_url": "https://github.com/hgapdvn/lx/pull/6",
+    "pr_title": "fix: resolve Windows test failures and lint errors in lxio package",
+    "files_changed": [
+      "lxio/path_test.go"
+    ],
+    "fix_size_lines": 4
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix: resolve Windows test failures and lint errors in lxio package",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "test"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES\nThe PR title mentions resolving Windows test failures, and the diff modifies a test case in the `lxio` package. While the provided log doesn't explicitly mention Windows or the `lxio` package, the"
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-pytorch-test-infra-24123425093",
+  "repo": "pytorch/test-infra",
+  "run_id": 24123425093,
+  "tags": [],
+  "transition": {
+    "failing_commit": "d79d884f89d8cce2f50af620b73e7a8abe686336",
+    "fix_commit": "8c8a25d5edb72a46f045b1204887f6ee33a7c3a1",
+    "pr_url": "https://github.com/pytorch/test-infra/pull/7936",
+    "pr_title": "Fix flaky test bot silently blocked by Vercel bot protection since Mar 11",
+    "files_changed": [
+      ".github/scripts/test_disable_flaky_tests.py"
+    ],
+    "fix_size_lines": 4
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "Fix flaky test bot silently blocked by Vercel bot protection since Mar 11",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "assertion",
+        "bug_location": "infrastructure"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES. The PR title indicates the bot was being blocked, and the diff modifies a test related to the flaky test bot. While the log snippet doesn't show the *exact* error, the context suggests the fix ad"
+  }
+}

@@ -303,9 +303,23 @@ func TestGetRepoFile(t *testing.T) {
 	defer srv.Close()
 
 	c := NewTestClient("myorg", "myproject", srv.URL, srv.Client())
-	content, err := c.GetRepoFile(context.Background(), testFilePath)
+	content, err := c.GetRepoFile(context.Background(), testFilePath, "")
 	require.NoError(t, err)
 	assert.Contains(t, content, "main()")
+}
+
+func TestGetRepoFile_WithRef(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "abc123", r.URL.Query().Get("versionDescriptor.version"))
+		assert.Equal(t, "commit", r.URL.Query().Get("versionDescriptor.versionType"))
+		w.Write([]byte(`pinned content`))
+	}))
+	defer srv.Close()
+
+	c := NewTestClient("myorg", "myproject", srv.URL, srv.Client())
+	content, err := c.GetRepoFile(context.Background(), testFilePath, "abc123")
+	require.NoError(t, err)
+	assert.Equal(t, "pinned content", content)
 }
 
 func TestGetRepoFile_NotFound(t *testing.T) {
@@ -315,7 +329,7 @@ func TestGetRepoFile_NotFound(t *testing.T) {
 	defer srv.Close()
 
 	c := NewTestClient("myorg", "myproject", srv.URL, srv.Client())
-	_, err := c.GetRepoFile(context.Background(), "nonexistent.ts")
+	_, err := c.GetRepoFile(context.Background(), "nonexistent.ts", "")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "404")
 }
@@ -648,7 +662,7 @@ func TestGetFileFromRepo(t *testing.T) {
 	defer srv.Close()
 
 	c := NewTestClient("myorg", "myproject", srv.URL, srv.Client())
-	content, err := c.GetFileFromRepo(context.Background(), ci.RepoRef{Project: "other-project", Repo: "other-repo"}, "src/Test.java")
+	content, err := c.GetFileFromRepo(context.Background(), ci.RepoRef{Project: "other-project", Repo: "other-repo"}, "src/Test.java", "")
 	require.NoError(t, err)
 	assert.Equal(t, "public class Test {}", content)
 }
@@ -660,7 +674,7 @@ func TestGetFileFromRepo_NotFound(t *testing.T) {
 	defer srv.Close()
 
 	c := NewTestClient("myorg", "myproject", srv.URL, srv.Client())
-	_, err := c.GetFileFromRepo(context.Background(), ci.RepoRef{Project: "other", Repo: "other"}, "missing.java")
+	_, err := c.GetFileFromRepo(context.Background(), ci.RepoRef{Project: "other", Repo: "other"}, "missing.java", "")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "404")
 }

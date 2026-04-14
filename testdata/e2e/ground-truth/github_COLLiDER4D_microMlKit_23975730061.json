@@ -2,7 +2,9 @@
   "case_id": "gh-COLLiDER4D-microMlKit-23975730061",
   "repo": "COLLiDER4D/microMlKit",
   "run_id": 23975730061,
-  "tags": [],
+  "tags": [
+    "smoke"
+  ],
   "transition": {
     "failing_commit": "fbb62828df6f9d25a338813882a852ee12109622",
     "fix_commit": "bd5c7af3898c496de8d12888d048041ed657ca1f",

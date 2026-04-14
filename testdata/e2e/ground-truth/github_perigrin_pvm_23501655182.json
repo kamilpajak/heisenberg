@@ -1,0 +1,45 @@
+{
+  "case_id": "gh-perigrin-pvm-23501655182",
+  "repo": "perigrin/pvm",
+  "run_id": 23501655182,
+  "tags": [],
+  "transition": {
+    "failing_commit": "7d4f5ce17b92e8b58360d960ff05166957219270",
+    "fix_commit": "74a079c1ed7c3b2dbfa34426d82afc0daeab4dff",
+    "pr_url": "https://github.com/perigrin/pvm/pull/413",
+    "pr_title": "fix: resolve remaining Windows CI test failures",
+    "files_changed": [
+      "internal/performance/analyzer_test.go",
+      "internal/perl/shell_test.go"
+    ],
+    "fix_size_lines": 26
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix: resolve remaining Windows CI test failures",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "production"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "",
+    "llm_correlation": "YES.\n\nThe diff modifies the thresholds in `TestAnalyzer_MinMaxTracking` to account for Windows timer resolution, which is likely the cause of the test failures on Windows. It also modifies `TestDetect"
+  }
+}

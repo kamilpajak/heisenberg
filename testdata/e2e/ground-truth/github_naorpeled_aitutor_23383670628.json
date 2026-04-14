@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-naorpeled-aitutor-23383670628",
+  "repo": "naorpeled/aitutor",
+  "run_id": 23383670628,
+  "tags": [],
+  "transition": {
+    "failing_commit": "4ce2a6f3b9b6c69134bd20c1a209ff2cd1556162",
+    "fix_commit": "d7c92b4d00a4e5d75a81c3609a236db59c0717f8",
+    "pr_url": "https://github.com/naorpeled/aitutor/pull/6",
+    "pr_title": "fix: resolve smoke test failures and enable Windows tests",
+    "files_changed": [
+      ".github/workflows/smoke.yml"
+    ],
+    "fix_size_lines": 4
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix: resolve smoke test failures and enable Windows tests",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "infrastructure"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES.\n\nThe diff modifies the way the `aitutor` CLI is located and executed within the Windows environment of the CI test. The original code was likely failing because `Get-Command aitutor` was returnin"
+  }
+}

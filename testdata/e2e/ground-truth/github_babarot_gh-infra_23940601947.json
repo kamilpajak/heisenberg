@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-babarot-gh-infra-23940601947",
+  "repo": "babarot/gh-infra",
+  "run_id": 23940601947,
+  "tags": [],
+  "transition": {
+    "failing_commit": "110e0855450f805903363daeb276459e9d8c1e42",
+    "fix_commit": "afd0b5e47982e8fbffcfade27e31a36872b1bea0",
+    "pr_url": "https://github.com/babarot/gh-infra/pull/64",
+    "pr_title": "fix: harden type assertions, fetch error handling, and add release_immutability docs",
+    "files_changed": [
+      "internal/repository/state_test.go"
+    ],
+    "fix_size_lines": 17
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix: harden type assertions, fetch error handling, and add release_immutability docs",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "network",
+        "bug_location": "production"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "",
+    "llm_correlation": "YES.\n\nThe diff modifies the `TestFetchRepoSettings_FetchErrorHandling` test, specifically how it handles missing responses (simulating errors) from the GitHub API. The PR title also mentions \"fetch er"
+  }
+}

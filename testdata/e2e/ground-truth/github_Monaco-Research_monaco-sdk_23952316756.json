@@ -2,7 +2,9 @@
   "case_id": "gh-Monaco-Research-monaco-sdk-23952316756",
   "repo": "Monaco-Research/monaco-sdk",
   "run_id": 23952316756,
-  "tags": [],
+  "tags": [
+    "smoke"
+  ],
   "transition": {
     "failing_commit": "436142835023af0aa343ea5f6d52ea3931045489",
     "fix_commit": "d37910f538b12ab04d7779ec5a40eaa112acb27f",
@@ -40,6 +42,9 @@
     "original_model": "",
     "heuristic_difficulty": "medium",
     "notes": "",
-    "llm_correlation": "YES\nThe PR title indicates the fix is for flaky CI tests, and the diff modifies the `ensureAuthenticated` function to accept a configuration object explicitly. This suggests that the previous implemen"
+    "llm_correlation": "YES\nThe PR title indicates the fix is for flaky CI tests, and the diff modifies the `ensureAuthenticated` function to accept a configuration object explicitly. This suggests that the previous implemen",
+    "judge_reasoning": "The log shows successful installation and build. The failure is likely due to an assertion error in the production code, not infrastructure issues like stale cache.",
+    "judge_model": "claude-sonnet-4-20250514",
+    "judge_winner": "A"
   }
 }

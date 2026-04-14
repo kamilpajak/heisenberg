@@ -1,0 +1,44 @@
+{
+  "case_id": "gh-RewstApp-agent-smith-go-24093577938",
+  "repo": "RewstApp/agent-smith-go",
+  "run_id": 24093577938,
+  "tags": [],
+  "transition": {
+    "failing_commit": "c524afa01cf56502b9d9656c63388ae9d05cf5df",
+    "fix_commit": "862963d250ac2342c58b9bb5f83556af66c86af8",
+    "pr_url": "https://github.com/RewstApp/agent-smith-go/pull/44",
+    "pr_title": "fix: [sc-86623] Agent Hangs Indefinitely \u2014 HTTP Requests Without Timeout",
+    "files_changed": [
+      "cmd/agent_smith/config_context.go"
+    ],
+    "fix_size_lines": 2
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix: [sc-86623] Agent Hangs Indefinitely \u2014 HTTP Requests Without Timeout",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "timeout",
+        "bug_location": "production"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES. The test failure log shows the job \"test-ubuntu-latest\" failing, and the PR title and code change indicate a fix for an agent hanging due to HTTP requests without a timeout. The diff increases th"
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "case_id": "gh-synnaxlabs-synnax-24153562007",
+  "repo": "synnaxlabs/synnax",
+  "run_id": 24153562007,
+  "tags": [],
+  "transition": {
+    "failing_commit": "135adb3e7462e4d610f03d79c79ecbcabf65200b",
+    "fix_commit": "c0efd6410066f12b96b33b4431772fa8bd9e72b6",
+    "pr_url": "https://github.com/synnaxlabs/synnax/pull/2199",
+    "pr_title": "SY-4042: Fix CI port 9090 flakiness by replacing Docker services with\u2026",
+    "files_changed": [
+      ".github/workflows/test.arc.yaml",
+      ".github/workflows/test.driver.yaml"
+    ],
+    "fix_size_lines": 2
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "SY-4042: Fix CI port 9090 flakiness by replacing Docker services with\u2026",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "timeout",
+        "bug_location": "infrastructure"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "",
+    "llm_correlation": "YES\nThe test failure log shows errors related to opening a writer with \"unauthorized\" errors and writing frames with \"unreachable\" errors. The provided diff focuses on ensuring port 9090 is free befor"
+  }
+}

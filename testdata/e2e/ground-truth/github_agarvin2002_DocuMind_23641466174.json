@@ -1,0 +1,46 @@
+{
+  "case_id": "gh-agarvin2002-DocuMind-23641466174",
+  "repo": "agarvin2002/DocuMind",
+  "run_id": 23641466174,
+  "tags": [
+    "smoke"
+  ],
+  "transition": {
+    "failing_commit": "f4ff5e8af9bbd42688d918c5571dc89f96aa8ff9",
+    "fix_commit": "027ec8a67c13310451204b8aed93efc5ef1abd53",
+    "pr_url": "https://github.com/agarvin2002/DocuMind/pull/19",
+    "pr_title": "fix: resolve two smoke test failures found during end-to-end testing",
+    "files_changed": [
+      "tests/unit/test_retrieval.py"
+    ],
+    "fix_size_lines": 4
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix: resolve two smoke test failures found during end-to-end testing",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "timeout",
+        "bug_location": "test"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "easy",
+    "notes": "",
+    "llm_correlation": "YES\nThe diff modifies an assertion in a test case related to sorting scores. The assertion message is also improved. While the provided log doesn't show the exact failure, the change directly relates "
+  }
+}

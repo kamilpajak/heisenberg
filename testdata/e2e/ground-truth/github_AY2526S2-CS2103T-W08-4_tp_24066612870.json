@@ -1,0 +1,46 @@
+{
+  "case_id": "gh-AY2526S2-CS2103T-W08-4-tp-24066612870",
+  "repo": "AY2526S2-CS2103T-W08-4/tp",
+  "run_id": 24066612870,
+  "tags": [
+    "smoke"
+  ],
+  "transition": {
+    "failing_commit": "dd0270866e10271fd002e356b0044c16dba67d17",
+    "fix_commit": "87b2ae28579a4b1dd67d6e23c3587e635cdac429",
+    "pr_url": "https://github.com/AY2526S2-CS2103T-W08-4/tp/pull/324",
+    "pr_title": "Fix Sort CI Issues",
+    "files_changed": [
+      "src/test/java/seedu/address/logic/parser/SortCommandParserTest.java"
+    ],
+    "fix_size_lines": 21
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "Fix Sort CI Issues",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "assertion",
+        "bug_location": "production"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "Vague PR title \u2014 actual_cause needs human review",
+    "llm_correlation": "YES. The original test failure log is not provided, but the diff shows that the code change addresses issues related to the `SortCommand` and its parsing, specifically regarding case-insensitive order"
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "case_id": "gh-spinnaker-spinnaker-24062170521",
+  "repo": "spinnaker/spinnaker",
+  "run_id": 24062170521,
+  "tags": [],
+  "transition": {
+    "failing_commit": "bb810f1743123063bd37ab055820b5083e96e2f0",
+    "fix_commit": "6d0f40085c82988f8eab862acd7a79ab5ebcc957",
+    "pr_url": "https://github.com/spinnaker/spinnaker/pull/7607",
+    "pr_title": "fix(saml): Fix wiring issue on saml.  Add FULL end to end integration test using keycloak & htmlunitdriver (backport #7525)",
+    "files_changed": [
+      "gate/gate-saml/src/main/java/com/netflix/spinnaker/gate/security/saml/ResponseAuthenticationConverter.java",
+      "gate/gate-saml/src/test/java/com/netflix/spinnaker/gate/security/saml/ResponseAuthenticationConverterTest.java"
+    ],
+    "fix_size_lines": 5
+  },
+  "assets": {
+    "patch_file": "fix_diff.patch",
+    "log_file": "log_excerpt.txt"
+  },
+  "ground_truth": {
+    "actual_cause": "fix(saml): Fix wiring issue on saml.  Add FULL end to end integration test using keycloak & htmlunitdriver (backport #7525)",
+    "observable_by_tool": true,
+    "review_status": "approved"
+  },
+  "expected_output": {
+    "category": "diagnosis",
+    "confidence_min": 60,
+    "confidence_max": 0,
+    "analyses": [
+      {
+        "failure_type": "timeout",
+        "bug_location": "production"
+      }
+    ],
+    "allow_partial_match": true
+  },
+  "metadata": {
+    "validated_date": "2026-04-09",
+    "original_model": "",
+    "heuristic_difficulty": "medium",
+    "notes": "",
+    "llm_correlation": "YES.\n\nThe test failure log shows a `java.lang.NullPointerException: Cannot invoke \"com.netflix.spinnaker.gate.security.saml.AllowedAccountsSupport.getObject()\" because \"this.allowedAccountsSupport\" is"
+  }
+}

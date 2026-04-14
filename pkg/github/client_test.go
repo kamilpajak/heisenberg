@@ -362,7 +362,19 @@ func TestGetRepoFile(t *testing.T) {
 	}))
 	defer srv.Close()
 	c := NewTestClient("o", "r", srv.URL, srv.Client())
-	content, err := c.GetRepoFile(context.Background(), "README.md")
+	content, err := c.GetRepoFile(context.Background(), "README.md", "")
+	require.NoError(t, err)
+	assert.Equal(t, "hello", content)
+}
+
+func TestGetRepoFile_WithRef(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "abc123", r.URL.Query().Get("ref"), "should pass ref as query param")
+		w.Write([]byte(`{"content":"aGVsbG8=","encoding":"base64"}`))
+	}))
+	defer srv.Close()
+	c := NewTestClient("o", "r", srv.URL, srv.Client())
+	content, err := c.GetRepoFile(context.Background(), "README.md", "abc123")
 	require.NoError(t, err)
 	assert.Equal(t, "hello", content)
 }
