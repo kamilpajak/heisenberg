@@ -45,6 +45,23 @@ func TestClassifyWeight_Warning(t *testing.T) {
 	}
 }
 
+func TestClassifyWeight_AssertionDetail(t *testing.T) {
+	// Assertion-detail lines carry the specific failure context that the LLM
+	// needs to diagnose failure_type=assertion. Under budget pressure they
+	// must outrank generic (pass)/build filler (weight 1).
+	lines := []string{
+		`Expected: "https://evm-rpc.sei-apis.com"`,
+		`Received: "https://rpc.example.com"`,
+		`AssertionError: assert 500 == 200`,
+		`assert response.status_code == 200`,
+		`expected 42 but got 7`,
+	}
+	for _, line := range lines {
+		assert.GreaterOrEqual(t, classifyWeight(line), weightWarning,
+			"assertion detail must rank at least warning weight: %q", line)
+	}
+}
+
 func TestClassifyWeight_NoiseFilteredByCaller(t *testing.T) {
 	// classifyWeight's contract: caller filters noise via classifyLine first.
 	// This test documents that contract — noise lines are dropped upstream.

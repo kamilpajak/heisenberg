@@ -19,6 +19,7 @@ var criticalPrefixes = []string{
 	"panic:",
 	"Traceback",
 	"##[error]",
+	"AssertionError",
 }
 
 var criticalRegexes = []*regexp.Regexp{
@@ -44,6 +45,16 @@ var warningContains = []string{
 	"OOMKilled",
 	"connection refused",
 	"connection reset",
+}
+
+// warningRegexes catch assertion-detail patterns that carry critical
+// diagnostic context but don't fit the contains-list style (need anchors or
+// captures). Elevating these above default-signal keeps them from losing
+// budget pressure to bulk (pass)/build filler.
+var warningRegexes = []*regexp.Regexp{
+	regexp.MustCompile(`^(Expected|Received):`),      // jest/vitest/jasmine/pytest assertion diff
+	regexp.MustCompile(`(?i)expected\s.+\sbut\sgot`), // "expected X but got Y"
+	regexp.MustCompile(`^\s*assert\s[A-Za-z_(]`),     // `assert foo == bar`
 }
 
 var warningContainsLower = func() []string {
@@ -78,6 +89,11 @@ func classifyWeight(line string) int {
 	lower := strings.ToLower(line)
 	for _, s := range warningContainsLower {
 		if strings.Contains(lower, s) {
+			return weightWarning
+		}
+	}
+	for _, re := range warningRegexes {
+		if re.MatchString(line) {
 			return weightWarning
 		}
 	}
