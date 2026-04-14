@@ -28,6 +28,10 @@ import (
 const (
 	labelFmt = "  %-25s"
 	valueFmt = "  %-20s"
+
+	// vcrReplayPlaceholder is used as a stand-in credential value when tests run
+	// in VCR replay mode — cassettes provide responses, so real tokens aren't needed.
+	vcrReplayPlaceholder = "vcr-replay"
 )
 
 // groundTruth defines expected results for an eval test case.
@@ -149,7 +153,7 @@ func buildEvalProvider(t *testing.T, gt groundTruth, httpClient *http.Client) ci
 			t.Skip("AZURE_DEVOPS_PAT not set")
 		}
 		if pat == "" {
-			pat = "vcr-replay"
+			pat = vcrReplayPlaceholder
 		}
 		return azure.NewClient(gt.AzureOrg, gt.AzureProject, pat, httpClient)
 	default: // "github" or empty
@@ -158,7 +162,7 @@ func buildEvalProvider(t *testing.T, gt groundTruth, httpClient *http.Client) ci
 			t.Skip("GITHUB_TOKEN not set")
 		}
 		if token == "" {
-			token = "vcr-replay"
+			token = vcrReplayPlaceholder
 		}
 		parts := strings.SplitN(gt.Repo, "/", 2)
 		require.Len(t, parts, 2, "repo must be owner/name")
@@ -665,105 +669,131 @@ func matchesExpected(exp expectedAnalysis, rca llm.RootCauseAnalysis) bool {
 func TestEval_Suite(t *testing.T) {
 	requireEnv(t)
 
-	model := os.Getenv("HEISENBERG_MODEL")
-	if model == "" {
-		model = llm.DefaultModel
-	}
-
-	allCases := loadGroundTruth(t)
-
-	// Filter by eval tier: HEISENBERG_EVAL_TIER=smoke runs only tagged cases.
-	// Default (empty or "full") runs all cases.
-	tier := os.Getenv("HEISENBERG_EVAL_TIER")
-	var cases []groundTruth
-	if tier == "smoke" {
-		for _, gt := range allCases {
-			for _, tag := range gt.Tags {
-				if tag == "smoke" {
-					cases = append(cases, gt)
-					break
-				}
-			}
-		}
-		t.Logf("Smoke tier: %d/%d cases", len(cases), len(allCases))
-	} else {
-		cases = allCases
-	}
+	model := evalModel()
+	cases := filterCasesByTier(t, loadGroundTruth(t))
 
 	logPath := filepath.Join("..", "..", "testdata", "e2e", "eval.jsonl")
 	report := evalReport{}
 
 	useVCR := os.Getenv("HEISENBERG_EVAL_RECORD") == "1" || os.Getenv("HEISENBERG_EVAL_VCR") != "0"
-	isReplay := useVCR && os.Getenv("HEISENBERG_EVAL_RECORD") != "1"
-
-	googleAPIKey := os.Getenv("GOOGLE_API_KEY")
-	if googleAPIKey == "" && isReplay {
-		googleAPIKey = "vcr-replay"
-	}
+	googleAPIKey := resolveGoogleAPIKey(useVCR)
 
 	for _, gt := range cases {
 		gt := gt
-		name := fmt.Sprintf("%s/%d", gt.Repo, gt.RunID)
-
-		t.Run(name, func(t *testing.T) {
-			cassetteName := strings.ReplaceAll(gt.Repo, "/", "_") + "_" + fmt.Sprint(gt.RunID)
-			cassettePath := filepath.Join("..", "..", "testdata", "e2e", "cassettes", cassetteName+".json.gz")
-
-			// In record mode, skip cases that already have a cassette.
-			if os.Getenv("HEISENBERG_EVAL_RECORD") == "1" {
-				if _, err := os.Stat(cassettePath); err == nil {
-					t.Skipf("cassette exists, skipping re-record")
-				}
-			}
-
-			var vcrClient *http.Client
-			var llmOpts []llm.ClientOption
-			if useVCR {
-				vcrClient = setupVCR(t, cassetteName)
-				llmOpts = append(llmOpts, llm.WithHTTPClient(vcrClient))
-			}
-
-			provider := buildEvalProvider(t, gt, vcrClient)
-
-			parts := strings.SplitN(gt.Repo, "/", 2)
-			require.Len(t, parts, 2)
-
-			emitter := llm.NewTextEmitter(os.Stderr, false)
-			result, err := analysis.Run(context.Background(), analysis.Params{
-				Owner:        parts[0],
-				Repo:         parts[1],
-				RunID:        gt.RunID,
-				Verbose:      false,
-				Emitter:      emitter,
-				SnapshotHTML: trace.SnapshotHTML,
-				Model:        model,
-				CI:           provider,
-				GoogleAPIKey: googleAPIKey,
-				LLMOptions:   llmOpts,
-			})
-			emitter.Close()
-			if err != nil {
-				t.Logf("ERROR: %v", err)
-				report.addCategoryResult(false)
-				report.addCaseScore(0)
-				return
-			}
-
-			scoreAndLog(t, gt, result, model, logPath, &report)
+		t.Run(fmt.Sprintf("%s/%d", gt.Repo, gt.RunID), func(t *testing.T) {
+			runEvalCase(t, gt, model, googleAPIKey, logPath, useVCR, &report)
 		})
 	}
 
-	// Aggregate report
+	logAggregateReport(t, &report)
+	assert.GreaterOrEqual(t, report.meanScore(), 0.3,
+		"aggregate score below minimum threshold — possible regression")
+}
+
+// evalModel returns the model to use for eval, falling back to DefaultModel.
+func evalModel() string {
+	if m := os.Getenv("HEISENBERG_MODEL"); m != "" {
+		return m
+	}
+	return llm.DefaultModel
+}
+
+// filterCasesByTier applies HEISENBERG_EVAL_TIER=smoke filter when set.
+func filterCasesByTier(t *testing.T, allCases []groundTruth) []groundTruth {
+	t.Helper()
+	if os.Getenv("HEISENBERG_EVAL_TIER") != "smoke" {
+		return allCases
+	}
+	var cases []groundTruth
+	for _, gt := range allCases {
+		for _, tag := range gt.Tags {
+			if tag == "smoke" {
+				cases = append(cases, gt)
+				break
+			}
+		}
+	}
+	t.Logf("Smoke tier: %d/%d cases", len(cases), len(allCases))
+	return cases
+}
+
+// resolveGoogleAPIKey returns the API key, using a placeholder when in VCR replay mode.
+func resolveGoogleAPIKey(useVCR bool) string {
+	key := os.Getenv("GOOGLE_API_KEY")
+	isReplay := useVCR && os.Getenv("HEISENBERG_EVAL_RECORD") != "1"
+	if key == "" && isReplay {
+		return vcrReplayPlaceholder
+	}
+	return key
+}
+
+// runEvalCase executes a single eval case under the given environment.
+func runEvalCase(t *testing.T, gt groundTruth, model, googleAPIKey, logPath string,
+	useVCR bool, report *evalReport) {
+	cassetteName := strings.ReplaceAll(gt.Repo, "/", "_") + "_" + fmt.Sprint(gt.RunID)
+
+	if skipIfCassetteExists(t, cassetteName) {
+		return
+	}
+
+	var vcrClient *http.Client
+	var llmOpts []llm.ClientOption
+	if useVCR {
+		vcrClient = setupVCR(t, cassetteName)
+		llmOpts = append(llmOpts, llm.WithHTTPClient(vcrClient))
+	}
+
+	provider := buildEvalProvider(t, gt, vcrClient)
+
+	parts := strings.SplitN(gt.Repo, "/", 2)
+	require.Len(t, parts, 2)
+
+	emitter := llm.NewTextEmitter(os.Stderr, false)
+	result, err := analysis.Run(context.Background(), analysis.Params{
+		Owner:        parts[0],
+		Repo:         parts[1],
+		RunID:        gt.RunID,
+		Verbose:      false,
+		Emitter:      emitter,
+		SnapshotHTML: trace.SnapshotHTML,
+		Model:        model,
+		CI:           provider,
+		GoogleAPIKey: googleAPIKey,
+		LLMOptions:   llmOpts,
+	})
+	emitter.Close()
+	if err != nil {
+		t.Logf("ERROR: %v", err)
+		report.addCategoryResult(false)
+		report.addCaseScore(0)
+		return
+	}
+
+	scoreAndLog(t, gt, result, model, logPath, report)
+}
+
+// skipIfCassetteExists skips the test in record mode if a cassette already exists.
+// Returns true when the test was skipped.
+func skipIfCassetteExists(t *testing.T, cassetteName string) bool {
+	if os.Getenv("HEISENBERG_EVAL_RECORD") != "1" {
+		return false
+	}
+	cassettePath := filepath.Join("..", "..", "testdata", "e2e", "cassettes", cassetteName+".json.gz")
+	if _, err := os.Stat(cassettePath); err == nil {
+		t.Skipf("cassette exists, skipping re-record")
+		return true
+	}
+	return false
+}
+
+// logAggregateReport prints end-of-suite metrics.
+func logAggregateReport(t *testing.T, report *evalReport) {
 	t.Logf("\n=== EVALUATION REPORT ===")
 	t.Logf("Total cases: %d", report.totalCases)
 	t.Logf("Mean score: %.1f%% (%0.1f/%d)", report.meanScore()*100, report.scoreSum, report.totalCases)
 	t.Logf("Category accuracy: %.1f%%", report.categoryAccuracy()*100)
 	t.Logf("Confidence (correct): %.0f avg", report.avgConfidenceCorrect())
 	t.Logf("Confidence (wrong):   %.0f avg", report.avgConfidenceWrong())
-
-	// Aggregate threshold assertion — catches regressions
-	assert.GreaterOrEqual(t, report.meanScore(), 0.3,
-		"aggregate score below minimum threshold — possible regression")
 }
 
 // scoreAndLog scores one eval case, logs per-case results, and appends to eval.jsonl.

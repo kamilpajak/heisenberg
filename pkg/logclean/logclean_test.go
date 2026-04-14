@@ -10,6 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const gitHubEndgroupMarker = "##[endgroup]"
+
 func TestExtract_EmptyLog(t *testing.T) {
 	out, stats := Extract("", 30000)
 	assert.Empty(t, out)
@@ -66,7 +68,7 @@ func TestExtract_ErrorAnnotationPreserved(t *testing.T) {
 
 	assert.Contains(t, out, "##[error]Process completed with exit code 1.")
 	assert.NotContains(t, out, "##[group]")
-	assert.NotContains(t, out, "##[endgroup]")
+	assert.NotContains(t, out, gitHubEndgroupMarker)
 	assert.NotContains(t, out, "##[warning]")
 }
 
@@ -77,7 +79,7 @@ func TestExtract_StackTracePreserved(t *testing.T) {
 		"Operating System",
 		"GITHUB_TOKEN Permissions",
 		"##[group]Run actions/checkout@v6",
-		"##[endgroup]",
+		gitHubEndgroupMarker,
 		"Getting action download info",
 		"Download action repository 'actions/checkout@v6' (SHA:abc123)",
 		"Download action repository 'actions/setup-go@v5' (SHA:def456)",
@@ -113,7 +115,7 @@ func TestExtract_FallbackOnOveraggressive(t *testing.T) {
 	var noiseLines []string
 	for i := 0; i < 30; i++ {
 		noiseLines = append(noiseLines, "##[group]Run actions/checkout@v6")
-		noiseLines = append(noiseLines, "##[endgroup]")
+		noiseLines = append(noiseLines, gitHubEndgroupMarker)
 	}
 	input := strings.Join(noiseLines, "\n")
 	require.Greater(t, len(input), 500, "input must exceed 500 bytes for fallback test")

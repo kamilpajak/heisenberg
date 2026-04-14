@@ -6,6 +6,11 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+const (
+	noiseAssertMsg  = "expected noise: %q"
+	signalAssertMsg = "expected signal: %q"
+)
+
 func TestClassifyLine_RunnerMetadata(t *testing.T) {
 	noiseLines := []string{
 		"Current runner version: '2.333.1'",
@@ -22,7 +27,7 @@ func TestClassifyLine_RunnerMetadata(t *testing.T) {
 		"Operating System",
 	}
 	for _, line := range noiseLines {
-		assert.Equal(t, lineNoise, classifyLine(line), "expected noise: %q", line)
+		assert.Equal(t, lineNoise, classifyLine(line), noiseAssertMsg, line)
 	}
 }
 
@@ -42,7 +47,7 @@ func TestClassifyLine_GitCommands(t *testing.T) {
 		"http.https://github.com/.extraheader",
 	}
 	for _, line := range noiseLines {
-		assert.Equal(t, lineNoise, classifyLine(line), "expected noise: %q", line)
+		assert.Equal(t, lineNoise, classifyLine(line), noiseAssertMsg, line)
 	}
 }
 
@@ -54,7 +59,7 @@ func TestClassifyLine_PostJobCleanup(t *testing.T) {
 		"Complete job name: Build",
 	}
 	for _, line := range noiseLines {
-		assert.Equal(t, lineNoise, classifyLine(line), "expected noise: %q", line)
+		assert.Equal(t, lineNoise, classifyLine(line), noiseAssertMsg, line)
 	}
 }
 
@@ -64,7 +69,7 @@ func TestClassifyLine_ActionSetup(t *testing.T) {
 		"Download action repository 'actions/setup-node@v4' (SHA:abc123)",
 	}
 	for _, line := range noiseLines {
-		assert.Equal(t, lineNoise, classifyLine(line), "expected noise: %q", line)
+		assert.Equal(t, lineNoise, classifyLine(line), noiseAssertMsg, line)
 	}
 }
 
@@ -74,7 +79,7 @@ func TestClassifyLine_DeprecationWarnings(t *testing.T) {
 		"(node:12345) [DEP0040] DeprecationWarning: The punycode module is deprecated",
 	}
 	for _, line := range noiseLines {
-		assert.Equal(t, lineNoise, classifyLine(line), "expected noise: %q", line)
+		assert.Equal(t, lineNoise, classifyLine(line), noiseAssertMsg, line)
 	}
 }
 
@@ -85,7 +90,7 @@ func TestClassifyLine_GHACommands(t *testing.T) {
 		"##[warning]Node.js 20 actions are deprecated",
 	}
 	for _, line := range noiseLines {
-		assert.Equal(t, lineNoise, classifyLine(line), "expected noise: %q", line)
+		assert.Equal(t, lineNoise, classifyLine(line), noiseAssertMsg, line)
 	}
 }
 
@@ -97,7 +102,7 @@ func TestClassifyLine_AzureDevOpsNoise(t *testing.T) {
 		"Finishing: Initialize job",
 	}
 	for _, line := range noiseLines {
-		assert.Equal(t, lineNoise, classifyLine(line), "expected noise: %q", line)
+		assert.Equal(t, lineNoise, classifyLine(line), noiseAssertMsg, line)
 	}
 }
 
@@ -111,7 +116,7 @@ func TestClassifyLine_ErrorLines(t *testing.T) {
 		"ERROR: build failed",
 	}
 	for _, line := range signalLines {
-		assert.Equal(t, lineSignal, classifyLine(line), "expected signal: %q", line)
+		assert.Equal(t, lineSignal, classifyLine(line), signalAssertMsg, line)
 	}
 }
 
@@ -125,7 +130,7 @@ func TestClassifyLine_StackTraces(t *testing.T) {
 		"thread 'main' panicked at src/main.rs:42:5",
 	}
 	for _, line := range signalLines {
-		assert.Equal(t, lineSignal, classifyLine(line), "expected signal: %q", line)
+		assert.Equal(t, lineSignal, classifyLine(line), signalAssertMsg, line)
 	}
 }
 
@@ -135,7 +140,7 @@ func TestClassifyLine_BuildFailures(t *testing.T) {
 		"FAILURE: Build failed with an exception.",
 	}
 	for _, line := range signalLines {
-		assert.Equal(t, lineSignal, classifyLine(line), "expected signal: %q", line)
+		assert.Equal(t, lineSignal, classifyLine(line), signalAssertMsg, line)
 	}
 }
 
@@ -146,7 +151,7 @@ func TestClassifyLine_ExitCodes(t *testing.T) {
 		"exit status 1",
 	}
 	for _, line := range signalLines {
-		assert.Equal(t, lineSignal, classifyLine(line), "expected signal: %q", line)
+		assert.Equal(t, lineSignal, classifyLine(line), signalAssertMsg, line)
 	}
 }
 
@@ -168,7 +173,7 @@ func TestClassifyLine_NormalBuildOutput(t *testing.T) {
 		"5 fail",
 	}
 	for _, line := range signalLines {
-		assert.Equal(t, lineSignal, classifyLine(line), "expected signal: %q", line)
+		assert.Equal(t, lineSignal, classifyLine(line), signalAssertMsg, line)
 	}
 }
 
