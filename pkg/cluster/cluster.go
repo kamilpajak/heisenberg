@@ -1,6 +1,9 @@
 package cluster
 
-import "sort"
+import (
+	"context"
+	"sort"
+)
 
 const (
 	// jaccardThreshold is the minimum similarity to merge two singleton clusters.
@@ -11,13 +14,23 @@ const (
 	maxClusters = 10
 )
 
-// ClusterFailures groups failures by error signature.
-// Phase A: exact match on normalized signature.
-// Phase B: Jaccard merge for similar singletons.
-// Returns a single-cluster result as fallback.
+// ClusterFailures groups failures by error signature using the default
+// OSS pipeline: exact match → Jaccard merge.
 func ClusterFailures(failures []FailureInfo) Result {
+	result, _ := ClusterFailuresWithStages(context.Background(), failures, JaccardStage{})
+	return result
+}
+
+// ClusterFailuresWithStages runs the clustering pipeline with a custom
+// ordered list of refinement stages. Stages run after exact-match grouping
+// and before the cluster cap. An error from any stage causes that stage's
+// output to be discarded; prior stage output is preserved.
+//
+// The returned error is always nil today; reserved for future stages that
+// need to surface fatal conditions to callers.
+func ClusterFailuresWithStages(ctx context.Context, failures []FailureInfo, stages ...Stage) (Result, error) {
 	if len(failures) == 0 {
-		return Result{Method: "single"}
+		return Result{Method: "single"}, nil
 	}
 	if len(failures) == 1 {
 		c := buildCluster(0, failures)
@@ -25,40 +38,23 @@ func ClusterFailures(failures []FailureInfo) Result {
 			Clusters:    []Cluster{c},
 			TotalFailed: 1,
 			Method:      "single",
-		}
+		}, nil
 	}
 
-	// Separate failures with/without signatures
-	var withSig, withoutSig []FailureInfo
-	for _, f := range failures {
-		if f.Signature.Category == "" {
-			withoutSig = append(withoutSig, f)
-		} else {
-			withSig = append(withSig, f)
-		}
-	}
-
-	// Phase A: exact match on Normalized string
-	groups := map[string][]FailureInfo{}
-	for _, f := range withSig {
-		key := f.Signature.Normalized
-		groups[key] = append(groups[key], f)
-	}
-
-	// Convert to cluster list
-	var clusters []Cluster
-	for _, members := range groups {
-		clusters = append(clusters, buildCluster(len(clusters), members))
-	}
-
+	withSig, withoutSig := partitionBySignature(failures)
+	clusters := exactMatchClusters(withSig)
 	method := "exact"
 
-	// Phase B: Jaccard merge for singletons
-	merged := jaccardMerge(clusters)
-	if len(merged) < len(clusters) {
-		method = "jaccard"
+	for _, stage := range stages {
+		refined, err := stage.Refine(ctx, clusters)
+		if err != nil {
+			continue
+		}
+		if len(refined) < len(clusters) {
+			method = stage.Name()
+		}
+		clusters = refined
 	}
-	clusters = merged
 
 	// Sort by size descending (largest cluster first)
 	sort.Slice(clusters, func(i, j int) bool {
@@ -73,7 +69,6 @@ func ClusterFailures(failures []FailureInfo) Result {
 		clusters = clusters[:maxClusters]
 	}
 
-	// Re-number clusters
 	for i := range clusters {
 		clusters[i].ID = i + 1
 	}
@@ -83,7 +78,31 @@ func ClusterFailures(failures []FailureInfo) Result {
 		Unclustered: withoutSig,
 		TotalFailed: len(failures),
 		Method:      method,
+	}, nil
+}
+
+func partitionBySignature(failures []FailureInfo) (withSig, withoutSig []FailureInfo) {
+	for _, f := range failures {
+		if f.Signature.Category == "" {
+			withoutSig = append(withoutSig, f)
+		} else {
+			withSig = append(withSig, f)
+		}
 	}
+	return
+}
+
+func exactMatchClusters(withSig []FailureInfo) []Cluster {
+	groups := map[string][]FailureInfo{}
+	for _, f := range withSig {
+		key := f.Signature.Normalized
+		groups[key] = append(groups[key], f)
+	}
+	var clusters []Cluster
+	for _, members := range groups {
+		clusters = append(clusters, buildCluster(len(clusters), members))
+	}
+	return clusters
 }
 
 // buildCluster creates a Cluster from a group of failures.
@@ -114,7 +133,7 @@ func jaccardMerge(clusters []Cluster) []Cluster {
 		return clusters
 	}
 
-	uf := newUnionFind(len(clusters))
+	uf := NewUnionFind(len(clusters))
 	mergeSimilarSingletons(uf, singletons, clusters)
 	return rebuildClusters(uf, clusters)
 }
@@ -129,26 +148,26 @@ func findSingletons(clusters []Cluster) []int {
 	return singletons
 }
 
-func mergeSimilarSingletons(uf *unionFind, singletons []int, clusters []Cluster) {
+func mergeSimilarSingletons(uf *UnionFind, singletons []int, clusters []Cluster) {
 	for i := 0; i < len(singletons); i++ {
 		for j := i + 1; j < len(singletons); j++ {
 			ci, cj := singletons[i], singletons[j]
-			if uf.find(ci) == uf.find(cj) {
+			if uf.Find(ci) == uf.Find(cj) {
 				continue
 			}
 			sim := jaccard(clusters[ci].Signature.Tokens, clusters[cj].Signature.Tokens)
 			if sim >= jaccardThreshold {
-				uf.union(ci, cj)
+				uf.Union(ci, cj)
 			}
 		}
 	}
 }
 
-func rebuildClusters(uf *unionFind, clusters []Cluster) []Cluster {
+func rebuildClusters(uf *UnionFind, clusters []Cluster) []Cluster {
 	grouped := map[int][]FailureInfo{}
 	groupSig := map[int]ErrorSignature{}
 	for i, c := range clusters {
-		root := uf.find(i)
+		root := uf.Find(i)
 		grouped[root] = append(grouped[root], c.Failures...)
 		if _, ok := groupSig[root]; !ok {
 			groupSig[root] = c.Signature
@@ -164,20 +183,21 @@ func rebuildClusters(uf *unionFind, clusters []Cluster) []Cluster {
 	return result
 }
 
-// unionFind is a simple disjoint-set data structure with path compression.
-type unionFind struct {
+// UnionFind is a simple disjoint-set data structure with path compression.
+type UnionFind struct {
 	parent []int
 }
 
-func newUnionFind(n int) *unionFind {
+func NewUnionFind(n int) *UnionFind {
 	parent := make([]int, n)
 	for i := range parent {
 		parent[i] = i
 	}
-	return &unionFind{parent: parent}
+	return &UnionFind{parent: parent}
 }
 
-func (uf *unionFind) find(x int) int {
+// Find returns the root of the set containing x, with path compression.
+func (uf *UnionFind) Find(x int) int {
 	for uf.parent[x] != x {
 		uf.parent[x] = uf.parent[uf.parent[x]]
 		x = uf.parent[x]
@@ -185,8 +205,9 @@ func (uf *unionFind) find(x int) int {
 	return x
 }
 
-func (uf *unionFind) union(a, b int) {
-	ra, rb := uf.find(a), uf.find(b)
+// Union merges the sets containing a and b.
+func (uf *UnionFind) Union(a, b int) {
+	ra, rb := uf.Find(a), uf.Find(b)
 	if ra != rb {
 		uf.parent[rb] = ra
 	}
