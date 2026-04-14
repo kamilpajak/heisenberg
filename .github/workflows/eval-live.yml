@@ -28,14 +28,13 @@ on:
         type: string
         default: 'baseline,weighted,semantic'
 
-permissions:
-  contents: read
-
 jobs:
   eval:
     name: Eval ${{ matrix.variant }}
     runs-on: ubuntu-latest
     timeout-minutes: 120
+    permissions:
+      contents: read
     if: ${{ github.event_name != 'workflow_dispatch' || contains(github.event.inputs.variants, matrix.variant) }}
     strategy:
       fail-fast: false
@@ -126,6 +125,8 @@ jobs:
     needs: eval
     runs-on: ubuntu-latest
     if: always()
+    permissions:
+      contents: read
     steps:
       - name: Download all results
         uses: actions/download-artifact@v4
