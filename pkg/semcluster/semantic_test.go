@@ -167,3 +167,23 @@ func TestSemanticStage_SingleSingleton_Skips(t *testing.T) {
 func TestSemanticStage_NameReportsCorrectly(t *testing.T) {
 	assert.Equal(t, "semantic", SemanticStage{}.Name())
 }
+
+func TestSemanticStage_MaxPairs_CapsComparisons(t *testing.T) {
+	// 4 singletons with identical embeddings → 6 potential pairs, all above
+	// threshold. MaxPairs=1 caps it so only the first pair merges.
+	embedder := &fakeEmbedder{byText: map[string][]float32{}}
+	stage := SemanticStage{Embedder: embedder, Threshold: 0.0, MaxPairs: 1}
+
+	in := []pkgcluster.Cluster{
+		singletonCluster(1, "a", "a"),
+		singletonCluster(2, "b", "b"),
+		singletonCluster(3, "c", "c"),
+		singletonCluster(4, "d", "d"),
+	}
+
+	out, err := stage.Refine(context.Background(), in)
+
+	require.NoError(t, err)
+	// First pair (indices 0,1) merges; indices 2,3 untouched = 3 clusters total.
+	assert.Len(t, out, 3, "MaxPairs=1 must short-circuit after the first comparison")
+}
