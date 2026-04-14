@@ -1,8 +1,15 @@
 package logclean
 
 import (
+	"os"
 	"regexp"
+	"sort"
 	"strings"
+)
+
+const (
+	weightedFlagEnv    = "HEISENBERG_LOG_WEIGHTED"
+	adjacencyBoostSize = 3
 )
 
 // GitHub Actions timestamp prefix: 2024-01-15T10:30:00.1234567Z
@@ -72,13 +79,101 @@ func Extract(logText string, maxBytes int) (string, Stats) {
 
 	stats.OutputLines = len(signalLines)
 
-	// Budget enforcement: if signal exceeds maxBytes, take the tail
+	// Budget enforcement: if signal exceeds maxBytes, select by weight (if enabled)
+	// or take the tail.
 	if len(result) > maxBytes {
-		result = result[len(result)-maxBytes:]
+		if weightedEnabled() {
+			result, stats.OutputLines = selectByWeight(lines, stripped, cleanupStart, maxBytes)
+			stats.DroppedLines = stats.InputLines - stats.OutputLines
+		} else {
+			result = result[len(result)-maxBytes:]
+		}
 	}
 
 	return result, stats
 }
+
+func weightedEnabled() bool {
+	return os.Getenv(weightedFlagEnv) == "1"
+}
+
+// selectByWeight picks the highest-weight lines that fit in maxBytes, preserving
+// chronological order. Returns the joined result and the count of selected lines.
+func selectByWeight(original, stripped []string, cleanupStart, maxBytes int) (string, int) {
+	type indexedLine struct {
+		idx    int
+		weight int
+		size   int
+	}
+
+	candidates := make([]indexedLine, 0, len(stripped))
+	for i, s := range stripped {
+		if cleanupStart >= 0 && i >= cleanupStart {
+			continue
+		}
+		if classifyLine(s) == lineNoise {
+			continue
+		}
+		w := classifyWeight(s)
+		candidates = append(candidates, indexedLine{idx: i, weight: w, size: len(original[i]) + 1})
+	}
+
+	// Adjacency boost: raise weight of up to adjacencyBoostSize lines that
+	// follow a critical line, so stack frames and context stay with their
+	// panic/exception header. Boost to weightError so they compete at the
+	// error tier (not critical — we don't want them to outrank fresh panics).
+	for i, c := range candidates {
+		if c.weight != weightCritical {
+			continue
+		}
+		boostTarget := c.idx + adjacencyBoostSize
+		for j := i + 1; j < len(candidates) && candidates[j].idx <= boostTarget; j++ {
+			if candidates[j].weight < weightError {
+				candidates[j].weight = weightError
+			}
+		}
+	}
+
+	// Sort by weight desc; tiebreak on later index (in CI, the last error is
+	// usually the root cause — earlier errors are often cascading consequences).
+	sort.Slice(candidates, func(i, j int) bool {
+		if candidates[i].weight != candidates[j].weight {
+			return candidates[i].weight > candidates[j].weight
+		}
+		return candidates[i].idx > candidates[j].idx
+	})
+
+	selected := make(map[int]bool, len(candidates))
+	budget := maxBytes
+	for _, c := range candidates {
+		if c.size > budget {
+			continue
+		}
+		selected[c.idx] = true
+		budget -= c.size
+	}
+
+	// Re-emit in chronological order, inserting a truncation marker where
+	// consecutive selected indices have a gap. This prevents the LLM from
+	// inferring causality between non-adjacent log events.
+	var out []string
+	prev := -1
+	kept := 0
+	for i := range original {
+		if !selected[i] {
+			continue
+		}
+		if prev >= 0 && i > prev+1 {
+			out = append(out, truncationMarker)
+		}
+		out = append(out, original[i])
+		prev = i
+		kept++
+	}
+	return strings.Join(out, "\n"), kept
+}
+
+const truncationMarker = "... [truncated] ..."
 
 // findTrailingCleanup finds the start index of the trailing post-job cleanup
 // section. Returns -1 if not found.
