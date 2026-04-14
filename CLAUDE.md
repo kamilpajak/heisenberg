@@ -130,6 +130,29 @@ This is a **public repo**. Private/corporate names must never appear in code, co
 
 When referencing private orgs/projects, use generic placeholders (e.g., `contoso/example-plugin`).
 
+## Eval Framework
+
+**Ground truth**: 171 cases in `testdata/e2e/ground-truth/*.json` (one JSON per case).
+
+**VCR cassettes**: `testdata/e2e/cassettes/*.json.gz` — recorded HTTP interactions (GitHub API + Gemini API). Custom `internal/vcr` package (JSON+gzip), not go-vcr.
+
+**Running eval**:
+```bash
+# Smoke tier (30 tagged cases, ~2.5s)
+HEISENBERG_EVAL_TIER=smoke go test ./pkg/analysis/ -tags eval -run TestEval_Suite -v
+
+# Full eval (171 cases, ~8s)
+go test ./pkg/analysis/ -tags eval -run TestEval_Suite -v
+
+# Record missing cassettes (live API, skips existing)
+HEISENBERG_EVAL_RECORD=1 go test ./pkg/analysis/ -tags eval -run TestEval_Suite -v -timeout 6h
+
+# Live mode (no VCR)
+HEISENBERG_EVAL_VCR=0 go test ./pkg/analysis/ -tags eval -run TestEval_Suite -v
+```
+
+**Current baseline**: 60.9% mean score, 98.2% category accuracy (171 cases, semantic scoring + network→infra merge).
+
 ## Artifact Formats
 
 - **blob-report** - Playwright binary format, requires merging before analysis
