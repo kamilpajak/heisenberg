@@ -35,7 +35,6 @@ jobs:
     timeout-minutes: 120
     permissions:
       contents: read
-    if: ${{ github.event_name != 'workflow_dispatch' || contains(github.event.inputs.variants, matrix.variant) }}
     strategy:
       fail-fast: false
       # Keep parallel=1 to stay under Gemini per-minute quotas.
@@ -50,7 +49,19 @@ jobs:
       HEISENBERG_EVAL_TIER: ${{ github.event.inputs.tier || 'smoke' }}
 
     steps:
+      - name: Skip unselected variant
+        id: gate
+        run: |
+          SELECTED="${{ github.event.inputs.variants }}"
+          if [ -z "$SELECTED" ] || echo ",$SELECTED," | grep -q ",${{ matrix.variant }},"; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "Variant ${{ matrix.variant }} not in '$SELECTED' — skipping."
+          fi
+
       - name: Preflight — require GOOGLE_API_KEY
+        if: steps.gate.outputs.run == 'true'
         run: |
           if [ -z "$GOOGLE_API_KEY" ]; then
             echo "::error::GOOGLE_API_KEY secret not set; skipping live eval."
@@ -58,15 +69,18 @@ jobs:
           fi
 
       - name: Checkout
+        if: steps.gate.outputs.run == 'true'
         uses: actions/checkout@v6
 
       - name: Setup Go
+        if: steps.gate.outputs.run == 'true'
         uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
           cache: true
 
       - name: Set variant flags
+        if: steps.gate.outputs.run == 'true'
         id: flags
         run: |
           case "${{ matrix.variant }}" in
@@ -82,6 +96,7 @@ jobs:
           esac
 
       - name: Run live eval
+        if: steps.gate.outputs.run == 'true'
         id: eval
         run: |
           mkdir -p eval-results
@@ -92,7 +107,7 @@ jobs:
             2>&1 | tee "eval-results/${{ matrix.variant }}.log"
 
       - name: Extract metrics
-        if: always()
+        if: ${{ always() && steps.gate.outputs.run == 'true' }}
         run: |
           LOG="eval-results/${{ matrix.variant }}.log"
           SUMMARY="eval-results/${{ matrix.variant }}.json"
@@ -113,7 +128,7 @@ jobs:
           cat "$SUMMARY"
 
       - name: Upload results
-        if: always()
+        if: ${{ always() && steps.gate.outputs.run == 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: eval-${{ matrix.variant }}
