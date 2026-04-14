@@ -126,11 +126,12 @@ const DefaultModel = "gemini-2.5-pro"
 type ClientOption func(*Client)
 
 // WithHTTPClient sets a custom HTTP client (e.g., for VCR recording/replay).
-// Also disables rate limiting since VCR replays don't hit real APIs.
+// Also disables rate limiting and retry backoff since VCR replays don't hit real APIs.
 func WithHTTPClient(hc *http.Client) ClientOption {
 	return func(c *Client) {
 		c.httpClient = hc
 		c.limiter = rate.NewLimiter(rate.Inf, 1) // no rate limiting for VCR
+		c.retryBaseDelay = time.Millisecond      // near-instant retry for VCR
 	}
 }
 
