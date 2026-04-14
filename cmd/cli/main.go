@@ -21,11 +21,13 @@ import (
 	"github.com/kamilpajak/heisenberg/pkg/analysis"
 	"github.com/kamilpajak/heisenberg/pkg/azure"
 	"github.com/kamilpajak/heisenberg/pkg/ci"
+	"github.com/kamilpajak/heisenberg/pkg/cluster"
 	"github.com/kamilpajak/heisenberg/pkg/config"
 	"github.com/kamilpajak/heisenberg/pkg/github"
 	"github.com/kamilpajak/heisenberg/pkg/llm"
 	"github.com/kamilpajak/heisenberg/pkg/patterns"
 	"github.com/kamilpajak/heisenberg/pkg/saas"
+	"github.com/kamilpajak/heisenberg/pkg/semcluster"
 	"github.com/kamilpajak/heisenberg/pkg/trace"
 	"github.com/spf13/cobra"
 )
@@ -301,6 +303,7 @@ func run(cmd *cobra.Command, args []string) error {
 		CI:             ciProvider,
 		GoogleAPIKey:   cfg.GoogleAPIKey,
 		PatternMatcher: matcher,
+		ClusterStages:  buildClusterStages(cfg.GoogleAPIKey),
 	})
 	if err != nil {
 		textEmitter.MarkFailed()
@@ -960,4 +963,27 @@ func serve(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	return nil
+}
+
+// buildClusterStages returns optional post-Jaccard refinement stages.
+// SemanticStage is opt-in via HEISENBERG_SEMANTIC_CLUSTERING=1 and requires
+// a Gemini API key. Defaults to no extra stages.
+func buildClusterStages(apiKey string) []cluster.Stage {
+	if os.Getenv("HEISENBERG_SEMANTIC_CLUSTERING") != "1" {
+		return nil
+	}
+	if apiKey == "" {
+		return nil
+	}
+	threshold := 0.90
+	if v := os.Getenv("HEISENBERG_SEMANTIC_CLUSTER_THRESHOLD"); v != "" {
+		if parsed, err := strconv.ParseFloat(v, 64); err == nil {
+			threshold = parsed
+		}
+	}
+	return []cluster.Stage{semcluster.SemanticStage{
+		Embedder:  semcluster.NewGeminiEmbedder(apiKey),
+		Threshold: threshold,
+		MaxPairs:  50,
+	}}
 }

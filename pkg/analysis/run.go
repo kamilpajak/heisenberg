@@ -27,6 +27,7 @@ type Params struct {
 	GoogleAPIKey   string                  // Google API key override (empty = env var)
 	PatternMatcher patterns.PatternMatcher // nil = no pattern matching
 	LLMOptions     []llm.ClientOption      // Optional LLM client settings (e.g., VCR HTTP client)
+	ClusterStages  []cluster.Stage         // Optional refinement stages after Jaccard (e.g., semantic)
 }
 
 // Run executes the full analysis pipeline: resolve run ID, fetch metadata, and
@@ -154,8 +155,10 @@ func runClustered(ctx context.Context, p Params,
 	// Fetch logs for all failed jobs in parallel
 	failures := fetchFailureLogs(ctx, p, failedJobs)
 
-	// Cluster by error signature
-	cr := cluster.ClusterFailures(failures)
+	// Cluster by error signature. JaccardStage always runs; extra stages
+	// (e.g., SemanticStage from ee/cluster) may be injected via Params.
+	stages := append([]cluster.Stage{cluster.JaccardStage{}}, p.ClusterStages...)
+	cr, _ := cluster.ClusterFailuresWithStages(ctx, failures, stages...)
 
 	// If clustering produced 1 cluster or failed, fall back to single path
 	if len(cr.Clusters) <= 1 {
