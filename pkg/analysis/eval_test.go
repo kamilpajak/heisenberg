@@ -278,8 +278,8 @@ func TestFailureTypeSimilarity(t *testing.T) {
 		wantMax float64
 	}{
 		{"exact match", "assertion", "assertion", 1.0, 1.0},
-		{"network≈infra", "network", "infra", 0.4, 0.7},
-		{"infra≈network", "infra", "network", 0.4, 0.7},
+		{"network≡infra (merged)", "network", "infra", 1.0, 1.0},
+		{"infra≡network (merged)", "infra", "network", 1.0, 1.0},
 		{"timeout≈infra", "timeout", "infra", 0.2, 0.4},
 		{"network≈timeout", "network", "timeout", 0.2, 0.4},
 		{"assertion vs network", "assertion", "network", 0.0, 0.1},
@@ -339,6 +339,41 @@ func TestScoreCase_UnrelatedNoCredit(t *testing.T) {
 	// assertion→timeout = 0 similarity, production→test = 0.3 similarity
 	// 0.3 * 0.0 + 0.5 * 0.3 = 0.15 / 0.8 ≈ 0.1875
 	assert.Less(t, score, 0.2, "assertion→timeout should get minimal credit")
+}
+
+func TestNormalizeFailureType(t *testing.T) {
+	tests := []struct {
+		input, want string
+	}{
+		{"network", "infra"},
+		{"infra", "infra"},
+		{"assertion", "assertion"},
+		{"timeout", "timeout"},
+		{"flake", "flake"},
+		{"unknown", "unknown"},
+		{"", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			assert.Equal(t, tt.want, normalizeFailureType(tt.input))
+		})
+	}
+}
+
+func TestScoreCase_NetworkInfraMerge(t *testing.T) {
+	score := scoreCase(
+		expectedAnalysis{FailureType: "network", BugLocation: "infrastructure"},
+		llm.RootCauseAnalysis{FailureType: "infra", BugLocation: llm.BugLocationInfrastructure},
+	)
+	assert.InDelta(t, 1.0, score, 0.01, "network≡infra should be full match")
+}
+
+func TestScoreCase_NetworkNetworkStillMatches(t *testing.T) {
+	score := scoreCase(
+		expectedAnalysis{FailureType: "network", BugLocation: "infrastructure"},
+		llm.RootCauseAnalysis{FailureType: "network", BugLocation: llm.BugLocationInfrastructure},
+	)
+	assert.InDelta(t, 1.0, score, 0.01)
 }
 
 func TestScoreResult_PartialMatch(t *testing.T) {
@@ -419,12 +454,24 @@ const (
 	weightFilePath    = 0.2
 )
 
+// normalizeFailureType maps equivalent failure types to a canonical form.
+// "network" and "infra" are merged — the model rarely distinguishes them.
+func normalizeFailureType(ft string) string {
+	if ft == "network" {
+		return "infra"
+	}
+	return ft
+}
+
 // failureTypeSimilarity returns a similarity score (0.0-1.0) between two failure types.
-// Related categories (e.g., network≈infra) receive partial credit.
+// Categories are normalized before comparison (network→infra merge).
+// Remaining related pairs receive partial credit.
 func failureTypeSimilarity(a, b string) float64 {
 	if a == "" || b == "" {
 		return 0
 	}
+	a = normalizeFailureType(a)
+	b = normalizeFailureType(b)
 	if a == b {
 		return 1.0
 	}
