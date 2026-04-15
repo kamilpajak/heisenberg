@@ -149,6 +149,27 @@ func TestRoundHours(t *testing.T) {
 	}
 }
 
+func TestIsQuotaExhausted(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{"nil", nil, false},
+		{"plain error", errors.New("something"), false},
+		{"APIError 429", &APIError{StatusCode: 429}, true},
+		{"APIError 429 wrapped", fmt.Errorf("wrap: %w", &APIError{StatusCode: 429}), true},
+		{"APIError 500", &APIError{StatusCode: 500}, false},
+		{"APIError 503", &APIError{StatusCode: 503}, false},
+		{"APIError 401", &APIError{StatusCode: 401}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, IsQuotaExhausted(tt.err))
+		})
+	}
+}
+
 func TestAPIError_ErrorsAs(t *testing.T) {
 	apiErr := parseAPIError(429, status429, []byte(`{}`))
 	wrapped := fmt.Errorf("step 4: %w", apiErr)

@@ -32,6 +32,12 @@ const (
 	// vcrReplayPlaceholder is used as a stand-in credential value when tests run
 	// in VCR replay mode — cassettes provide responses, so real tokens aren't needed.
 	vcrReplayPlaceholder = "vcr-replay"
+
+	// maxConsecutiveQuotaStrikes stops the eval loop after this many consecutive
+	// Gemini 429 errors. Daily quota exhaustion (#68 root-cause) can burn
+	// thousands of retries otherwise; circuit-breaking preserves quota for
+	// the next scheduled run instead.
+	maxConsecutiveQuotaStrikes = 3
 )
 
 // groundTruth defines expected results for an eval test case.
@@ -678,10 +684,23 @@ func TestEval_Suite(t *testing.T) {
 	useVCR := os.Getenv("HEISENBERG_EVAL_RECORD") == "1" || os.Getenv("HEISENBERG_EVAL_VCR") != "0"
 	googleAPIKey := resolveGoogleAPIKey(useVCR)
 
+	quotaStrikes := 0
 	for _, gt := range cases {
 		gt := gt
+		if quotaStrikes >= maxConsecutiveQuotaStrikes {
+			t.Logf("CIRCUIT OPEN: skipping %s/%d after %d consecutive quota errors",
+				gt.Repo, gt.RunID, quotaStrikes)
+			report.addCategoryResult(false)
+			report.addCaseScore(0)
+			continue
+		}
 		t.Run(fmt.Sprintf("%s/%d", gt.Repo, gt.RunID), func(t *testing.T) {
-			runEvalCase(t, gt, model, googleAPIKey, logPath, useVCR, &report)
+			err := runEvalCase(t, gt, model, googleAPIKey, logPath, useVCR, &report)
+			if llm.IsQuotaExhausted(err) {
+				quotaStrikes++
+			} else {
+				quotaStrikes = 0
+			}
 		})
 	}
 
@@ -728,12 +747,15 @@ func resolveGoogleAPIKey(useVCR bool) string {
 }
 
 // runEvalCase executes a single eval case under the given environment.
+// Returns the error from analysis.Run so the caller can react to quota
+// exhaustion via a circuit breaker; the returned error is nil when the
+// case was scored (or skipped because a cassette exists).
 func runEvalCase(t *testing.T, gt groundTruth, model, googleAPIKey, logPath string,
-	useVCR bool, report *evalReport) {
+	useVCR bool, report *evalReport) error {
 	cassetteName := strings.ReplaceAll(gt.Repo, "/", "_") + "_" + fmt.Sprint(gt.RunID)
 
 	if skipIfCassetteExists(t, cassetteName) {
-		return
+		return nil
 	}
 
 	var vcrClient *http.Client
@@ -766,10 +788,11 @@ func runEvalCase(t *testing.T, gt groundTruth, model, googleAPIKey, logPath stri
 		t.Logf("ERROR: %v", err)
 		report.addCategoryResult(false)
 		report.addCaseScore(0)
-		return
+		return err
 	}
 
 	scoreAndLog(t, gt, result, model, logPath, report)
+	return nil
 }
 
 // skipIfCassetteExists skips the test in record mode if a cassette already exists.

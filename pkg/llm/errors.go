@@ -2,6 +2,7 @@ package llm
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"regexp"
@@ -82,6 +83,21 @@ func (e *APIError) hint429WithRetries(prefix string) string {
 	}
 	parts = append(parts, "Check usage at ai.google.dev")
 	return strings.Join(parts, " ")
+}
+
+// IsQuotaExhausted reports whether err is (or wraps) an APIError with HTTP 429.
+// 429 covers both per-minute rate limits and exhausted daily quotas; callers
+// that want to stop firing more requests after repeated quota hits should use
+// this as their circuit-breaker signal.
+func IsQuotaExhausted(err error) bool {
+	if err == nil {
+		return false
+	}
+	var apiErr *APIError
+	if !errors.As(err, &apiErr) {
+		return false
+	}
+	return apiErr.StatusCode == 429
 }
 
 // ConfigError represents a configuration problem (e.g. missing API key).
